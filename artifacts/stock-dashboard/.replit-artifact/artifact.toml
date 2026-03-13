@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "토스증권 주식 대시보드"
+version = "1.0.0"
+id = "artifacts/stock-dashboard"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+localPort = 19936
+name = "expo"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/stock-dashboard run dev"
+
+[services.env]
+PORT = "19936"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/stock-dashboard", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/stock-dashboard", "run", "serve"]
