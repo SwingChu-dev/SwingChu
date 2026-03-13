@@ -113,6 +113,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="scalping"
+        options={{
+          title: "단타레이더",
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView
+                name={focused ? "bolt.fill" : "bolt"}
+                tintColor={color}
+                size={24}
+              />
+            ) : (
+              <Ionicons name={focused ? "flash" : "flash-outline"} size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="analysis"
         options={{
           title: "분석",
