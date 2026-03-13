@@ -68,7 +68,7 @@ export default function StockCard({
       <Animated.View
         style={[
           styles.deleteWrap,
-          { opacity: deleteOpacity },
+          { opacity: deleteOpacity, pointerEvents: editMode ? "auto" : "none" },
         ]}
       >
         <TouchableOpacity
