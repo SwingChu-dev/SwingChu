@@ -15,6 +15,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useColorScheme } from "react-native";
 import Colors from "@/constants/colors";
 import { WatchlistProvider } from "@/context/WatchlistContext";
+import { SignalProvider } from "@/context/SignalContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
@@ -78,7 +79,9 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <WatchlistProvider>
-                <RootLayoutNav />
+                <SignalProvider>
+                  <RootLayoutNav />
+                </SignalProvider>
               </WatchlistProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

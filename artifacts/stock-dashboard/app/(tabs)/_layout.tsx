@@ -1,40 +1,51 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { Ionicons } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
-import { Feather, Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useSignals } from "@/context/SignalContext";
+import { Text } from "react-native";
 
-function NativeTabLayout() {
+function TabBadge({ count }: { count: number }) {
+  if (count === 0) return null;
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "chart.line.uptrend.xyaxis", selected: "chart.line.uptrend.xyaxis" }} />
-        <Label>관심종목</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="analysis">
-        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-        <Label>분석</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="strategy">
-        <Icon sf={{ default: "shield.checkerboard", selected: "shield.fill" }} />
-        <Label>전략</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <View style={badge.wrap}>
+      <Text style={badge.text}>{count > 9 ? "9+" : count}</Text>
+    </View>
   );
 }
 
-function ClassicTabLayout() {
+const badge = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#F04452",
+    borderRadius: 8,
+    minWidth: 15,
+    height: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  text: {
+    color: "#fff",
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+  },
+});
+
+export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const c = isDark ? Colors.dark : Colors.light;
   const safeAreaInsets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const { newCount } = useSignals();
 
   return (
     <Tabs
@@ -44,9 +55,9 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : isDark ? "#0D1117" : "#fff",
-          borderTopWidth: isWeb ? 1 : 0,
-          borderTopColor: isDark ? "#1E2D4A" : "#E2E8F0",
+          backgroundColor: isIOS ? "transparent" : isDark ? "#1C1C1E" : "#FFFFFF",
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
           elevation: 0,
           paddingBottom: safeAreaInsets.bottom,
           ...(isWeb ? { height: 84 } : {}),
@@ -54,41 +65,66 @@ function ClassicTabLayout() {
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
+              intensity={80}
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: isDark ? "#0D1117" : "#fff" },
-              ]}
-            />
           ) : null,
+        tabBarLabelStyle: {
+          fontFamily: "Inter_500Medium",
+          fontSize: 10,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "관심종목",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="chart.line.uptrend.xyaxis" tintColor={color} size={24} />
+              <SymbolView
+                name={focused ? "star.fill" : "star"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Ionicons name="trending-up" size={22} color={color} />
+              <Ionicons name={focused ? "star" : "star-outline"} size={22} color={color} />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="signals"
+        options={{
+          title: "세력감지",
+          tabBarIcon: ({ color, focused }) => (
+            <View>
+              {isIOS ? (
+                <SymbolView
+                  name={focused ? "eye.fill" : "eye"}
+                  tintColor={color}
+                  size={24}
+                />
+              ) : (
+                <Ionicons name={focused ? "eye" : "eye-outline"} size={22} color={color} />
+              )}
+              <TabBadge count={newCount} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
         name="analysis"
         options={{
           title: "분석",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="chart.bar.fill" tintColor={color} size={24} />
+              <SymbolView
+                name={focused ? "chart.bar.fill" : "chart.bar"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Ionicons name="bar-chart" size={22} color={color} />
+              <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={22} color={color} />
             ),
         }}
       />
@@ -96,23 +132,18 @@ function ClassicTabLayout() {
         name="strategy"
         options={{
           title: "전략",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="shield.fill" tintColor={color} size={24} />
+              <SymbolView
+                name={focused ? "shield.fill" : "shield"}
+                tintColor={color}
+                size={24}
+              />
             ) : (
-              <Ionicons name="shield-checkmark" size={22} color={color} />
+              <Ionicons name={focused ? "shield" : "shield-outline"} size={22} color={color} />
             ),
         }}
       />
     </Tabs>
   );
 }
-
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
-}
-
-const styles = StyleSheet.create({});
