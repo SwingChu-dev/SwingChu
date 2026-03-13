@@ -46,7 +46,9 @@ export default function StockCard({
   const deleteOpacity = slideAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
   const contentShift = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 42] });
 
-  const latestForecast = stock.forecasts[stock.forecasts.length - 1];
+  const latestForecast =
+    stock.forecasts.find((f) => f.period === "12개월 후" || f.period === "360일") ??
+    stock.forecasts[Math.min(5, stock.forecasts.length - 1)];
   const forecastUp = latestForecast.changePercent >= 0;
 
   const boxPos = stock.boxRange.currentPosition;

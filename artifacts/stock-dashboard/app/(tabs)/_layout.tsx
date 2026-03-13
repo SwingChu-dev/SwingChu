@@ -93,6 +93,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="explore"
+        options={{
+          title: "탐색",
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView
+                name={focused ? "magnifyingglass.circle.fill" : "magnifyingglass.circle"}
+                tintColor={color}
+                size={24}
+              />
+            ) : (
+              <Ionicons name={focused ? "search" : "search-outline"} size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="signals"
         options={{
           title: "세력감지",

@@ -106,6 +106,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 305000, changePercent: 14.1 },
       { period: "6개월 후", price: 330000, changePercent: 23.4 },
       { period: "12개월 후", price: 380000, changePercent: 42.1 },
+      { period: "1800일",   price: 960000, changePercent: 258.4 },
     ],
     financials: {
       per: 35.2,
@@ -164,6 +165,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 490000, changePercent: 10.1 },
       { period: "6개월 후", price: 520000, changePercent: 16.8 },
       { period: "12개월 후", price: 580000, changePercent: 30.3 },
+      { period: "1800일",   price: 1160000, changePercent: 160.6 },
     ],
     financials: {
       per: 21.5,
@@ -222,6 +224,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 260000, changePercent: 11.9 },
       { period: "6개월 후", price: 278000, changePercent: 19.6 },
       { period: "12개월 후", price: 310000, changePercent: 33.4 },
+      { period: "1800일",   price: 580000, changePercent: 149.8 },
     ],
     financials: {
       per: 28.3,
@@ -280,6 +283,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 62000, changePercent: 26.8 },
       { period: "6개월 후", price: 72000, changePercent: 47.3 },
       { period: "12개월 후", price: 90000, changePercent: 84.1 },
+      { period: "1800일",   price: 290000, changePercent: 493.0 },
     ],
     financials: {
       per: -18.5,
@@ -338,6 +342,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 1080000, changePercent: 11.9 },
       { period: "6개월 후", price: 1150000, changePercent: 19.1 },
       { period: "12개월 후", price: 1280000, changePercent: 32.6 },
+      { period: "1800일",   price: 2400000, changePercent: 148.7 },
     ],
     financials: {
       per: 22.1,
@@ -396,6 +401,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 2900, changePercent: 37.1 },
       { period: "6개월 후", price: 3300, changePercent: 55.9 },
       { period: "12개월 후", price: 4000, changePercent: 89.0 },
+      { period: "1800일",   price: 12500, changePercent: 490.0 },
     ],
     financials: {
       per: -5.2,
@@ -454,6 +460,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 208000, changePercent: 13.0 },
       { period: "6개월 후", price: 220000, changePercent: 19.6 },
       { period: "12개월 후", price: 250000, changePercent: 35.9 },
+      { period: "1800일",   price: 490000, changePercent: 165.9 },
     ],
     financials: {
       per: 12.8,
@@ -512,6 +519,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 1020000, changePercent: 11.5 },
       { period: "6개월 후", price: 1100000, changePercent: 20.2 },
       { period: "12개월 후", price: 1250000, changePercent: 36.6 },
+      { period: "1800일",   price: 2800000, changePercent: 206.0 },
     ],
     financials: {
       per: 14.2,
@@ -570,6 +578,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 1650000, changePercent: 11.9 },
       { period: "6개월 후", price: 1800000, changePercent: 22.1 },
       { period: "12개월 후", price: 2100000, changePercent: 42.5 },
+      { period: "1800일",   price: 4200000, changePercent: 184.6 },
     ],
     financials: {
       per: 38.5,
@@ -628,6 +637,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 560000, changePercent: 7.9 },
       { period: "6개월 후", price: 590000, changePercent: 13.7 },
       { period: "12개월 후", price: 650000, changePercent: 25.2 },
+      { period: "1800일",   price: 1200000, changePercent: 131.1 },
     ],
     financials: {
       per: 6.8,
@@ -686,6 +696,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 125000, changePercent: 17.8 },
       { period: "6개월 후", price: 138000, changePercent: 30.1 },
       { period: "12개월 후", price: 165000, changePercent: 55.5 },
+      { period: "1800일",   price: 430000, changePercent: 305.9 },
     ],
     financials: {
       per: 42.3,
@@ -744,6 +755,7 @@ export const STOCKS: StockInfo[] = [
       { period: "3개월 후", price: 30000, changePercent: 22.7 },
       { period: "6개월 후", price: 33000, changePercent: 35.0 },
       { period: "12개월 후", price: 40000, changePercent: 63.6 },
+      { period: "1800일",   price: 105000, changePercent: 329.4 },
     ],
     financials: {
       per: 25.3,

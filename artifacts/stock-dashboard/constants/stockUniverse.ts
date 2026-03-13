@@ -1,0 +1,178 @@
+export type UniverseMarket = "NASDAQ" | "KOSPI" | "KOSDAQ";
+
+export interface UniverseStock {
+  id: string;
+  name: string;
+  nameEn: string;
+  ticker: string;
+  market: UniverseMarket;
+  sector: string;
+  currentPrice: number;
+  marketCap: string;
+}
+
+export const PREDEFINED_IDS = new Set([
+  "nvda","googl","orcl","ionq","sandisk","eon",
+  "samsung","skhynix","hanwha","hyundai","doosan","woritech",
+]);
+
+export const UNIVERSE_STOCKS: UniverseStock[] = [
+  // ─── NASDAQ ───────────────────────────────────────────────
+  { id:"aapl",   name:"애플",           nameEn:"Apple",           ticker:"AAPL",   market:"NASDAQ", sector:"IT/소비자",    currentPrice:283050,  marketCap:"2,900조" },
+  { id:"msft",   name:"마이크로소프트",  nameEn:"Microsoft",       ticker:"MSFT",   market:"NASDAQ", sector:"클라우드/AI",  currentPrice:594500,  marketCap:"4,400조" },
+  { id:"amzn",   name:"아마존",          nameEn:"Amazon",          ticker:"AMZN",   market:"NASDAQ", sector:"이커머스/클라우드", currentPrice:268250, marketCap:"2,800조" },
+  { id:"meta",   name:"메타",            nameEn:"Meta",            ticker:"META",   market:"NASDAQ", sector:"소셜미디어/AI", currentPrice:754000, marketCap:"1,900조" },
+  { id:"tsla",   name:"테슬라",          nameEn:"Tesla",           ticker:"TSLA",   market:"NASDAQ", sector:"전기차/AI",    currentPrice:253750,  marketCap:"800조" },
+  { id:"amd",    name:"AMD",             nameEn:"AMD",             ticker:"AMD",    market:"NASDAQ", sector:"반도체",       currentPrice:174000,  marketCap:"280조" },
+  { id:"intc",   name:"인텔",            nameEn:"Intel",           ticker:"INTC",   market:"NASDAQ", sector:"반도체",       currentPrice:31900,   marketCap:"130조" },
+  { id:"qcom",   name:"퀄컴",            nameEn:"Qualcomm",        ticker:"QCOM",   market:"NASDAQ", sector:"반도체/모바일", currentPrice:224750, marketCap:"380조" },
+  { id:"avgo",   name:"브로드컴",        nameEn:"Broadcom",        ticker:"AVGO",   market:"NASDAQ", sector:"반도체/네트워크", currentPrice:268250, marketCap:"1,250조" },
+  { id:"mu",     name:"마이크론",        nameEn:"Micron",          ticker:"MU",     market:"NASDAQ", sector:"메모리반도체",  currentPrice:130500,  marketCap:"145조" },
+  { id:"arm",    name:"ARM홀딩스",       nameEn:"ARM Holdings",    ticker:"ARM",    market:"NASDAQ", sector:"반도체설계",    currentPrice:188500,  marketCap:"195조" },
+  { id:"pltr",   name:"팔란티어",        nameEn:"Palantir",        ticker:"PLTR",   market:"NASDAQ", sector:"AI/빅데이터",  currentPrice:40600,   marketCap:"87조" },
+  { id:"smci",   name:"슈퍼마이크로",    nameEn:"Super Micro",     ticker:"SMCI",   market:"NASDAQ", sector:"서버/AI인프라", currentPrice:50750,  marketCap:"30조" },
+  { id:"nflx",   name:"넷플릭스",        nameEn:"Netflix",         ticker:"NFLX",   market:"NASDAQ", sector:"OTT/콘텐츠",  currentPrice:1044000, marketCap:"445조" },
+  { id:"crm",    name:"세일즈포스",      nameEn:"Salesforce",      ticker:"CRM",    market:"NASDAQ", sector:"SaaS/CRM",    currentPrice:420500,  marketCap:"400조" },
+  { id:"adbe",   name:"어도비",          nameEn:"Adobe",           ticker:"ADBE",   market:"NASDAQ", sector:"소프트웨어/AI", currentPrice:551000, marketCap:"240조" },
+  { id:"pypl",   name:"페이팔",          nameEn:"PayPal",          ticker:"PYPL",   market:"NASDAQ", sector:"핀테크",       currentPrice:94250,   marketCap:"65조" },
+  { id:"uber",   name:"우버",            nameEn:"Uber",            ticker:"UBER",   market:"NASDAQ", sector:"모빌리티/배달", currentPrice:104400, marketCap:"220조" },
+  { id:"spot",   name:"스포티파이",      nameEn:"Spotify",         ticker:"SPOT",   market:"NASDAQ", sector:"음악스트리밍",  currentPrice:551000,  marketCap:"107조" },
+  { id:"coin",   name:"코인베이스",      nameEn:"Coinbase",        ticker:"COIN",   market:"NASDAQ", sector:"암호화폐/핀테크", currentPrice:304500, marketCap:"72조" },
+  { id:"snow",   name:"스노우플레이크",  nameEn:"Snowflake",       ticker:"SNOW",   market:"NASDAQ", sector:"클라우드/데이터", currentPrice:210250, marketCap:"71조" },
+  { id:"crwd",   name:"크라우드스트라이크", nameEn:"CrowdStrike",  ticker:"CRWD",   market:"NASDAQ", sector:"사이버보안",    currentPrice:493000,  marketCap:"119조" },
+  { id:"zm",     name:"줌",              nameEn:"Zoom",            ticker:"ZM",     market:"NASDAQ", sector:"화상회의",      currentPrice:94250,   marketCap:"29조" },
+  { id:"shop",   name:"쇼피파이",        nameEn:"Shopify",         ticker:"SHOP",   market:"NASDAQ", sector:"이커머스플랫폼", currentPrice:137750, marketCap:"117조" },
+  { id:"mrvl",   name:"마벨테크놀로지",  nameEn:"Marvell",         ticker:"MRVL",   market:"NASDAQ", sector:"반도체/AI",    currentPrice:101500,  marketCap:"86조" },
+  { id:"txn",    name:"텍사스인스트루먼트", nameEn:"Texas Instruments", ticker:"TXN", market:"NASDAQ", sector:"반도체",     currentPrice:253750,  marketCap:"230조" },
+  { id:"amat",   name:"어플라이드머티리얼", nameEn:"Applied Materials", ticker:"AMAT", market:"NASDAQ", sector:"반도체장비", currentPrice:239250, marketCap:"198조" },
+  { id:"lrcx",   name:"램리서치",        nameEn:"Lam Research",    ticker:"LRCX",   market:"NASDAQ", sector:"반도체장비",    currentPrice:1087500, marketCap:"145조" },
+  { id:"klac",   name:"KLA코퍼레이션",   nameEn:"KLA Corp",        ticker:"KLAC",   market:"NASDAQ", sector:"반도체장비",    currentPrice:1015000, marketCap:"136조" },
+  { id:"asml",   name:"ASML",            nameEn:"ASML",            ticker:"ASML",   market:"NASDAQ", sector:"반도체장비/EUV", currentPrice:1131000, marketCap:"448조" },
+  { id:"tsm",    name:"TSMC",            nameEn:"TSMC",            ticker:"TSM",    market:"NASDAQ", sector:"파운드리",      currentPrice:268250,  marketCap:"1,390조" },
+  { id:"panw",   name:"팔로알토네트웍스", nameEn:"Palo Alto Networks", ticker:"PANW", market:"NASDAQ", sector:"사이버보안",  currentPrice:253750,  marketCap:"258조" },
+  { id:"ftnt",   name:"포티넷",          nameEn:"Fortinet",        ticker:"FTNT",   market:"NASDAQ", sector:"사이버보안",    currentPrice:101500,  marketCap:"77조" },
+  { id:"csco",   name:"시스코",          nameEn:"Cisco",           ticker:"CSCO",   market:"NASDAQ", sector:"네트워크",      currentPrice:84100,   marketCap:"336조" },
+  { id:"adp",    name:"ADP",             nameEn:"ADP",             ticker:"ADP",    market:"NASDAQ", sector:"HR소프트웨어",  currentPrice:319000,  marketCap:"128조" },
+  { id:"lulu",   name:"룰루레몬",        nameEn:"Lululemon",       ticker:"LULU",   market:"NASDAQ", sector:"스포츠의류",    currentPrice:391500,  marketCap:"46조" },
+  { id:"abnb",   name:"에어비앤비",      nameEn:"Airbnb",          ticker:"ABNB",   market:"NASDAQ", sector:"여행/공유경제", currentPrice:188500,  marketCap:"119조" },
+  { id:"ddog",   name:"데이터독",        nameEn:"Datadog",         ticker:"DDOG",   market:"NASDAQ", sector:"클라우드모니터링", currentPrice:188500, marketCap:"60조" },
+  { id:"team",   name:"아틀라시안",      nameEn:"Atlassian",       ticker:"TEAM",   market:"NASDAQ", sector:"협업소프트웨어", currentPrice:232250, marketCap:"59조" },
+  { id:"mdb",    name:"몽고DB",          nameEn:"MongoDB",         ticker:"MDB",    market:"NASDAQ", sector:"데이터베이스",  currentPrice:348000,  marketCap:"26조" },
+  { id:"rblx",   name:"로블록스",        nameEn:"Roblox",          ticker:"RBLX",   market:"NASDAQ", sector:"메타버스/게임", currentPrice:52200,  marketCap:"30조" },
+  { id:"roku",   name:"로쿠",            nameEn:"Roku",            ticker:"ROKU",   market:"NASDAQ", sector:"스트리밍TV",    currentPrice:86250,   marketCap:"12조" },
+  { id:"docu",   name:"도큐사인",        nameEn:"DocuSign",        ticker:"DOCU",   market:"NASDAQ", sector:"전자서명",      currentPrice:87000,   marketCap:"17조" },
+  { id:"okta",   name:"옥타",            nameEn:"Okta",            ticker:"OKTA",   market:"NASDAQ", sector:"사이버보안/ID", currentPrice:101500, marketCap:"16조" },
+  { id:"twlo",   name:"트윌리오",        nameEn:"Twilio",          ticker:"TWLO",   market:"NASDAQ", sector:"클라우드통신",  currentPrice:75375,   marketCap:"13조" },
+  { id:"wday",   name:"워크데이",        nameEn:"Workday",         ticker:"WDAY",   market:"NASDAQ", sector:"HR클라우드",    currentPrice:261000,  marketCap:"54조" },
+  { id:"hubs",   name:"허브스팟",        nameEn:"HubSpot",         ticker:"HUBS",   market:"NASDAQ", sector:"마케팅SaaS",    currentPrice:739500,  marketCap:"36조" },
+  { id:"bill",   name:"빌닷컴",          nameEn:"Bill.com",        ticker:"BILL",   market:"NASDAQ", sector:"중소기업핀테크", currentPrice:84100,  marketCap:"8조" },
+  { id:"zs",     name:"지스케일러",      nameEn:"Zscaler",         ticker:"ZS",     market:"NASDAQ", sector:"클라우드보안",  currentPrice:232250,  marketCap:"34조" },
+  { id:"net",    name:"클라우드플레어",  nameEn:"Cloudflare",      ticker:"NET",    market:"NASDAQ", sector:"네트워크보안",  currentPrice:145000,  marketCap:"46조" },
+  { id:"spr",    name:"스피릿에어로시스템", nameEn:"Spirit AeroSystems", ticker:"SPR", market:"NASDAQ", sector:"항공우주부품", currentPrice:42050, marketCap:"3조" },
+  { id:"ttd",    name:"더트레이드데스크", nameEn:"The Trade Desk",  ticker:"TTD",    market:"NASDAQ", sector:"디지털광고",    currentPrice:145000,  marketCap:"35조" },
+  { id:"upst",   name:"업스타트",        nameEn:"Upstart",         ticker:"UPST",   market:"NASDAQ", sector:"AI대출/핀테크", currentPrice:72500,  marketCap:"6조" },
+  { id:"afrm",   name:"어펌",            nameEn:"Affirm",          ticker:"AFRM",   market:"NASDAQ", sector:"BNPL/핀테크",   currentPrice:58000,   marketCap:"18조" },
+  { id:"sofi",   name:"소파이",          nameEn:"SoFi",            ticker:"SOFI",   market:"NASDAQ", sector:"디지털뱅크",    currentPrice:13050,   marketCap:"14조" },
+  { id:"lcid",   name:"루시드그룹",      nameEn:"Lucid Group",     ticker:"LCID",   market:"NASDAQ", sector:"전기차",        currentPrice:3045,    marketCap:"7조" },
+  { id:"rivn",   name:"리비안",          nameEn:"Rivian",          ticker:"RIVN",   market:"NASDAQ", sector:"전기차",        currentPrice:14500,   marketCap:"15조" },
+  { id:"nio",    name:"니오",            nameEn:"NIO",             ticker:"NIO",    market:"NASDAQ", sector:"전기차/중국",   currentPrice:5075,    marketCap:"11조" },
+  { id:"bidu",   name:"바이두",          nameEn:"Baidu",           ticker:"BIDU",   market:"NASDAQ", sector:"AI/검색/중국",  currentPrice:101500,  marketCap:"36조" },
+  { id:"jd",     name:"징둥닷컴",        nameEn:"JD.com",          ticker:"JD",     market:"NASDAQ", sector:"이커머스/중국", currentPrice:43500,  marketCap:"67조" },
+  { id:"pdd",    name:"테무(PDD)",       nameEn:"PDD Holdings",    ticker:"PDD",    market:"NASDAQ", sector:"이커머스/중국", currentPrice:181250, marketCap:"250조" },
+  { id:"baba",   name:"알리바바",        nameEn:"Alibaba",         ticker:"BABA",   market:"NASDAQ", sector:"이커머스/클라우드", currentPrice:130500, marketCap:"230조" },
+  { id:"grab",   name:"그랩",            nameEn:"Grab",            ticker:"GRAB",   market:"NASDAQ", sector:"동남아/모빌리티", currentPrice:5800,  marketCap:"25조" },
+  { id:"se",     name:"씨리미티드",      nameEn:"Sea Limited",     ticker:"SE",     market:"NASDAQ", sector:"동남아/게임/이커머스", currentPrice:101500, marketCap:"57조" },
+  { id:"dkng",   name:"드래프트킹스",    nameEn:"DraftKings",      ticker:"DKNG",   market:"NASDAQ", sector:"온라인스포츠베팅", currentPrice:46400, marketCap:"22조" },
+  { id:"gtlb",   name:"깃랩",            nameEn:"GitLab",          ticker:"GTLB",   market:"NASDAQ", sector:"개발자플랫폼",  currentPrice:72500,   marketCap:"12조" },
+  { id:"ionq_skip", name:"아이온큐",     nameEn:"IonQ",            ticker:"IONQ",   market:"NASDAQ", sector:"양자컴퓨팅",    currentPrice:48877,  marketCap:"10조" },
+
+  // ─── KOSPI ───────────────────────────────────────────────
+  { id:"005930_skip", name:"삼성전자",   nameEn:"Samsung Electronics", ticker:"005930", market:"KOSPI", sector:"반도체/가전", currentPrice:184000, marketCap:"1,097조" },
+  { id:"000660_skip", name:"SK하이닉스", nameEn:"SK Hynix",        ticker:"000660", market:"KOSPI", sector:"메모리반도체",  currentPrice:915000,  marketCap:"660조" },
+  { id:"207940", name:"삼성바이오로직스", nameEn:"Samsung Biologics", ticker:"207940", market:"KOSPI", sector:"바이오/의약",  currentPrice:900000,  marketCap:"129조" },
+  { id:"005490", name:"POSCO홀딩스",    nameEn:"POSCO Holdings",   ticker:"005490", market:"KOSPI", sector:"철강/소재",     currentPrice:280000,  marketCap:"24조" },
+  { id:"373220", name:"LG에너지솔루션", nameEn:"LG Energy Solution", ticker:"373220", market:"KOSPI", sector:"배터리/전기차", currentPrice:340000, marketCap:"79조" },
+  { id:"068270", name:"셀트리온",       nameEn:"Celltrion",        ticker:"068270", market:"KOSPI", sector:"바이오시밀러",  currentPrice:185000,  marketCap:"24조" },
+  { id:"105560", name:"KB금융",         nameEn:"KB Financial",     ticker:"105560", market:"KOSPI", sector:"금융/은행",     currentPrice:88000,   marketCap:"37조" },
+  { id:"055550", name:"신한금융지주",   nameEn:"Shinhan Financial", ticker:"055550", market:"KOSPI", sector:"금융/은행",     currentPrice:58000,   marketCap:"28조" },
+  { id:"086790", name:"하나금융지주",   nameEn:"Hana Financial",   ticker:"086790", market:"KOSPI", sector:"금융/은행",     currentPrice:68000,   marketCap:"20조" },
+  { id:"316140", name:"우리금융지주",   nameEn:"Woori Financial",  ticker:"316140", market:"KOSPI", sector:"금융/은행",     currentPrice:16500,   marketCap:"13조" },
+  { id:"012330", name:"현대모비스",     nameEn:"Hyundai Mobis",    ticker:"012330", market:"KOSPI", sector:"자동차부품",    currentPrice:245000,  marketCap:"23조" },
+  { id:"000270", name:"기아",           nameEn:"Kia",              ticker:"000270", market:"KOSPI", sector:"자동차",        currentPrice:87000,   marketCap:"35조" },
+  { id:"051910", name:"LG화학",         nameEn:"LG Chem",          ticker:"051910", market:"KOSPI", sector:"화학/배터리",   currentPrice:280000,  marketCap:"19조" },
+  { id:"006400", name:"삼성SDI",        nameEn:"Samsung SDI",      ticker:"006400", market:"KOSPI", sector:"배터리",        currentPrice:300000,  marketCap:"20조" },
+  { id:"035420", name:"NAVER",          nameEn:"Naver",            ticker:"035420", market:"KOSPI", sector:"IT/검색/클라우드", currentPrice:170000, marketCap:"27조" },
+  { id:"035720", name:"카카오",         nameEn:"Kakao",            ticker:"035720", market:"KOSPI", sector:"IT/플랫폼",     currentPrice:42000,   marketCap:"19조" },
+  { id:"066570", name:"LG전자",         nameEn:"LG Electronics",   ticker:"066570", market:"KOSPI", sector:"가전/전장",     currentPrice:88000,   marketCap:"14조" },
+  { id:"028260", name:"삼성물산",       nameEn:"Samsung C&T",      ticker:"028260", market:"KOSPI", sector:"건설/패션/IT",  currentPrice:165000,  marketCap:"30조" },
+  { id:"096770", name:"SK이노베이션",   nameEn:"SK Innovation",    ticker:"096770", market:"KOSPI", sector:"에너지/배터리", currentPrice:130000,  marketCap:"12조" },
+  { id:"010130", name:"고려아연",       nameEn:"Korea Zinc",       ticker:"010130", market:"KOSPI", sector:"비철금속",      currentPrice:600000,  marketCap:"12조" },
+  { id:"015760", name:"한국전력",       nameEn:"KEPCO",            ticker:"015760", market:"KOSPI", sector:"전력/유틸리티", currentPrice:20000,   marketCap:"13조" },
+  { id:"017670", name:"SK텔레콤",       nameEn:"SK Telecom",       ticker:"017670", market:"KOSPI", sector:"통신",          currentPrice:55000,   marketCap:"14조" },
+  { id:"030200", name:"KT",             nameEn:"KT",               ticker:"030200", market:"KOSPI", sector:"통신",          currentPrice:42000,   marketCap:"11조" },
+  { id:"003550", name:"LG",             nameEn:"LG Corp",          ticker:"003550", market:"KOSPI", sector:"지주회사",      currentPrice:85000,   marketCap:"14조" },
+  { id:"034730", name:"SK",             nameEn:"SK Inc",           ticker:"034730", market:"KOSPI", sector:"지주회사",      currentPrice:180000,  marketCap:"13조" },
+  { id:"032830", name:"삼성생명",       nameEn:"Samsung Life",     ticker:"032830", market:"KOSPI", sector:"보험",          currentPrice:78000,   marketCap:"15조" },
+  { id:"000810", name:"삼성화재",       nameEn:"Samsung Fire",     ticker:"000810", market:"KOSPI", sector:"보험",          currentPrice:330000,  marketCap:"14조" },
+  { id:"000720", name:"현대건설",       nameEn:"Hyundai E&C",      ticker:"000720", market:"KOSPI", sector:"건설",          currentPrice:27000,   marketCap:"3조" },
+  { id:"247540", name:"에코프로비엠",   nameEn:"EcoPro BM",        ticker:"247540", market:"KOSPI", sector:"양극재/배터리",  currentPrice:150000, marketCap:"12조" },
+  { id:"086520", name:"에코프로",       nameEn:"EcoPro",           ticker:"086520", market:"KOSPI", sector:"배터리소재",    currentPrice:100000,  marketCap:"7조" },
+  { id:"003670", name:"포스코퓨처엠",   nameEn:"POSCO Future M",   ticker:"003670", market:"KOSPI", sector:"배터리소재",    currentPrice:200000,  marketCap:"16조" },
+  { id:"010120", name:"LS ELECTRIC",    nameEn:"LS Electric",      ticker:"010120", market:"KOSPI", sector:"전력기기",      currentPrice:170000,  marketCap:"3조" },
+  { id:"047810", name:"한국항공우주",   nameEn:"Korea Aerospace",  ticker:"047810", market:"KOSPI", sector:"방산/항공",     currentPrice:65000,   marketCap:"2조" },
+  { id:"272210", name:"한화시스템",     nameEn:"Hanwha Systems",   ticker:"272210", market:"KOSPI", sector:"방산/IT",       currentPrice:22000,   marketCap:"3조" },
+  { id:"010140", name:"삼성중공업",     nameEn:"Samsung Heavy Ind", ticker:"010140", market:"KOSPI", sector:"조선",          currentPrice:11000,  marketCap:"4조" },
+  { id:"329180", name:"HD현대중공업",   nameEn:"HD Hyundai Heavy", ticker:"329180", market:"KOSPI", sector:"조선/플랜트",   currentPrice:145000,  marketCap:"5조" },
+  { id:"011200", name:"HMM",            nameEn:"HMM",              ticker:"011200", market:"KOSPI", sector:"해운",          currentPrice:17000,   marketCap:"4조" },
+  { id:"028670", name:"팬오션",         nameEn:"Pan Ocean",        ticker:"028670", market:"KOSPI", sector:"벌크해운",      currentPrice:7500,    marketCap:"2조" },
+  { id:"180640", name:"한진칼",         nameEn:"Hanjin KAL",       ticker:"180640", market:"KOSPI", sector:"항공지주",      currentPrice:68000,   marketCap:"3조" },
+  { id:"003490", name:"대한항공",       nameEn:"Korean Air",       ticker:"003490", market:"KOSPI", sector:"항공",          currentPrice:25000,   marketCap:"5조" },
+  { id:"009830", name:"한화솔루션",     nameEn:"Hanwha Solutions",  ticker:"009830", market:"KOSPI", sector:"태양광/화학",  currentPrice:28000,   marketCap:"4조" },
+  { id:"373220b",name:"OCI홀딩스",      nameEn:"OCI Holdings",     ticker:"010060", market:"KOSPI", sector:"태양광/화학",   currentPrice:55000,   marketCap:"1조" },
+  { id:"004020", name:"현대제철",       nameEn:"Hyundai Steel",    ticker:"004020", market:"KOSPI", sector:"철강",          currentPrice:30000,   marketCap:"5조" },
+  { id:"033780", name:"KT&G",           nameEn:"KT&G",             ticker:"033780", market:"KOSPI", sector:"담배/부동산",   currentPrice:105000,  marketCap:"11조" },
+  { id:"097950", name:"CJ제일제당",     nameEn:"CJ CheilJedang",   ticker:"097950", market:"KOSPI", sector:"식품/바이오",   currentPrice:245000,  marketCap:"5조" },
+  { id:"000100", name:"유한양행",       nameEn:"Yuhan Corp",       ticker:"000100", market:"KOSPI", sector:"제약",          currentPrice:125000,  marketCap:"4조" },
+  { id:"128940", name:"한미약품",       nameEn:"Hanmi Pharm",      ticker:"128940", market:"KOSPI", sector:"제약",          currentPrice:380000,  marketCap:"3조" },
+  { id:"145020", name:"휴젤",           nameEn:"Hugel",            ticker:"145020", market:"KOSPI", sector:"보톡스/바이오", currentPrice:280000,  marketCap:"2조" },
+  { id:"302440", name:"SK바이오사이언스", nameEn:"SK Bioscience",  ticker:"302440", market:"KOSPI", sector:"백신/바이오",   currentPrice:55000,   marketCap:"2조" },
+  { id:"069620", name:"대웅제약",       nameEn:"Daewoong Pharm",   ticker:"069620", market:"KOSPI", sector:"제약",          currentPrice:105000,  marketCap:"1조" },
+  { id:"009150", name:"삼성전기",       nameEn:"Samsung Electro-Mechanics", ticker:"009150", market:"KOSPI", sector:"전자부품", currentPrice:145000, marketCap:"10조" },
+  { id:"006260", name:"LS",             nameEn:"LS Corp",          ticker:"006260", market:"KOSPI", sector:"전선/지주",     currentPrice:120000,  marketCap:"3조" },
+  { id:"011070", name:"LG이노텍",       nameEn:"LG Innotek",       ticker:"011070", market:"KOSPI", sector:"전자부품",      currentPrice:180000,  marketCap:"4조" },
+  { id:"000150", name:"두산",           nameEn:"Doosan Corp",      ticker:"000150", market:"KOSPI", sector:"지주/중공업",   currentPrice:210000,  marketCap:"3조" },
+  { id:"012450_skip", name:"한화에어로스페이스", nameEn:"Hanwha Aerospace", ticker:"012450", market:"KOSPI", sector:"방산/항공우주", currentPrice:1474000, marketCap:"20조" },
+  { id:"005380_skip", name:"현대차",    nameEn:"Hyundai Motor",    ticker:"005380", market:"KOSPI", sector:"자동차",        currentPrice:519000,  marketCap:"23조" },
+  { id:"034020_skip", name:"두산에너빌리티", nameEn:"Doosan Enerbility", ticker:"034020", market:"KOSPI", sector:"원자력/에너지", currentPrice:106100, marketCap:"8조" },
+
+  // ─── KOSDAQ ────────────────────────────────────────────────
+  { id:"032820_skip", name:"우리기술투자", nameEn:"Woori Tech Inv", ticker:"032820", market:"KOSDAQ", sector:"원전/소형주", currentPrice:24450, marketCap:"0.3조" },
+  { id:"293490", name:"카카오게임즈",    nameEn:"Kakao Games",      ticker:"293490", market:"KOSDAQ", sector:"게임",          currentPrice:20000,   marketCap:"0.9조" },
+  { id:"112040", name:"위메이드",        nameEn:"Wemade",           ticker:"112040", market:"KOSDAQ", sector:"게임/블록체인", currentPrice:35000,   marketCap:"0.6조" },
+  { id:"263750", name:"펄어비스",        nameEn:"Pearl Abyss",      ticker:"263750", market:"KOSDAQ", sector:"게임",          currentPrice:30000,   marketCap:"0.7조" },
+  { id:"036570", name:"엔씨소프트",      nameEn:"NCSoft",           ticker:"036570", market:"KOSDAQ", sector:"게임",          currentPrice:155000,  marketCap:"3조" },
+  { id:"251270", name:"넷마블",          nameEn:"Netmarble",        ticker:"251270", market:"KOSDAQ", sector:"게임",          currentPrice:45000,   marketCap:"1조" },
+  { id:"041510", name:"에스엠",          nameEn:"SM Ent",           ticker:"041510", market:"KOSDAQ", sector:"K-POP/엔터",   currentPrice:80000,   marketCap:"1조" },
+  { id:"352820", name:"하이브",          nameEn:"HYBE",             ticker:"352820", market:"KOSDAQ", sector:"K-POP/엔터",   currentPrice:185000,  marketCap:"4조" },
+  { id:"035900", name:"JYP엔터",         nameEn:"JYP Ent",          ticker:"035900", market:"KOSDAQ", sector:"K-POP/엔터",   currentPrice:55000,   marketCap:"0.9조" },
+  { id:"122870", name:"와이지엔터테인먼트", nameEn:"YG Ent",        ticker:"122870", market:"KOSDAQ", sector:"K-POP/엔터",   currentPrice:40000,   marketCap:"0.6조" },
+  { id:"091990", name:"셀트리온헬스케어", nameEn:"Celltrion HC",    ticker:"091990", market:"KOSDAQ", sector:"바이오시밀러",  currentPrice:70000,   marketCap:"4조" },
+  { id:"214150", name:"클래시스",        nameEn:"Classys",          ticker:"214150", market:"KOSDAQ", sector:"의료기기",      currentPrice:40000,   marketCap:"0.7조" },
+  { id:"108670", name:"LB세미콘",        nameEn:"LB Semicon",       ticker:"108670", market:"KOSDAQ", sector:"반도체",        currentPrice:28000,   marketCap:"0.5조" },
+  { id:"137310", name:"에스에프에이",    nameEn:"SFA",              ticker:"137310", market:"KOSDAQ", sector:"디스플레이장비", currentPrice:38000,  marketCap:"0.5조" },
+  { id:"039030", name:"이오테크닉스",    nameEn:"EO Technics",      ticker:"039030", market:"KOSDAQ", sector:"레이저/반도체장비", currentPrice:180000, marketCap:"1조" },
+];
+
+export function filterUniverse(query: string, market: "ALL" | UniverseMarket): UniverseStock[] {
+  const q = query.trim().toLowerCase();
+  return UNIVERSE_STOCKS.filter((s) => {
+    const marketMatch = market === "ALL" || s.market === market;
+    if (!q) return marketMatch;
+    return marketMatch && (
+      s.name.toLowerCase().includes(q) ||
+      s.nameEn.toLowerCase().includes(q) ||
+      s.ticker.toLowerCase().includes(q) ||
+      s.sector.toLowerCase().includes(q)
+    );
+  });
+}
