@@ -14,7 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useColorScheme } from "react-native";
 import Colors from "@/constants/colors";
-
+import { WatchlistProvider } from "@/context/WatchlistContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
@@ -40,6 +40,15 @@ function RootLayoutNav() {
         options={{
           headerShown: false,
           animation: "slide_from_right",
+        }}
+      />
+      <Stack.Screen
+        name="add-stock"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.75, 1],
+          sheetGrabberVisible: true,
+          headerShown: false,
         }}
       />
     </Stack>
@@ -68,7 +77,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <RootLayoutNav />
+              <WatchlistProvider>
+                <RootLayoutNav />
+              </WatchlistProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
