@@ -1,3 +1,5 @@
+export const USD_KRW_RATE = 1450;
+
 export type Market = "NASDAQ" | "KOSPI" | "KOSDAQ";
 export type MarketRegion = "미국장" | "국내장";
 export type StockGrade = "우량주" | "중형주" | "소형주";

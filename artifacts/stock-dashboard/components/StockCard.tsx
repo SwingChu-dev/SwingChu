@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { StockInfo } from "@/constants/stockData";
+import { StockInfo, USD_KRW_RATE } from "@/constants/stockData";
 import { SIGNAL_META } from "@/constants/smartMoney";
 import { useSignals } from "@/context/SignalContext";
 
@@ -125,6 +125,11 @@ export default function StockCard({
             <Text style={[styles.price, { color: c.text }]}>
               ₩{formatPrice(stock.currentPrice)}
             </Text>
+            {stock.market === "NASDAQ" && (
+              <Text style={[styles.usdPrice, { color: c.textTertiary }]}>
+                ${(stock.currentPrice / USD_KRW_RATE).toFixed(2)}
+              </Text>
+            )}
             <Text
               style={[
                 styles.change,
@@ -222,6 +227,10 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+  },
+  usdPrice: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
   },
   change: {
     fontSize: 12,

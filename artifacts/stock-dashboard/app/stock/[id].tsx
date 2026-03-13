@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
-import { STOCKS } from "@/constants/stockData";
+import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
 import SplitEntrySection from "@/components/detail/SplitEntrySection";
 import ProfitTargetSection from "@/components/detail/ProfitTargetSection";
 import BoxRangeSection from "@/components/detail/BoxRangeSection";
@@ -79,6 +79,13 @@ export default function StockDetailScreen() {
             <Text style={[styles.headerPrice, { color: c.text }]}>
               ₩{stock.currentPrice.toLocaleString()}
             </Text>
+            {stock.market === "NASDAQ" && (
+              <View style={[styles.usdBadge, { backgroundColor: "#0064FF14" }]}>
+                <Text style={[styles.usdBadgeText, { color: "#0064FF" }]}>
+                  ${(stock.currentPrice / USD_KRW_RATE).toFixed(2)}
+                </Text>
+              </View>
+            )}
             <View style={[styles.regionBadge, { backgroundColor: c.backgroundTertiary }]}>
               <Text style={[styles.regionText, { color: c.textSecondary }]}>
                 {stock.region} · {stock.grade}
@@ -278,6 +285,15 @@ const styles = StyleSheet.create({
   regionText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
+  },
+  usdBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  usdBadgeText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   statsBar: {
     flexDirection: "row",

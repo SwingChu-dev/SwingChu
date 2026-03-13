@@ -12,7 +12,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { STOCKS } from "@/constants/stockData";
+import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
 import { useWatchlist } from "@/context/WatchlistContext";
 
 const MARKET_COLORS: Record<string, string> = {
@@ -114,6 +114,7 @@ export default function AddStockSheet() {
                     </View>
                     <Text style={[styles.ticker, { color: c.textTertiary }]}>
                       {stock.ticker} · ₩{stock.currentPrice.toLocaleString()}
+                      {stock.market === "NASDAQ" && ` ($${(stock.currentPrice / USD_KRW_RATE).toFixed(2)})`}
                     </Text>
                   </View>
 
