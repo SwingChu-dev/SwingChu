@@ -77,10 +77,8 @@ function StockCardInner({
   return (
     <View style={styles.wrapper}>
       <Animated.View
-        style={[
-          styles.deleteWrap,
-          { opacity: deleteOpacity, pointerEvents: editMode ? "auto" : "none" },
-        ]}
+        style={[styles.deleteWrap, { opacity: deleteOpacity }]}
+        pointerEvents={editMode ? "auto" : "none"}
       >
         <TouchableOpacity
           style={styles.deleteBtn}
