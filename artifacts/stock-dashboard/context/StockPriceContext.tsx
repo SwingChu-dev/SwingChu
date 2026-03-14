@@ -9,7 +9,8 @@ import React, {
 } from "react";
 import { AppState, AppStateStatus } from "react-native";
 
-const REFRESH_INTERVAL_MS = 60_000;
+const REFRESH_INTERVAL_MS = 30_000;
+const USD_KRW_FALLBACK    = 1450;
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 
 export interface LiveQuote {
@@ -37,6 +38,7 @@ interface StockPriceContextType {
   quotes:     Record<string, LiveQuote>;
   loading:    boolean;
   lastUpdate: number | null;
+  usdKrw:     number;
   refresh:    () => void;
   getQuote:   (ticker: string, market: string) => LiveQuote | null;
   priceKRW:   (ticker: string, market: string, fallback: number) => number;
@@ -59,22 +61,46 @@ export function StockPriceProvider({ children, watchlist }: Props) {
   const [quotes,     setQuotes]     = useState<Record<string, LiveQuote>>({});
   const [loading,    setLoading]    = useState(false);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [usdKrw,     setUsdKrw]     = useState<number>(USD_KRW_FALLBACK);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetch = useCallback(async () => {
     if (watchlist.length === 0) return;
-    const items = watchlist.map((s) => `${s.ticker}:${s.market}`).join(",");
+    // Include USD/KRW rate in the same batch request
+    const stockItems  = watchlist.map((s) => `${s.ticker}:${s.market}`).join(",");
+    const allItems    = `${stockItems},USDKRW=X:INDEX`;
     try {
       setLoading(true);
-      const res = await globalThis.fetch(`${API_BASE}/stocks/quotes?items=${encodeURIComponent(items)}`);
+      const res = await globalThis.fetch(
+        `${API_BASE}/stocks/quotes?items=${encodeURIComponent(allItems)}`
+      );
       if (!res.ok) return;
       const data: LiveQuote[] = await res.json();
-      const map: Record<string, LiveQuote> = {};
-      data.forEach((q) => {
-        if (q.ok) map[`${q.ticker}:${q.market}`] = { ...q, fetchedAt: Date.now() };
+      const now = Date.now();
+
+      // Extract USD/KRW rate
+      const fxQuote = data.find((q) => q.ticker === "USDKRW=X");
+      if (fxQuote?.ok && fxQuote.price > 100) {
+        setUsdKrw(Math.round(fxQuote.price));
+      }
+
+      // Update only quotes that changed (minimise re-renders)
+      setQuotes((prev) => {
+        const next: Record<string, LiveQuote> = { ...prev };
+        let changed = false;
+        data.forEach((q) => {
+          if (!q.ok || q.ticker === "USDKRW=X") return;
+          const key     = `${q.ticker}:${q.market}`;
+          const prevQ   = prev[key];
+          const updated = { ...q, fetchedAt: now };
+          if (!prevQ || prevQ.price !== q.price || prevQ.changePercent !== q.changePercent) {
+            next[key] = updated;
+            changed   = true;
+          }
+        });
+        return changed ? next : prev;
       });
-      setQuotes((prev) => ({ ...prev, ...map }));
-      setLastUpdate(Date.now());
+      setLastUpdate(now);
     } catch {
     } finally {
       setLoading(false);
@@ -117,7 +143,7 @@ export function StockPriceProvider({ children, watchlist }: Props) {
 
   return (
     <StockPriceContext.Provider
-      value={{ quotes, loading, lastUpdate, refresh: fetch, getQuote, priceKRW, changePct }}
+      value={{ quotes, loading, lastUpdate, usdKrw, refresh: fetch, getQuote, priceKRW, changePct }}
     >
       {children}
     </StockPriceContext.Provider>

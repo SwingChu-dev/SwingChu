@@ -9,11 +9,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useVix, vixLabel } from "@/hooks/useVix";
 
 export default function StrategyScreen() {
   const isDark = useColorScheme() === "dark";
-  const c = isDark ? Colors.dark : Colors.light;
+  const c      = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
+  const vix    = useVix();
 
   const strategies = [
     {
@@ -123,12 +125,34 @@ export default function StrategyScreen() {
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <View style={[styles.alertCard, { backgroundColor: c.negative + "15", borderColor: c.negative + "40" }]}>
-          <Ionicons name="information-circle" size={18} color={c.negative} />
-          <Text style={[styles.alertText, { color: c.negative }]}>
-            현재 VIX 27.53 (높음) — 변동성 구간. 포지션 크기 조절 필요.
-          </Text>
-        </View>
+        {/* Live VIX alert */}
+        {(() => {
+          const high    = vix != null && vix >= 25;
+          const warn    = vix != null && vix >= 20 && vix < 25;
+          const safe    = vix != null && vix < 20;
+          const color   = high ? c.negative : warn ? c.warning : safe ? c.positive : c.textSecondary;
+          const bgColor = color + "15";
+          const bdColor = color + "40";
+          const msg = vix == null
+            ? "VIX 불러오는 중..."
+            : vix >= 30
+            ? `${vixLabel(vix)} — 공포 구간. 전체 포지션 50% 이하 유지 권장.`
+            : vix >= 25
+            ? `${vixLabel(vix)} — 변동성 구간. 포지션 크기 조절 필요.`
+            : vix >= 20
+            ? `${vixLabel(vix)} — 변동성 주의 구간. 신규 진입 신중하게.`
+            : `${vixLabel(vix)} — 시장 안정 구간. 정상 포지션 허용.`;
+          return (
+            <View style={[styles.alertCard, { backgroundColor: bgColor, borderColor: bdColor }]}>
+              <Ionicons
+                name={high ? "warning" : warn ? "information-circle" : "checkmark-circle"}
+                size={18}
+                color={color}
+              />
+              <Text style={[styles.alertText, { color }]}>{msg}</Text>
+            </View>
+          );
+        })()}
 
         {strategies.map((s, i) => (
           <View

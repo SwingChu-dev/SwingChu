@@ -5,10 +5,10 @@ import Colors from "@/constants/colors";
 import { StockInfo } from "@/constants/stockData";
 
 interface ProfitTargetSectionProps {
-  stock: StockInfo;
+  stock:      StockInfo;
+  livePrice?: number;
 }
 
-const PROFIT_LABELS = ["단기 익절 (3%)", "중기 익절 (8%)", "목표 익절 (15%)"];
 const PROFIT_ICONS: ("checkmark-circle" | "trending-up" | "rocket")[] = [
   "checkmark-circle",
   "trending-up",
@@ -16,29 +16,35 @@ const PROFIT_ICONS: ("checkmark-circle" | "trending-up" | "rocket")[] = [
 ];
 const PROFIT_COLORS = ["#F59E0B", "#00C896", "#3B82F6"];
 
-export default function ProfitTargetSection({ stock }: ProfitTargetSectionProps) {
-  const isDark = useColorScheme() === "dark";
-  const c = isDark ? Colors.dark : Colors.light;
+export default function ProfitTargetSection({ stock, livePrice }: ProfitTargetSectionProps) {
+  const isDark  = useColorScheme() === "dark";
+  const c       = isDark ? Colors.dark : Colors.light;
+  const basePrice = livePrice && livePrice > 0 ? livePrice : stock.currentPrice;
+  const isLive    = !!(livePrice && livePrice > 0 && livePrice !== stock.currentPrice);
 
   return (
     <View style={[styles.section, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
       <View style={styles.sectionHeader}>
         <Ionicons name="trophy" size={18} color={c.tint} />
-        <Text style={[styles.sectionTitle, { color: c.text }]}>
-          익절 목표가
-        </Text>
+        <Text style={[styles.sectionTitle, { color: c.text }]}>익절 목표가</Text>
+        {isLive && (
+          <View style={[styles.liveBadge, { backgroundColor: "#F04452" + "18" }]}>
+            <View style={styles.liveDot} />
+            <Text style={[styles.liveTxt, { color: "#F04452" }]}>실시간</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.currentPriceRow}>
         <Text style={[styles.currentLabel, { color: c.textTertiary }]}>현재가</Text>
         <Text style={[styles.currentPrice, { color: c.text }]}>
-          ₩{stock.currentPrice.toLocaleString()}
+          ₩{basePrice.toLocaleString()}
         </Text>
       </View>
 
       {stock.profitTargets.map((target, i) => {
-        const gain = target.price - stock.currentPrice;
-        const gainPerPer = ((gain / stock.currentPrice) * 100).toFixed(1);
+        const gain       = target.price - basePrice;
+        const gainPerPer = ((gain / basePrice) * 100).toFixed(1);
         return (
           <View
             key={i}
@@ -55,7 +61,7 @@ export default function ProfitTargetSection({ stock }: ProfitTargetSectionProps)
             </View>
             <View style={styles.targetInfo}>
               <Text style={[styles.targetLabel, { color: c.textSecondary }]}>
-                {PROFIT_LABELS[i]}
+                {target.percent > 0 ? `+${target.percent}% 목표` : `익절 목표`}
               </Text>
               <Text style={[styles.targetPrice, { color: c.text }]}>
                 ₩{target.price.toLocaleString()}
@@ -63,10 +69,10 @@ export default function ProfitTargetSection({ stock }: ProfitTargetSectionProps)
             </View>
             <View style={[styles.gainBadge, { backgroundColor: PROFIT_COLORS[i] + "22" }]}>
               <Text style={[styles.gainText, { color: PROFIT_COLORS[i] }]}>
-                +{target.percent}%
+                {gain >= 0 ? "+" : ""}{gainPerPer}%
               </Text>
               <Text style={[styles.gainPrice, { color: PROFIT_COLORS[i] }]}>
-                +₩{gain.toLocaleString()}
+                {gain >= 0 ? "+" : ""}₩{Math.abs(gain).toLocaleString()}
               </Text>
             </View>
           </View>
@@ -93,6 +99,25 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    flex: 1,
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#F04452",
+  },
+  liveTxt: {
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
   currentPriceRow: {
@@ -143,11 +168,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   gainText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   gainPrice: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
+    marginTop: 1,
   },
 });

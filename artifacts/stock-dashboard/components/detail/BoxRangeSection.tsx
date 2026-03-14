@@ -4,18 +4,26 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { StockInfo } from "@/constants/stockData";
 
+type BoxPos = "저점권" | "중간권" | "고점권";
+
 interface BoxRangeSectionProps {
-  stock: StockInfo;
+  stock:      StockInfo;
+  livePrice?: number;
+  dynBoxPos?: BoxPos;
 }
 
-export default function BoxRangeSection({ stock }: BoxRangeSectionProps) {
+export default function BoxRangeSection({ stock, livePrice, dynBoxPos }: BoxRangeSectionProps) {
   const isDark = useColorScheme() === "dark";
   const c = isDark ? Colors.dark : Colors.light;
 
-  const { support, resistance, currentPosition } = stock.boxRange;
+  const { support, resistance } = stock.boxRange;
   const range = resistance - support;
-  const currentPos = stock.currentPrice;
-  const posRatio = Math.max(0, Math.min(1, (currentPos - support) / range));
+
+  // Use live price if available, otherwise fall back to stub
+  const currentPos   = livePrice && livePrice > 0 ? livePrice : stock.currentPrice;
+  const currentPosition: BoxPos = dynBoxPos ?? (stock.boxRange.currentPosition as BoxPos);
+  const posRatio     = range > 0 ? Math.max(0, Math.min(1, (currentPos - support) / range)) : 0.5;
+  const isLive       = !!(livePrice && livePrice > 0 && dynBoxPos);
 
   const posColor =
     currentPosition === "저점권"
@@ -29,6 +37,12 @@ export default function BoxRangeSection({ stock }: BoxRangeSectionProps) {
       <View style={styles.sectionHeader}>
         <Ionicons name="stats-chart" size={18} color={c.tint} />
         <Text style={[styles.sectionTitle, { color: c.text }]}>박스권 분석</Text>
+        {isLive && (
+          <View style={[styles.liveBadge, { backgroundColor: "#F04452" + "18" }]}>
+            <View style={styles.liveDot} />
+            <Text style={[styles.liveTxt, { color: "#F04452" }]}>실시간</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -58,7 +72,7 @@ export default function BoxRangeSection({ stock }: BoxRangeSectionProps) {
             style={[
               styles.barFill,
               {
-                width: `${posRatio * 100}%`,
+                width: `${posRatio * 100}%` as any,
                 backgroundColor: posColor,
               },
             ]}
@@ -66,13 +80,20 @@ export default function BoxRangeSection({ stock }: BoxRangeSectionProps) {
           <View
             style={[
               styles.currentIndicator,
-              { left: `${posRatio * 100}%`, backgroundColor: posColor },
+              { left: `${posRatio * 100}%` as any, backgroundColor: posColor },
             ]}
           />
         </View>
 
         <View style={styles.positionRow}>
-          <Text style={[styles.positionLabel, { color: c.textTertiary }]}>현재 위치</Text>
+          <View>
+            <Text style={[styles.positionLabel, { color: c.textTertiary }]}>
+              현재가
+            </Text>
+            <Text style={[styles.positionPrice, { color: c.text }]}>
+              ₩{currentPos.toLocaleString()}
+            </Text>
+          </View>
           <View style={[styles.positionBadge, { backgroundColor: posColor + "22" }]}>
             <View style={[styles.positionDot, { backgroundColor: posColor }]} />
             <Text style={[styles.positionText, { color: posColor }]}>
@@ -119,15 +140,34 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+    flex: 1,
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#F04452",
+  },
+  liveTxt: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
   },
   content: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    padding: 16,
+    paddingTop: 0,
   },
   labels: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   labelItem: {
     flexDirection: "row",
@@ -135,39 +175,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   labelTitle: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    marginBottom: 2,
   },
   labelPrice: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+    marginTop: 2,
   },
   barTrack: {
-    height: 12,
-    borderRadius: 6,
-    position: "relative",
+    height: 10,
+    borderRadius: 5,
     marginBottom: 16,
+    position: "relative",
     overflow: "visible",
   },
   barFill: {
     height: "100%",
-    borderRadius: 6,
+    borderRadius: 5,
   },
   currentIndicator: {
     position: "absolute",
     top: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 3,
     borderColor: "#FFF",
-    marginLeft: -10,
+    marginLeft: -9,
   },
   positionRow: {
     flexDirection: "row",
@@ -176,8 +216,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   positionLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
+  },
+  positionPrice: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 2,
   },
   positionBadge: {
     flexDirection: "row",

@@ -18,29 +18,7 @@ import { useStockPrice } from "@/context/StockPriceContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
 import { calcBoxPosition } from "@/utils/boxPosition";
-
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
-
-function useVix() {
-  const [vix, setVix] = useState<number | null>(null);
-  const fetch = useCallback(async () => {
-    try {
-      const resp = await globalThis.fetch(
-        `${API_BASE}/stocks/quotes?items=${encodeURIComponent("^VIX:INDEX")}`
-      );
-      if (!resp.ok) return;
-      const data = await resp.json();
-      const q = data?.[0];
-      if (q?.ok && q.price > 0) setVix(parseFloat(q.price.toFixed(2)));
-    } catch {}
-  }, []);
-  useEffect(() => {
-    fetch();
-    const t = setInterval(fetch, 300_000); // 5분마다 갱신
-    return () => clearInterval(t);
-  }, [fetch]);
-  return vix;
-}
+import { useVix } from "@/hooks/useVix";
 
 type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "저평가" | "고점권";
 

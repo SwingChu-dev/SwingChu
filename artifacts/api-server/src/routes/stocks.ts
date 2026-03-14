@@ -39,7 +39,24 @@ interface ScreenStock {
   basePrice: number; // KRW 기준 참조가격 (동적 PER 계산용)
 }
 
-const USD_KRW = 1450;
+// ─── Live USD/KRW rate cache (refreshes every 5 minutes) ───────────────────
+let USD_KRW = 1450;
+let usdKrwLastFetched = 0;
+const USD_KRW_TTL = 5 * 60 * 1000;
+
+async function getLiveUsdKrw(): Promise<number> {
+  const now = Date.now();
+  if (now - usdKrwLastFetched < USD_KRW_TTL) return USD_KRW;
+  try {
+    const q = await yahooFinance.quote("USDKRW=X");
+    const rate = q?.regularMarketPrice;
+    if (rate && rate > 100) {
+      USD_KRW = Math.round(rate);
+      usdKrwLastFetched = now;
+    }
+  } catch {}
+  return USD_KRW;
+}
 
 const SCREEN_UNIVERSE: ScreenStock[] = [
   // ── NASDAQ ───────────────────────────────────────────────────────────────
@@ -111,6 +128,8 @@ router.get("/stocks/quotes", async (req, res) => {
     return { ticker, market, yahooTicker: toYahooTicker(ticker, market) };
   });
 
+  const liveRate = await getLiveUsdKrw();
+
   try {
     const results = await Promise.all(
       parsed.map(async (p) => {
@@ -119,7 +138,7 @@ router.get("/stocks/quotes", async (req, res) => {
           const priceKRW =
             p.market === "KOSPI" || p.market === "KOSDAQ"
               ? q.regularMarketPrice ?? 0
-              : Math.round((q.regularMarketPrice ?? 0) * USD_KRW);
+              : Math.round((q.regularMarketPrice ?? 0) * liveRate);
           return {
             ticker:        p.ticker,
             market:        p.market,
@@ -190,6 +209,7 @@ router.get("/stocks/search", async (req, res) => {
 // ─── 저평가 우량주 스크리닝 ───────────────────────────────────────────────────
 router.get("/stocks/screen", async (req, res) => {
   const market = (req.query.market as string) ?? "ALL";
+  const liveRate = await getLiveUsdKrw();
 
   const candidates = SCREEN_UNIVERSE.filter(
     (s) => market === "ALL" || s.market === market
@@ -204,7 +224,7 @@ router.get("/stocks/screen", async (req, res) => {
       const priceKRW  =
         c.market === "KOSPI" || c.market === "KOSDAQ"
           ? livePrice
-          : Math.round(livePrice * USD_KRW);
+          : Math.round(livePrice * liveRate);
       const changePercent = q.regularMarketChangePercent ?? 0;
 
       // 동적 PER: 현재가 기준으로 재계산 (기준가 대비 가격 변화 반영)
@@ -258,6 +278,7 @@ router.get("/stocks/detail", async (req, res) => {
 
   const yahooTicker = toYahooTicker(ticker, market);
   const isKorean = market === "KOSPI" || market === "KOSDAQ";
+  const liveRate = await getLiveUsdKrw();
 
   try {
     const [summary, rawQuote] = await Promise.all([
@@ -274,11 +295,11 @@ router.get("/stocks/detail", async (req, res) => {
     const pr = (summary as any)?.price ?? {};
 
     const currentPrice: number = q?.regularMarketPrice ?? 0;
-    const priceKRW: number = isKorean ? currentPrice : Math.round(currentPrice * USD_KRW);
+    const priceKRW: number = isKorean ? currentPrice : Math.round(currentPrice * liveRate);
     const high52w: number = q?.fiftyTwoWeekHigh ?? 0;
     const low52w: number  = q?.fiftyTwoWeekLow  ?? 0;
-    const high52wKRW: number = isKorean ? high52w : Math.round(high52w * USD_KRW);
-    const low52wKRW: number  = isKorean ? low52w  : Math.round(low52w  * USD_KRW);
+    const high52wKRW: number = isKorean ? high52w : Math.round(high52w * liveRate);
+    const low52wKRW: number  = isKorean ? low52w  : Math.round(low52w  * liveRate);
 
     const per: number | null          = sd?.trailingPE ?? null;
     const forwardPer: number | null   = sd?.forwardPE  ?? ks?.forwardEpsNtm != null ? null : null;
@@ -293,7 +314,7 @@ router.get("/stocks/detail", async (req, res) => {
     const targetMean: number | null    = fd?.targetMeanPrice  ?? null;
     const targetHigh: number | null    = fd?.targetHighPrice  ?? null;
     const targetLow: number | null     = fd?.targetLowPrice   ?? null;
-    const targetMeanKRW: number | null = targetMean ? (isKorean ? Math.round(targetMean) : Math.round(targetMean * USD_KRW)) : null;
+    const targetMeanKRW: number | null = targetMean ? (isKorean ? Math.round(targetMean) : Math.round(targetMean * liveRate)) : null;
 
     const beta: number | null          = sd?.beta ?? ks?.beta ?? null;
     const changePercent: number        = q?.regularMarketChangePercent ?? 0;
