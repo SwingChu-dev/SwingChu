@@ -265,7 +265,7 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
   },
   {
     stockId: "woritech",
-    stockName: "우리기술투자",
+    stockName: "우리기술",
     ticker: "032820",
     market: "KOSDAQ",
     type: "고점위험",

@@ -444,7 +444,7 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   // ══════════════════════════════════════════════════════════════════════════
   // KOSDAQ ─ 바이오 / 제약
   // ══════════════════════════════════════════════════════════════════════════
-  { id:"032820_skip", name:"우리기술투자", nameEn:"Woori Tech Inv",  ticker:"032820", market:"KOSDAQ", sector:"원전/소형주",       currentPrice:24450,  marketCap:"0.3조" },
+  { id:"032820_skip", name:"우리기술",     nameEn:"Woori Tech",      ticker:"032820", market:"KOSDAQ", sector:"원전/소형주",       currentPrice:24450,  marketCap:"0.3조" },
   { id:"196170", name:"알테오젠",       nameEn:"Alteogen",          ticker:"196170", market:"KOSDAQ", sector:"피하주사플랫폼/바이오",currentPrice:200000,marketCap:"12조" },
   { id:"028300", name:"HLB",            nameEn:"HLB",               ticker:"028300", market:"KOSDAQ", sector:"항암신약/리보세라닙",currentPrice:30000,  marketCap:"2조" },
   { id:"068760", name:"셀트리온제약",   nameEn:"Celltrion Pharm",   ticker:"068760", market:"KOSDAQ", sector:"바이오시밀러판매",  currentPrice:85000,  marketCap:"5조" },
