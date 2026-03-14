@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, memo } from "react";
+import React, { useState, useMemo, useCallback, memo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   useColorScheme,
 } from "react-native";
+
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -20,6 +21,8 @@ import {
   isUndervalued,
 } from "@/constants/stockUniverse";
 import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
+
+const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 
 type MarketFilter = "ALL" | UniverseMarket;
 
@@ -51,15 +54,16 @@ function formatPrice(p: number, market: string): string {
 // ─── Memoized row ─────────────────────────────────────────────────────────────
 interface RowProps {
   item:       UniverseStock;
+  livePrice:  number;
   inWatchlist:boolean;
   onToggle:   () => void;
   c:          any;
   isDark:     boolean;
 }
 
-const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c, isDark }: RowProps) {
+const StockRow = memo(function StockRow({ item, livePrice, inWatchlist, onToggle, c, isDark }: RowProps) {
   const mc  = MARKET_COLORS[item.market] || "#888";
-  const val = VALUATION_MAP[item.id];
+  const val = VALUATION_MAP[item.ticker] ?? VALUATION_MAP[item.id];
   const uv  = isUndervalued(item);
   return (
     <View style={[styles.row, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
@@ -97,10 +101,10 @@ const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c, isDark
 
       <View style={styles.rowRight}>
         <View style={styles.priceBlock}>
-          <Text style={[styles.price, { color: c.text }]}>{formatPrice(item.currentPrice, item.market)}</Text>
-          {item.market === "NASDAQ" && item.currentPrice > 0 && (
+          <Text style={[styles.price, { color: c.text }]}>{formatPrice(livePrice, item.market)}</Text>
+          {item.market === "NASDAQ" && livePrice > 0 && (
             <Text style={[styles.usd, { color: c.textTertiary }]}>
-              ${(item.currentPrice / USD_KRW_RATE).toFixed(2)}
+              ${(livePrice / USD_KRW_RATE).toFixed(2)}
             </Text>
           )}
         </View>
@@ -125,6 +129,7 @@ const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c, isDark
   );
 }, (prev, next) =>
   prev.inWatchlist === next.inWatchlist &&
+  prev.livePrice   === next.livePrice   &&
   prev.item.id     === next.item.id     &&
   prev.isDark      === next.isDark
 );
@@ -139,6 +144,8 @@ export default function ExploreScreen() {
   const [query,      setQuery]      = useState("");
   const [market,     setMarket]     = useState<MarketFilter>("ALL");
   const [uvOnly,     setUvOnly]     = useState(false);   // 저평가 필터
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 종목 필터링
   const results = useMemo(() => {
@@ -156,6 +163,36 @@ export default function ExploreScreen() {
       );
     });
   }, [query, market, uvOnly]);
+
+  // 실시간 가격 batch-fetch: 검색/필터 결과가 100개 이하일 때 최대 30개 fetch
+  // 전체 421개 기본뷰는 너무 많아 생략, 검색·필터 시에만 동작
+  const batchKey = useMemo(() => {
+    if (results.length > 100) return ""; // 기본뷰는 스킵
+    return results.slice(0, 30).map((s) => `${s.ticker}:${s.market}`).join(",");
+  }, [results]);
+
+  useEffect(() => {
+    if (!batchKey) return;
+    if (fetchTimer.current) clearTimeout(fetchTimer.current);
+    // 검색어 타이핑 중에 너무 잦은 요청을 막기 위해 300ms debounce
+    fetchTimer.current = setTimeout(async () => {
+      try {
+        const res = await globalThis.fetch(
+          `${API_BASE}/stocks/quotes?items=${encodeURIComponent(batchKey)}`
+        );
+        if (!res.ok) return;
+        const data: any[] = await res.json();
+        setLivePrices((prev) => {
+          const next = { ...prev };
+          data.forEach((q) => {
+            if (q.ok && q.priceKRW) next[`${q.ticker}:${q.market}`] = q.priceKRW;
+          });
+          return next;
+        });
+      } catch {}
+    }, 300);
+    return () => { if (fetchTimer.current) clearTimeout(fetchTimer.current); };
+  }, [batchKey]);
 
   const watchlistSet = useMemo(() => new Set(watchlistIds), [watchlistIds]);
 
@@ -182,15 +219,19 @@ export default function ExploreScreen() {
     []
   );
 
-  const renderItem = useCallback(({ item }: { item: UniverseStock }) => (
-    <StockRow
-      item={item}
-      inWatchlist={isInWatchlist(item)}
-      onToggle={() => handleToggle(item)}
-      c={c}
-      isDark={isDark}
-    />
-  ), [isInWatchlist, handleToggle, c, isDark]);
+  const renderItem = useCallback(({ item }: { item: UniverseStock }) => {
+    const livePrice = livePrices[`${item.ticker}:${item.market}`] ?? item.currentPrice;
+    return (
+      <StockRow
+        item={item}
+        livePrice={livePrice}
+        inWatchlist={isInWatchlist(item)}
+        onToggle={() => handleToggle(item)}
+        c={c}
+        isDark={isDark}
+      />
+    );
+  }, [livePrices, isInWatchlist, handleToggle, c, isDark]);
 
   const keyExtractor = useCallback((item: UniverseStock) => item.id, []);
 
