@@ -17,7 +17,7 @@ import { useSignals } from "@/context/SignalContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
 
-type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권";
+type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "저평가" | "고점권";
 
 export default function HomeScreen() {
   const isDark = useColorScheme() === "dark";
@@ -38,6 +38,8 @@ export default function HomeScreen() {
       case "국내장": return watchlistStocks.filter((s) => s.region === "국내장");
       case "우량주": return watchlistStocks.filter((s) => s.grade === "우량주");
       case "저점권": return watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권");
+      case "저평가": return watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가"));
+      case "고점권": return watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권");
       default: return watchlistStocks;
     }
   }, [filter, watchlistStocks]);
@@ -96,15 +98,15 @@ export default function HomeScreen() {
             <Text style={[styles.summaryLbl, { color: c.textSecondary }]}>저점 기회</Text>
           </TouchableOpacity>
           <View style={[styles.summaryDivider, { backgroundColor: c.separator }]} />
-          <TouchableOpacity style={styles.summaryItem}>
+          <TouchableOpacity style={styles.summaryItem} onPress={() => setFilter("저평가")}>
             <Text style={[styles.summaryVal, { color: "#0064FF" }]}>{underCount}</Text>
             <Text style={[styles.summaryLbl, { color: c.textSecondary }]}>저평가</Text>
           </TouchableOpacity>
           <View style={[styles.summaryDivider, { backgroundColor: c.separator }]} />
-          <View style={styles.summaryItem}>
+          <TouchableOpacity style={styles.summaryItem} onPress={() => setFilter("고점권")}>
             <Text style={[styles.summaryVal, { color: "#FF6B00" }]}>{highCount}</Text>
             <Text style={[styles.summaryLbl, { color: c.textSecondary }]}>고점 주의</Text>
-          </View>
+          </TouchableOpacity>
           <View style={[styles.summaryDivider, { backgroundColor: c.separator }]} />
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryVal, { color: c.textSecondary }]}>27.53</Text>
