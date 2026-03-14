@@ -523,6 +523,13 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   { id:"310210", name:"보로노이",       nameEn:"Voronoi",           ticker:"310210", market:"KOSDAQ", sector:"면역항암신약",      currentPrice:30000,  marketCap:"0.4조" },
   { id:"196300", name:"애경산업",       nameEn:"AK Holdings",       ticker:"196300", market:"KOSDAQ", sector:"생활용품/화장품",   currentPrice:20000,  marketCap:"0.3조" },
   { id:"298380", name:"에이비엘바이오", nameEn:"ABL Bio",           ticker:"298380", market:"KOSDAQ", sector:"이중항체플랫폼바이오",currentPrice:20000, marketCap:"0.5조" },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // 추가 종목
+  // ══════════════════════════════════════════════════════════════════════════
+  { id:"benf",   name:"브랜드인게이지먼트", nameEn:"Brand Engagement Network", ticker:"BENF",   market:"NASDAQ", sector:"AI마케팅/챗봇",   currentPrice:4350,  marketCap:"0.1조" },
+  { id:"kbio",   name:"케이바이오",         nameEn:"K-Bio Healthcare",          ticker:"099330", market:"KOSDAQ", sector:"바이오/의약품",   currentPrice:6800,  marketCap:"0.2조" },
+  { id:"sgworld",name:"SG세계물산",         nameEn:"SG Worldco",                ticker:"004060", market:"KOSPI",  sector:"건설/인테리어",  currentPrice:2850,  marketCap:"0.2조" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -768,6 +775,10 @@ export const VALUATION_MAP: Record<string, ValuationData> = {
   "336570":     { per: 20,  pbr: 2.5 }, "257720":     { per: 10,  pbr: 1.5 },
   "310210":     { per: null,pbr: 3   }, "196300":     { per: 12,  pbr: 0.8 },
   "298380":     { per: null,pbr: 3   },
+  // ── 추가 종목 ────────────────────────────────────────────────────────────
+  "BENF":        { per: null,pbr: 2.5 },
+  "099330":     { per: null,pbr: 1.5 },
+  "004060":     { per: 14,  pbr: 0.5 },
 };
 
 // 저평가 판정: PER과 PBR 기준을 시장별로 다르게 적용
