@@ -22,6 +22,16 @@ export default function DayFeaturesSection({ stock }: DayFeaturesSectionProps) {
         <Text style={[styles.sectionTitle, { color: c.text }]}>요일별 특징 & 유의사항</Text>
       </View>
 
+      {stock.dayFeatures.length === 0 && (
+        <View style={styles.emptyWrap}>
+          <Ionicons name="calendar-outline" size={36} color={c.textTertiary} />
+          <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>요일별 데이터 없음</Text>
+          <Text style={[styles.emptyDesc, { color: c.textTertiary }]}>
+            탐색·검색으로 추가된 종목은{"\n"}요일별 데이터가 제공되지 않습니다.
+          </Text>
+        </View>
+      )}
+
       {stock.dayFeatures.map((item, i) => (
         <View
           key={i}
@@ -116,5 +126,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     lineHeight: 17,
+  },
+  emptyWrap: {
+    alignItems: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  emptyDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

@@ -22,12 +22,37 @@ export default function FinancialsSection({ stock }: FinancialsSectionProps) {
   const { financials } = stock;
   const evalColor = EVAL_COLORS[financials.evaluation] || "#888";
 
+  const isStub = financials.per === 0 && financials.pbr === 0 && financials.roe === 0;
+
+  const fmtPer = () => {
+    if (isStub || financials.per == null) return "N/A";
+    if (financials.per < 0) return "적자";
+    return `${financials.per}배`;
+  };
+  const fmtPbr = () => {
+    if (isStub || financials.pbr == null || financials.pbr === 0) return "N/A";
+    return `${financials.pbr}배`;
+  };
+  const fmtRoe = () => {
+    if (isStub || financials.roe == null || financials.roe === 0) return "N/A";
+    if (financials.roe < 0) return `${financials.roe}%`;
+    return `${financials.roe}%`;
+  };
+  const fmtDebt = () => {
+    if (isStub || financials.debtRatio == null || financials.debtRatio === 0) return "N/A";
+    return `${financials.debtRatio}%`;
+  };
+  const fmtRev = () => {
+    if (isStub || financials.revenueGrowth == null || financials.revenueGrowth === 0) return "N/A";
+    return `${financials.revenueGrowth > 0 ? "+" : ""}${financials.revenueGrowth}%`;
+  };
+
   const metrics = [
-    { label: "PER (주가수익비율)", value: financials.per < 0 ? "적자" : `${financials.per}배`, good: financials.per > 0 && financials.per < 25, na: financials.per < 0 },
-    { label: "PBR (주가순자산비율)", value: `${financials.pbr}배`, good: financials.pbr < 3, na: false },
-    { label: "ROE (자기자본이익률)", value: `${financials.roe}%`, good: financials.roe > 15, na: financials.roe < 0 },
-    { label: "부채비율", value: `${financials.debtRatio}%`, good: financials.debtRatio < 100, na: false },
-    { label: "매출 성장률", value: `+${financials.revenueGrowth}%`, good: financials.revenueGrowth > 10, na: false },
+    { label: "PER (주가수익비율)",  value: fmtPer(),  good: !isStub && financials.per > 0 && financials.per < 25,     na: isStub || financials.per  <= 0 },
+    { label: "PBR (주가순자산비율)",value: fmtPbr(),  good: !isStub && financials.pbr > 0 && financials.pbr < 3,      na: isStub || financials.pbr  === 0 },
+    { label: "ROE (자기자본이익률)",value: fmtRoe(),  good: !isStub && financials.roe > 15,                            na: isStub || financials.roe  === 0 },
+    { label: "부채비율",            value: fmtDebt(), good: !isStub && financials.debtRatio > 0 && financials.debtRatio < 100, na: isStub || financials.debtRatio === 0 },
+    { label: "매출 성장률",         value: fmtRev(),  good: !isStub && financials.revenueGrowth > 10,                 na: isStub || financials.revenueGrowth === 0 },
   ];
 
   return (

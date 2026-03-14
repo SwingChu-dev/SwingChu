@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,29 @@ import { useStockPrice } from "@/context/StockPriceContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
 
+const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+
+function useVix() {
+  const [vix, setVix] = useState<number | null>(null);
+  const fetch = useCallback(async () => {
+    try {
+      const resp = await globalThis.fetch(
+        `${API_BASE}/stocks/quotes?items=${encodeURIComponent("^VIX:INDEX")}`
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const q = data?.[0];
+      if (q?.ok && q.price > 0) setVix(parseFloat(q.price.toFixed(2)));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    fetch();
+    const t = setInterval(fetch, 300_000); // 5분마다 갱신
+    return () => clearInterval(t);
+  }, [fetch]);
+  return vix;
+}
+
 type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "저평가" | "고점권";
 
 export default function HomeScreen() {
@@ -31,6 +54,7 @@ export default function HomeScreen() {
   const { watchlistStocks, removeStock } = useWatchlist();
   const { newCount, getSignalForStock } = useSignals();
   const { getQuote, refresh } = useStockPrice();
+  const vix = useVix();
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
 
@@ -113,7 +137,11 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <View style={[styles.summaryDivider, { backgroundColor: c.separator }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryVal, { color: c.textSecondary }]}>27.53</Text>
+            <Text style={[styles.summaryVal, {
+              color: vix == null ? c.textSecondary : vix >= 30 ? "#F04452" : vix >= 20 ? "#FF6B00" : "#2DB55D"
+            }]}>
+              {vix != null ? vix.toFixed(2) : "—"}
+            </Text>
             <Text style={[styles.summaryLbl, { color: c.textSecondary }]}>VIX</Text>
           </View>
         </View>
