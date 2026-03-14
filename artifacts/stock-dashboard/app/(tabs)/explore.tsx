@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useWatchlist } from "@/context/WatchlistContext";
-import {
-  UNIVERSE_STOCKS,
-  UniverseStock,
-  UniverseMarket,
-} from "@/constants/stockUniverse";
+import { UNIVERSE_STOCKS, UniverseStock, UniverseMarket } from "@/constants/stockUniverse";
 import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
 
 type MarketFilter = "ALL" | UniverseMarket;
@@ -34,7 +30,10 @@ const MARKET_COLORS: Record<string, string> = {
   KOSDAQ: "#F59E0B",
 };
 
-function formatPrice(p: number, market: string) {
+// Approximate row height for getItemLayout (avoids measuring every row)
+const ITEM_HEIGHT = 78;
+
+function formatPrice(p: number, market: string): string {
   if (p === 0) return "—";
   if (market === "KOSPI" || market === "KOSDAQ") {
     if (p >= 1000000) return `₩${(p / 1000000).toFixed(1)}M`;
@@ -44,20 +43,17 @@ function formatPrice(p: number, market: string) {
   return `₩${Math.round(p).toLocaleString()}`;
 }
 
-function StockRow({
-  item,
-  inWatchlist,
-  onToggle,
-  c,
-}: {
-  item: UniverseStock;
-  inWatchlist: boolean;
-  onToggle: () => void;
-  c: any;
-}) {
-  const mc = MARKET_COLORS[item.market] || "#888";
-  const isUSD = item.market === "NASDAQ";
+// ─── Memoized row ─────────────────────────────────────────────────────────────
+interface RowProps {
+  item:       UniverseStock;
+  inWatchlist:boolean;
+  onToggle:   () => void;
+  c:          any;
+}
 
+const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c }: RowProps) {
+  const mc     = MARKET_COLORS[item.market] || "#888";
+  const isUSD  = item.market === "NASDAQ";
   return (
     <View style={[styles.row, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
       <View style={styles.rowLeft}>
@@ -77,9 +73,7 @@ function StockRow({
 
       <View style={styles.rowRight}>
         <View style={styles.priceBlock}>
-          <Text style={[styles.price, { color: c.text }]}>
-            {formatPrice(item.currentPrice, item.market)}
-          </Text>
+          <Text style={[styles.price, { color: c.text }]}>{formatPrice(item.currentPrice, item.market)}</Text>
           {isUSD && item.currentPrice > 0 && (
             <Text style={[styles.usd, { color: c.textTertiary }]}>
               ${(item.currentPrice / USD_KRW_RATE).toFixed(2)}
@@ -96,11 +90,8 @@ function StockRow({
           onPress={onToggle}
           activeOpacity={0.7}
         >
-          <Ionicons
-            name={inWatchlist ? "checkmark" : "add"}
-            size={16}
-            color={inWatchlist ? "#F04452" : "#0064FF"}
-          />
+          <Ionicons name={inWatchlist ? "checkmark" : "add"} size={16}
+            color={inWatchlist ? "#F04452" : "#0064FF"} />
           <Text style={[styles.toggleText, { color: inWatchlist ? "#F04452" : "#0064FF" }]}>
             {inWatchlist ? "추가됨" : "추가"}
           </Text>
@@ -108,11 +99,16 @@ function StockRow({
       </View>
     </View>
   );
-}
+}, (prev, next) =>
+  prev.inWatchlist === next.inWatchlist &&
+  prev.item.id     === next.item.id     &&
+  prev.c           === next.c
+);
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ExploreScreen() {
   const isDark = useColorScheme() === "dark";
-  const c = isDark ? Colors.dark : Colors.light;
+  const c      = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const { watchlistIds, removeStock, addFromUniverse } = useWatchlist();
 
@@ -122,10 +118,10 @@ export default function ExploreScreen() {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return UNIVERSE_STOCKS.filter((s) => {
-      const marketMatch = market === "ALL" || s.market === market;
-      if (!q) return marketMatch;
-      return marketMatch && (
-        s.name.toLowerCase().includes(q) ||
+      const mOk = market === "ALL" || s.market === market;
+      if (!q) return mOk;
+      return mOk && (
+        s.name.toLowerCase().includes(q)   ||
         s.nameEn.toLowerCase().includes(q) ||
         s.ticker.toLowerCase().includes(q) ||
         s.sector.toLowerCase().includes(q)
@@ -133,26 +129,42 @@ export default function ExploreScreen() {
     });
   }, [query, market]);
 
-  const isInWatchlist = useCallback((item: UniverseStock) => {
-    const predefined = STOCKS.find((s) => s.ticker === item.ticker);
-    if (predefined) return watchlistIds.includes(predefined.id);
-    return watchlistIds.includes(item.id);
-  }, [watchlistIds]);
+  // Stable watchlistSet for O(1) lookup (avoids Array.includes on every row)
+  const watchlistSet = useMemo(() => new Set(watchlistIds), [watchlistIds]);
+
+  const isInWatchlist = useCallback((item: UniverseStock): boolean => {
+    const pre = STOCKS.find((s) => s.ticker === item.ticker);
+    return pre ? watchlistSet.has(pre.id) : watchlistSet.has(item.id);
+  }, [watchlistSet]);
 
   const handleToggle = useCallback((item: UniverseStock) => {
-    const predefined = STOCKS.find((s) => s.ticker === item.ticker);
-    const targetId   = predefined ? predefined.id : item.id;
-    if (watchlistIds.includes(targetId)) {
-      removeStock(targetId);
-    } else {
-      addFromUniverse(item);
-    }
-  }, [watchlistIds, removeStock, addFromUniverse]);
+    const pre      = STOCKS.find((s) => s.ticker === item.ticker);
+    const targetId = pre ? pre.id : item.id;
+    if (watchlistSet.has(targetId)) removeStock(targetId);
+    else addFromUniverse(item);
+  }, [watchlistSet, removeStock, addFromUniverse]);
 
   const addedCount = useMemo(
     () => results.filter((s) => isInWatchlist(s)).length,
     [results, isInWatchlist]
   );
+
+  // Fixed-height rows allow FlatList to skip measuring and jump to any offset instantly
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }),
+    []
+  );
+
+  const renderItem = useCallback(({ item }: { item: UniverseStock }) => (
+    <StockRow
+      item={item}
+      inWatchlist={isInWatchlist(item)}
+      onToggle={() => handleToggle(item)}
+      c={c}
+    />
+  ), [isInWatchlist, handleToggle, c]);
+
+  const keyExtractor = useCallback((item: UniverseStock) => item.id, []);
 
   return (
     <View style={[styles.root, { backgroundColor: c.background }]}>
@@ -171,7 +183,7 @@ export default function ExploreScreen() {
         )}
       </View>
 
-      {/* Search bar */}
+      {/* Search */}
       <View style={[styles.searchWrap, { backgroundColor: c.backgroundSecondary }]}>
         <View style={[styles.searchBox, { backgroundColor: isDark ? "#1E2D3D" : "#F0F4F8" }]}>
           <Ionicons name="search" size={16} color={c.textTertiary} />
@@ -203,13 +215,11 @@ export default function ExploreScreen() {
             ]}
             onPress={() => setMarket(t.key)}
           >
-            <Text
-              style={[
-                styles.filterTabText,
-                { color: market === t.key ? c.tint : c.textSecondary },
-                market === t.key && { fontFamily: "Inter_700Bold" },
-              ]}
-            >
+            <Text style={[
+              styles.filterTabText,
+              { color: market === t.key ? c.tint : c.textSecondary },
+              market === t.key && { fontFamily: "Inter_700Bold" },
+            ]}>
               {t.label}
             </Text>
           </TouchableOpacity>
@@ -227,21 +237,17 @@ export default function ExploreScreen() {
       {/* List */}
       <FlatList
         data={results}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <StockRow
-            item={item}
-            inWatchlist={isInWatchlist(item)}
-            onToggle={() => handleToggle(item)}
-            c={c}
-          />
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        getItemLayout={getItemLayout}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        initialNumToRender={30}
-        maxToRenderPerBatch={30}
-        windowSize={10}
+        initialNumToRender={20}
+        maxToRenderPerBatch={20}
+        updateCellsBatchingPeriod={50}
+        windowSize={7}
+        removeClippedSubviews
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="search-outline" size={40} color={c.textTertiary} />
@@ -262,29 +268,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-  },
-  headerSub: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
-  addedBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 100,
-  },
-  addedBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  searchWrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
+  headerTitle:    { fontSize: 22, fontFamily: "Inter_700Bold" },
+  headerSub:      { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  addedBadge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
+  addedBadgeText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  searchWrap:     { paddingHorizontal: 16, paddingVertical: 8 },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -293,92 +281,36 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-  },
+  searchInput:    { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
   filterRow: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 8,
   },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  filterTabActive: {
-    borderBottomWidth: 2,
-  },
-  filterTabText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-  },
-  countRow: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  countText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
+  filterTab:       { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
+  filterTabActive: { borderBottomWidth: 2 },
+  filterTabText:   { fontSize: 13, fontFamily: "Inter_500Medium" },
+  countRow:        { paddingHorizontal: 20, paddingVertical: 8 },
+  countText:       { fontSize: 12, fontFamily: "Inter_400Regular" },
   row: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    height: ITEM_HEIGHT,
   },
-  rowLeft: {
-    flex: 1,
-    gap: 2,
-    marginRight: 8,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  name: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    flexShrink: 1,
-  },
-  mktBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  mktText: {
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-  },
-  sub: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
-  cap: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-  },
-  rowRight: {
-    alignItems: "flex-end",
-    gap: 6,
-  },
-  priceBlock: {
-    alignItems: "flex-end",
-    gap: 1,
-  },
-  price: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  usd: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-  },
+  rowLeft:   { flex: 1, gap: 2, marginRight: 8 },
+  nameRow:   { flexDirection: "row", alignItems: "center", gap: 6 },
+  name:      { fontSize: 15, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  mktBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  mktText:   { fontSize: 9, fontFamily: "Inter_700Bold" },
+  sub:       { fontSize: 12, fontFamily: "Inter_400Regular" },
+  cap:       { fontSize: 11, fontFamily: "Inter_400Regular" },
+  rowRight:  { alignItems: "flex-end", gap: 6 },
+  priceBlock:{ alignItems: "flex-end", gap: 1 },
+  price:     { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  usd:       { fontSize: 11, fontFamily: "Inter_400Regular" },
   toggleBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -388,17 +320,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  toggleText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  empty: {
-    alignItems: "center",
-    paddingVertical: 80,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-  },
+  toggleText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  empty:      { alignItems: "center", paddingVertical: 80, gap: 12 },
+  emptyText:  { fontSize: 15, fontFamily: "Inter_500Medium" },
 });

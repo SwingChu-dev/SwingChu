@@ -1,76 +1,81 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  useColorScheme,
   Animated,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
 import { StockInfo, USD_KRW_RATE } from "@/constants/stockData";
-import { SIGNAL_META } from "@/constants/smartMoney";
-import { useSignals } from "@/context/SignalContext";
-import { useStockPrice } from "@/context/StockPriceContext";
+import { SIGNAL_META, SmartMoneySignal } from "@/constants/smartMoney";
+import { LiveQuote } from "@/context/StockPriceContext";
 
-interface StockCardProps {
-  stock: StockInfo;
-  onPress: () => void;
-  editMode?: boolean;
-  onDelete?: () => void;
-  isLast?: boolean;
+// Moved outside component – created once, not per render
+function formatPrice(p: number): string {
+  if (p >= 100000000) return `${(p / 100000000).toFixed(1)}억`;
+  if (p >= 10000)     return `${Math.round(p / 10000)}만`;
+  return p.toLocaleString();
 }
 
-export default function StockCard({
+interface StockCardProps {
+  stock:    StockInfo;
+  quote:    LiveQuote | null;
+  signal:   SmartMoneySignal | null;
+  colors:   any;
+  isDark:   boolean;
+  onPress:  () => void;
+  editMode?: boolean;
+  onDelete?: () => void;
+  isLast?:  boolean;
+}
+
+// useNativeDriver=true on native (translateX + opacity are supported),
+// false on web (no native thread)
+const USE_NATIVE = Platform.OS !== "web";
+
+function StockCardInner({
   stock,
+  quote,
+  signal,
+  colors: c,
+  isDark,
   onPress,
   editMode = false,
   onDelete,
   isLast = false,
 }: StockCardProps) {
-  const isDark = useColorScheme() === "dark";
-  const c = isDark ? Colors.dark : Colors.light;
-  const { getSignalForStock } = useSignals();
-  const signal = getSignalForStock(stock.id);
-  const { priceKRW: liveKRW, changePct: liveChangePct } = useStockPrice();
-
   const latestForecast =
     stock.forecasts.find((f) => f.period === "12개월 후" || f.period === "360일") ??
     stock.forecasts[Math.min(5, stock.forecasts.length - 1)];
 
-  const displayPrice     = liveKRW(stock.ticker, stock.market, stock.currentPrice);
-  const rawChangePct     = liveChangePct(stock.ticker, stock.market);
+  const displayPrice     = quote?.priceKRW      ?? stock.currentPrice;
+  const rawChangePct     = quote ? quote.changePercent : null;
   const isLiveChange     = rawChangePct !== null;
-  const displayChangePct = isLiveChange ? rawChangePct : latestForecast?.changePercent ?? 0;
+  const displayChangePct = isLiveChange ? rawChangePct : (latestForecast?.changePercent ?? 0);
   const isPositiveChange = displayChangePct >= 0;
 
+  // Animation
   const slideAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(slideAnim, {
       toValue: editMode ? 1 : 0,
-      useNativeDriver: false,
+      useNativeDriver: USE_NATIVE,
       tension: 120,
       friction: 14,
     }).start();
   }, [editMode]);
 
   const deleteOpacity = slideAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
-  const contentShift = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 42] });
+  const contentShift  = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 42] });
 
-  const boxPos  = stock.boxRange.currentPosition;
+  const boxPos   = stock.boxRange.currentPosition;
   const boxColor = boxPos === "저점권" ? c.positiveGreen : boxPos === "고점권" ? c.positive : c.warning;
-
-  const formatPrice = (p: number) => {
-    if (p >= 100000000) return `${(p / 100000000).toFixed(1)}억`;
-    if (p >= 10000) return `${Math.round(p / 10000)}만`;
-    return p.toLocaleString();
-  };
-
   const signalMeta = signal ? SIGNAL_META[signal.type] : null;
 
   return (
-    <View style={{ overflow: "hidden" }}>
+    <View style={styles.wrapper}>
       <Animated.View
         style={[
           styles.deleteWrap,
@@ -78,7 +83,7 @@ export default function StockCard({
         ]}
       >
         <TouchableOpacity
-          style={[styles.deleteBtn, { backgroundColor: "#F04452" }]}
+          style={styles.deleteBtn}
           onPress={onDelete}
           activeOpacity={0.8}
         >
@@ -86,7 +91,10 @@ export default function StockCard({
         </TouchableOpacity>
       </Animated.View>
 
-      <Animated.View style={{ transform: [{ translateX: contentShift }] }}>
+      <Animated.View style={USE_NATIVE
+        ? { transform: [{ translateX: contentShift }] }
+        : { transform: [{ translateX: contentShift }] }
+      }>
         <TouchableOpacity
           style={[
             styles.row,
@@ -101,9 +109,7 @@ export default function StockCard({
               <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
                 {stock.name}
               </Text>
-              {signal && signal.isNew && (
-                <View style={[styles.newDot, { backgroundColor: "#F04452" }]} />
-              )}
+              {signal?.isNew && <View style={styles.newDot} />}
             </View>
             <Text style={[styles.ticker, { color: c.textSecondary }]}>
               {stock.ticker}  ·  {stock.market}
@@ -112,15 +118,15 @@ export default function StockCard({
 
           <View style={styles.mid}>
             {signalMeta && signal ? (
-              <View style={[styles.signalBadge, { backgroundColor: isDark ? signal.type === "세력이탈" || signal.type === "분산중" ? "#1B2744" : "#3A1218" : signalMeta.bg }]}>
-                <Ionicons
-                  name={signalMeta.icon as any}
-                  size={11}
-                  color={signalMeta.color}
-                />
-                <Text style={[styles.signalText, { color: signalMeta.color }]}>
-                  {signal.type}
-                </Text>
+              <View style={[
+                styles.signalBadge,
+                { backgroundColor: isDark
+                    ? (signal.type === "세력이탈" || signal.type === "분산중" ? "#1B2744" : "#3A1218")
+                    : signalMeta.bg
+                }
+              ]}>
+                <Ionicons name={signalMeta.icon as any} size={11} color={signalMeta.color} />
+                <Text style={[styles.signalText, { color: signalMeta.color }]}>{signal.type}</Text>
               </View>
             ) : (
               <View style={[styles.boxBadge, { backgroundColor: boxColor + "20" }]}>
@@ -131,24 +137,15 @@ export default function StockCard({
 
           <View style={styles.right}>
             <View style={styles.priceRow}>
-              <Text style={[styles.price, { color: c.text }]}>
-                ₩{formatPrice(displayPrice)}
-              </Text>
-              {isLiveChange && (
-                <View style={[styles.liveDot, { backgroundColor: "#22C55E" }]} />
-              )}
+              <Text style={[styles.price, { color: c.text }]}>₩{formatPrice(displayPrice)}</Text>
+              {isLiveChange && <View style={styles.liveDot} />}
             </View>
             {stock.market === "NASDAQ" && (
               <Text style={[styles.usdPrice, { color: c.textTertiary }]}>
                 ${(displayPrice / USD_KRW_RATE).toFixed(2)}
               </Text>
             )}
-            <Text
-              style={[
-                styles.change,
-                { color: isPositiveChange ? c.positive : c.negative },
-              ]}
-            >
+            <Text style={[styles.change, { color: isPositiveChange ? c.positive : c.negative }]}>
               {isPositiveChange ? "▲" : "▼"} {Math.abs(displayChangePct).toFixed(2)}%
               {!isLiveChange && " (예측)"}
             </Text>
@@ -163,7 +160,24 @@ export default function StockCard({
   );
 }
 
+// memo: skip re-render if props are shallowly equal
+// quote reference changes only when THIS stock's price changes (passed from parent)
+const StockCard = memo(StockCardInner, (prev, next) => {
+  return (
+    prev.editMode    === next.editMode   &&
+    prev.isLast      === next.isLast     &&
+    prev.stock.id    === next.stock.id   &&
+    prev.isDark      === next.isDark     &&
+    prev.colors      === next.colors     &&
+    prev.quote       === next.quote      &&
+    prev.signal      === next.signal
+  );
+});
+
+export default StockCard;
+
 const styles = StyleSheet.create({
+  wrapper: { overflow: "hidden" },
   deleteWrap: {
     position: "absolute",
     left: 16,
@@ -176,6 +190,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
+    backgroundColor: "#F04452",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -186,33 +201,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     minHeight: 64,
   },
-  left: {
-    flex: 1,
-    gap: 4,
-    marginRight: 8,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  name: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
-  newDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  ticker: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
-  mid: {
-    alignItems: "center",
-    marginRight: 12,
-  },
+  left: { flex: 1, gap: 4, marginRight: 8 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  name: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  newDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#F04452" },
+  ticker: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  mid: { alignItems: "center", marginRight: 12 },
   signalBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -221,46 +215,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
-  signalText: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-  },
-  boxBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  boxText: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
-  },
-  right: {
-    alignItems: "flex-end",
-    gap: 3,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  price: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
-  usdPrice: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-  },
-  change: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  chevron: {
-    marginLeft: 4,
-  },
+  signalText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  boxBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  boxText: { fontSize: 10, fontFamily: "Inter_500Medium" },
+  right: { alignItems: "flex-end", gap: 3 },
+  priceRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" },
+  price: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  usdPrice: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  change: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  chevron: { marginLeft: 4 },
 });

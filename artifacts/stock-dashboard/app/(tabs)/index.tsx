@@ -1,12 +1,12 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  useColorScheme,
   RefreshControl,
   TouchableOpacity,
+  useColorScheme,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useSignals } from "@/context/SignalContext";
+import { useStockPrice } from "@/context/StockPriceContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
 
@@ -28,33 +29,43 @@ export default function HomeScreen() {
   const [editMode, setEditMode] = useState(false);
 
   const { watchlistStocks, removeStock } = useWatchlist();
-  const { newCount } = useSignals();
+  const { newCount, getSignalForStock } = useSignals();
+  const { getQuote, refresh } = useStockPrice();
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
 
   const displayed = useMemo(() => {
     switch (filter) {
-      case "미국장": return watchlistStocks.filter((s) => s.region === "미국장");
-      case "국내장": return watchlistStocks.filter((s) => s.region === "국내장");
-      case "우량주": return watchlistStocks.filter((s) => s.grade === "우량주");
-      case "저점권": return watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권");
-      case "저평가": return watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가"));
-      case "고점권": return watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권");
-      default: return watchlistStocks;
+      case "미국장":  return watchlistStocks.filter((s) => s.region === "미국장");
+      case "국내장":  return watchlistStocks.filter((s) => s.region === "국내장");
+      case "우량주":  return watchlistStocks.filter((s) => s.grade === "우량주");
+      case "저점권":  return watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권");
+      case "저평가":  return watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가"));
+      case "고점권":  return watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권");
+      default:        return watchlistStocks;
     }
   }, [filter, watchlistStocks]);
 
-  const lowCount = watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권").length;
-  const underCount = watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가")).length;
-  const highCount = watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권").length;
+  const lowCount   = useMemo(() => watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권").length, [watchlistStocks]);
+  const underCount = useMemo(() => watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가")).length, [watchlistStocks]);
+  const highCount  = useMemo(() => watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권").length, [watchlistStocks]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    refresh();
+    setTimeout(() => setRefreshing(false), 1200);
+  }, [refresh]);
+
+  const handleFilter = useCallback((f: FilterType) => {
+    setFilter(f);
+    if (editMode) setEditMode(false);
+  }, [editMode]);
 
   return (
     <View style={[styles.root, { backgroundColor: c.background }]}>
       {/* ─── Header ─── */}
       <View style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: c.background }]}>
-        <View>
-          <Text style={[styles.headerTitle, { color: c.text }]}>관심종목</Text>
-        </View>
+        <Text style={[styles.headerTitle, { color: c.text }]}>관심종목</Text>
         <View style={styles.headerRight}>
           {newCount > 0 && (
             <TouchableOpacity
@@ -68,10 +79,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[
-              styles.editBtn,
-              { backgroundColor: editMode ? c.tint + "18" : "transparent" },
-            ]}
+            style={[styles.editBtn, { backgroundColor: editMode ? c.tint + "18" : "transparent" }]}
             onPress={() => setEditMode((v) => !v)}
           >
             <Text style={[styles.editBtnText, { color: editMode ? c.tint : c.textSecondary }]}>
@@ -84,11 +92,7 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1000); }}
-            tintColor={c.tint}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.tint} />
         }
       >
         {/* ─── Summary Row ─── */}
@@ -121,15 +125,7 @@ export default function HomeScreen() {
           contentContainerStyle={styles.filterRow}
         >
           {filters.map((f) => (
-            <FilterChip
-              key={f}
-              label={f}
-              selected={filter === f}
-              onPress={() => {
-                setFilter(f);
-                if (editMode) setEditMode(false);
-              }}
-            />
+            <FilterChip key={f} label={f} selected={filter === f} onPress={() => handleFilter(f)} />
           ))}
         </ScrollView>
 
@@ -140,9 +136,7 @@ export default function HomeScreen() {
               {displayed.length}개 종목
             </Text>
             {editMode && (
-              <Text style={[styles.editHint, { color: c.textTertiary }]}>
-                — 버튼으로 삭제
-              </Text>
+              <Text style={[styles.editHint, { color: c.textTertiary }]}>— 버튼으로 삭제</Text>
             )}
           </View>
 
@@ -150,6 +144,11 @@ export default function HomeScreen() {
             <StockCard
               key={stock.id}
               stock={stock}
+              // Pass computed props so React.memo can skip re-renders correctly
+              quote={getQuote(stock.ticker, stock.market)}
+              signal={getSignalForStock(stock.id) ?? null}
+              colors={c}
+              isDark={isDark}
               editMode={editMode}
               onDelete={() => removeStock(stock.id)}
               isLast={idx === displayed.length - 1}
@@ -186,7 +185,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root:      { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -194,45 +193,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 12,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  alertBtn: {
-    padding: 6,
-    position: "relative",
-  },
+  headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold" },
+  headerRight:  { flexDirection: "row", alignItems: "center", gap: 4 },
+  alertBtn:     { padding: 6, position: "relative" },
   alertBadge: {
     position: "absolute",
-    top: 4,
-    right: 4,
+    top: 4, right: 4,
     backgroundColor: "#F04452",
     borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    minWidth: 16, height: 16,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 3,
   },
-  alertBadgeText: {
-    color: "#fff",
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-  },
-  editBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
-  },
-  editBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
+  alertBadgeText: { color: "#fff", fontSize: 9, fontFamily: "Inter_700Bold" },
+  editBtn:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
+  editBtnText:    { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   summaryCard: {
     marginHorizontal: 16,
     marginBottom: 12,
@@ -240,34 +216,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingVertical: 16,
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  summaryVal: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-  },
-  summaryLbl: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-  },
-  summaryDivider: {
-    width: StyleSheet.hairlineWidth,
-    marginVertical: 4,
-  },
-  filterRow: {
-    paddingHorizontal: 16,
-    gap: 8,
-    paddingBottom: 12,
-  },
-  listCard: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 10,
-  },
+  summaryItem:   { flex: 1, alignItems: "center", gap: 4 },
+  summaryVal:    { fontSize: 20, fontFamily: "Inter_700Bold" },
+  summaryLbl:    { fontSize: 11, fontFamily: "Inter_400Regular" },
+  summaryDivider:{ width: StyleSheet.hairlineWidth, marginVertical: 4 },
+  filterRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
+  listCard:      { marginHorizontal: 16, borderRadius: 16, overflow: "hidden", marginBottom: 10 },
   listHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -276,22 +230,10 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 10,
   },
-  listCount: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  editHint: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-  },
-  emptyWrap: {
-    padding: 32,
-    alignItems: "center",
-  },
-  emptyText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
+  listCount:  { fontSize: 12, fontFamily: "Inter_500Medium" },
+  editHint:   { fontSize: 11, fontFamily: "Inter_400Regular" },
+  emptyWrap:  { padding: 32, alignItems: "center" },
+  emptyText:  { fontSize: 14, fontFamily: "Inter_400Regular" },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -301,8 +243,5 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 16,
   },
-  addBtnText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
+  addBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
 });
