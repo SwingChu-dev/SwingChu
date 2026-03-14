@@ -17,7 +17,7 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useSignals } from "@/context/SignalContext";
 import { SIGNAL_META, STRENGTH_META, SmartMoneySignal } from "@/constants/smartMoney";
-import { STOCKS } from "@/constants/stockData";
+
 import { useStockPrice } from "@/context/StockPriceContext";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { generateSmartMoneySignal } from "@/utils/generateSignals";
@@ -323,9 +323,11 @@ export default function SignalsScreen() {
 
   // 탐색 추가 스텁 종목 동적 신호 생성 (관망 제외하고 실질적 신호만)
   const dynamicSignals: SmartMoneySignal[] = useMemo(() => {
+    // staticIds = 이미 하드코딩 신호가 있는 stockId 목록
     const staticIds = new Set(staticSignals.map((s) => s.stockId));
+    // 하드코딩 신호가 없는 모든 워치리스트 종목(기본 13종목 중 미포함분 + 탐색 추가분)에 동적 신호 생성
     return watchlistStocks
-      .filter((s) => !STOCKS.find((p) => p.id === s.id) && !staticIds.has(s.id))
+      .filter((s) => !staticIds.has(s.id))
       .flatMap((stock) => {
         const quote = getQuote(stock.ticker, stock.market);
         if (!quote || !quote.ok) return [];

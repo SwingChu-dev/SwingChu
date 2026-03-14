@@ -144,7 +144,7 @@ export const SMART_MONEY_SIGNALS: SmartMoneySignal[] = [
   },
   {
     id: "sig_doosan_1",
-    stockId: "doosanenergility",
+    stockId: "doosan",
     stockName: "두산에너빌리티",
     ticker: "034020",
     market: "KOSPI",
