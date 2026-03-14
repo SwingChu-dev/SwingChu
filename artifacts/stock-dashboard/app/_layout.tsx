@@ -14,13 +14,20 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useColorScheme } from "react-native";
 import Colors from "@/constants/colors";
-import { WatchlistProvider } from "@/context/WatchlistContext";
+import { WatchlistProvider, useWatchlist } from "@/context/WatchlistContext";
 import { SignalProvider } from "@/context/SignalContext";
+import { StockPriceProvider } from "@/context/StockPriceContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+function PriceBridge({ children }: { children: React.ReactNode }) {
+  const { watchlistStocks } = useWatchlist();
+  const watchlist = watchlistStocks.map((s) => ({ ticker: s.ticker, market: s.market }));
+  return <StockPriceProvider watchlist={watchlist}>{children}</StockPriceProvider>;
+}
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
@@ -79,9 +86,11 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <WatchlistProvider>
-                <SignalProvider>
-                  <RootLayoutNav />
-                </SignalProvider>
+                <PriceBridge>
+                  <SignalProvider>
+                    <RootLayoutNav />
+                  </SignalProvider>
+                </PriceBridge>
               </WatchlistProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

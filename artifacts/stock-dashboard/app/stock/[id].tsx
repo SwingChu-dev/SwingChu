@@ -12,6 +12,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
+import { useStockPrice } from "@/context/StockPriceContext";
+import { useWatchlist } from "@/context/WatchlistContext";
 import SplitEntrySection from "@/components/detail/SplitEntrySection";
 import ProfitTargetSection from "@/components/detail/ProfitTargetSection";
 import BoxRangeSection from "@/components/detail/BoxRangeSection";
@@ -36,8 +38,10 @@ export default function StockDetailScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("진입");
+  const { allKnownStocks } = useWatchlist();
+  const { priceKRW: liveKRW, changePct: liveChangePct, getQuote } = useStockPrice();
 
-  const stock = STOCKS.find((s) => s.id === id);
+  const stock = allKnownStocks.find((s) => s.id === id) ?? STOCKS.find((s) => s.id === id);
 
   if (!stock) {
     return (
@@ -50,9 +54,14 @@ export default function StockDetailScreen() {
     );
   }
 
-  const marketColor = MARKET_COLORS[stock.market] || "#888";
-  const firstForecast = stock.forecasts[0];
-  const isPositiveShort = firstForecast.changePercent >= 0;
+  const marketColor    = MARKET_COLORS[stock.market] || "#888";
+  const firstForecast  = stock.forecasts[0];
+  const displayPrice   = liveKRW(stock.ticker, stock.market, stock.currentPrice);
+  const rawChangePct   = liveChangePct(stock.ticker, stock.market);
+  const liveQuote      = getQuote(stock.ticker, stock.market);
+  const isLive         = rawChangePct !== null;
+  const displayChangePct = isLive ? rawChangePct : firstForecast?.changePercent ?? 0;
+  const isPositiveShort  = displayChangePct >= 0;
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -77,13 +86,19 @@ export default function StockDetailScreen() {
           </View>
           <View style={styles.headerPriceRow}>
             <Text style={[styles.headerPrice, { color: c.text }]}>
-              ₩{stock.currentPrice.toLocaleString()}
+              ₩{displayPrice.toLocaleString()}
             </Text>
             {stock.market === "NASDAQ" && (
               <View style={[styles.usdBadge, { backgroundColor: "#0064FF14" }]}>
                 <Text style={[styles.usdBadgeText, { color: "#0064FF" }]}>
-                  ${(stock.currentPrice / USD_KRW_RATE).toFixed(2)}
+                  ${(displayPrice / USD_KRW_RATE).toFixed(2)}
                 </Text>
+              </View>
+            )}
+            {isLive && (
+              <View style={[styles.liveBadge]}>
+                <View style={styles.liveDotDetail} />
+                <Text style={styles.liveText}>실시간</Text>
               </View>
             )}
             <View style={[styles.regionBadge, { backgroundColor: c.backgroundTertiary }]}>
@@ -134,14 +149,16 @@ export default function StockDetailScreen() {
         </View>
         <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
         <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: c.textTertiary }]}>내일 전망</Text>
+          <Text style={[styles.statLabel, { color: c.textTertiary }]}>
+            {isLive ? "당일 등락" : "내일 전망"}
+          </Text>
           <Text
             style={[
               styles.statValue,
               { color: isPositiveShort ? c.positive : c.negative },
             ]}
           >
-            {isPositiveShort ? "+" : ""}{firstForecast.changePercent.toFixed(1)}%
+            {isPositiveShort ? "+" : ""}{displayChangePct.toFixed(2)}%
           </Text>
         </View>
         <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
@@ -294,6 +311,26 @@ const styles = StyleSheet.create({
   usdBadgeText: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "#22C55E18",
+  },
+  liveDotDetail: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22C55E",
+  },
+  liveText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#22C55E",
   },
   statsBar: {
     flexDirection: "row",

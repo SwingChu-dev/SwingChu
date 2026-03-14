@@ -12,6 +12,7 @@ import Colors from "@/constants/colors";
 import { StockInfo, USD_KRW_RATE } from "@/constants/stockData";
 import { SIGNAL_META } from "@/constants/smartMoney";
 import { useSignals } from "@/context/SignalContext";
+import { useStockPrice } from "@/context/StockPriceContext";
 
 interface StockCardProps {
   stock: StockInfo;
@@ -32,6 +33,17 @@ export default function StockCard({
   const c = isDark ? Colors.dark : Colors.light;
   const { getSignalForStock } = useSignals();
   const signal = getSignalForStock(stock.id);
+  const { priceKRW: liveKRW, changePct: liveChangePct } = useStockPrice();
+
+  const latestForecast =
+    stock.forecasts.find((f) => f.period === "12개월 후" || f.period === "360일") ??
+    stock.forecasts[Math.min(5, stock.forecasts.length - 1)];
+
+  const displayPrice     = liveKRW(stock.ticker, stock.market, stock.currentPrice);
+  const rawChangePct     = liveChangePct(stock.ticker, stock.market);
+  const isLiveChange     = rawChangePct !== null;
+  const displayChangePct = isLiveChange ? rawChangePct : latestForecast?.changePercent ?? 0;
+  const isPositiveChange = displayChangePct >= 0;
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -46,14 +58,8 @@ export default function StockCard({
   const deleteOpacity = slideAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
   const contentShift = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 42] });
 
-  const latestForecast =
-    stock.forecasts.find((f) => f.period === "12개월 후" || f.period === "360일") ??
-    stock.forecasts[Math.min(5, stock.forecasts.length - 1)];
-  const forecastUp = latestForecast.changePercent >= 0;
-
-  const boxPos = stock.boxRange.currentPosition;
-  const boxColor =
-    boxPos === "저점권" ? c.positiveGreen : boxPos === "고점권" ? c.positive : c.warning;
+  const boxPos  = stock.boxRange.currentPosition;
+  const boxColor = boxPos === "저점권" ? c.positiveGreen : boxPos === "고점권" ? c.positive : c.warning;
 
   const formatPrice = (p: number) => {
     if (p >= 100000000) return `${(p / 100000000).toFixed(1)}억`;
@@ -124,21 +130,27 @@ export default function StockCard({
           </View>
 
           <View style={styles.right}>
-            <Text style={[styles.price, { color: c.text }]}>
-              ₩{formatPrice(stock.currentPrice)}
-            </Text>
+            <View style={styles.priceRow}>
+              <Text style={[styles.price, { color: c.text }]}>
+                ₩{formatPrice(displayPrice)}
+              </Text>
+              {isLiveChange && (
+                <View style={[styles.liveDot, { backgroundColor: "#22C55E" }]} />
+              )}
+            </View>
             {stock.market === "NASDAQ" && (
               <Text style={[styles.usdPrice, { color: c.textTertiary }]}>
-                ${(stock.currentPrice / USD_KRW_RATE).toFixed(2)}
+                ${(displayPrice / USD_KRW_RATE).toFixed(2)}
               </Text>
             )}
             <Text
               style={[
                 styles.change,
-                { color: forecastUp ? c.positive : c.negative },
+                { color: isPositiveChange ? c.positive : c.negative },
               ]}
             >
-              {forecastUp ? "▲" : "▼"} {Math.abs(latestForecast.changePercent).toFixed(1)}%
+              {isPositiveChange ? "▲" : "▼"} {Math.abs(displayChangePct).toFixed(2)}%
+              {!isLiveChange && " (예측)"}
             </Text>
           </View>
 
@@ -225,6 +237,16 @@ const styles = StyleSheet.create({
   right: {
     alignItems: "flex-end",
     gap: 3,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   price: {
     fontSize: 15,
