@@ -8,7 +8,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -133,14 +133,16 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const [timerDone, setTimerDone] = useState(false);
 
-  // 스플래시를 바로 숨기고 면책 로딩 화면을 직접 보여줌
+  // 스플래시를 바로 숨기고 면책 화면을 5초 보여줌
   useEffect(() => {
     SplashScreen.hideAsync();
+    const t = setTimeout(() => setTimerDone(true), 5000);
+    return () => clearTimeout(t);
   }, []);
 
-
-  if (!fontsLoaded && !fontError) {
+  if (!timerDone || (!fontsLoaded && !fontError)) {
     return (
       <SafeAreaProvider>
         <DisclaimerScreen />

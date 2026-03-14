@@ -13,7 +13,7 @@ export interface UniverseStock {
 
 export const PREDEFINED_IDS = new Set([
   "nvda","googl","orcl","ionq","sandisk","eon",
-  "samsung","skhynix","hanwha","hyundai","doosan","woritech",
+  "samsung","skhynix","hanwha","hyundai","doosan","woritech","jejusemi",
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,13 +25,7 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   // ══════════════════════════════════════════════════════════════════════════
   // NASDAQ ─ 메가캡 / AI / 반도체
   // ══════════════════════════════════════════════════════════════════════════
-  { id:"nvda_skip",  name:"엔비디아",           nameEn:"NVIDIA",              ticker:"NVDA",  market:"NASDAQ", sector:"AI반도체",           currentPrice:261363, marketCap:"6,400조" },
-  { id:"googl_skip", name:"알파벳 A",            nameEn:"Alphabet A",          ticker:"GOOGL", market:"NASDAQ", sector:"AI/검색/클라우드",    currentPrice:438306, marketCap:"5,400조" },
   { id:"goog",       name:"알파벳 C",            nameEn:"Alphabet C",          ticker:"GOOG",  market:"NASDAQ", sector:"AI/검색/클라우드",    currentPrice:438306, marketCap:"5,400조" },
-  { id:"orcl_skip",  name:"오라클",              nameEn:"Oracle",              ticker:"ORCL",  market:"NASDAQ", sector:"클라우드DB/AI",        currentPrice:224750, marketCap:"580조" },
-  { id:"ionq_skip",  name:"아이온큐",            nameEn:"IonQ",                ticker:"IONQ",  market:"NASDAQ", sector:"양자컴퓨팅",           currentPrice:47850,  marketCap:"10조" },
-  { id:"sndk_skip",  name:"샌디스크",            nameEn:"SanDisk",             ticker:"SNDK",  market:"NASDAQ", sector:"낸드플래시/스토리지",  currentPrice:958500, marketCap:"30조" },
-  { id:"eonr_skip",  name:"EON 리소시스",        nameEn:"EON Resources",       ticker:"EONR",  market:"NASDAQ", sector:"희토류/자원",          currentPrice:2116,   marketCap:"0.1조" },
   { id:"aapl",  name:"애플",            nameEn:"Apple",               ticker:"AAPL",  market:"NASDAQ", sector:"IT/소비자전자",       currentPrice:283050, marketCap:"2,900조" },
   { id:"msft",  name:"마이크로소프트",   nameEn:"Microsoft",           ticker:"MSFT",  market:"NASDAQ", sector:"클라우드/AI/OS",      currentPrice:594500, marketCap:"4,400조" },
   { id:"amzn",  name:"아마존",          nameEn:"Amazon",              ticker:"AMZN",  market:"NASDAQ", sector:"이커머스/클라우드",   currentPrice:268250, marketCap:"2,800조" },
@@ -265,11 +259,6 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   // ══════════════════════════════════════════════════════════════════════════
   // KOSPI ─ 반도체 / IT
   // ══════════════════════════════════════════════════════════════════════════
-  { id:"005930_skip", name:"삼성전자",   nameEn:"Samsung Electronics", ticker:"005930", market:"KOSPI", sector:"반도체/가전/디스플레이", currentPrice:184000, marketCap:"1,097조" },
-  { id:"000660_skip", name:"SK하이닉스", nameEn:"SK Hynix",          ticker:"000660", market:"KOSPI", sector:"DRAM/HBM/낸드",       currentPrice:915000, marketCap:"660조" },
-  { id:"012450_skip", name:"한화에어로스페이스", nameEn:"Hanwha Aerospace",ticker:"012450",market:"KOSPI",sector:"방산/우주항공",    currentPrice:1474000,marketCap:"20조" },
-  { id:"005380_skip", name:"현대차",     nameEn:"Hyundai Motor",     ticker:"005380", market:"KOSPI", sector:"자동차/전기차/수소",  currentPrice:519000, marketCap:"23조" },
-  { id:"034020_skip", name:"두산에너빌리티", nameEn:"Doosan Enerbility",ticker:"034020",market:"KOSPI",sector:"원전/가스터빈",     currentPrice:106100, marketCap:"8조" },
   { id:"009150", name:"삼성전기",       nameEn:"Samsung Electro-Mechanics", ticker:"009150",market:"KOSPI",sector:"MLCC/카메라모듈",currentPrice:145000, marketCap:"10조" },
   { id:"011070", name:"LG이노텍",       nameEn:"LG Innotek",        ticker:"011070", market:"KOSPI", sector:"카메라모듈/전장부품", currentPrice:180000, marketCap:"4조" },
   { id:"000990", name:"DB하이텍",       nameEn:"DB HiTek",          ticker:"000990", market:"KOSPI", sector:"8인치파운드리",       currentPrice:30000,  marketCap:"1.5조" },
@@ -444,7 +433,6 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   // ══════════════════════════════════════════════════════════════════════════
   // KOSDAQ ─ 바이오 / 제약
   // ══════════════════════════════════════════════════════════════════════════
-  { id:"032820_skip", name:"우리기술",     nameEn:"Woori Tech",      ticker:"032820", market:"KOSDAQ", sector:"원전/소형주",       currentPrice:24450,  marketCap:"0.3조" },
   { id:"196170", name:"알테오젠",       nameEn:"Alteogen",          ticker:"196170", market:"KOSDAQ", sector:"피하주사플랫폼/바이오",currentPrice:200000,marketCap:"12조" },
   { id:"028300", name:"HLB",            nameEn:"HLB",               ticker:"028300", market:"KOSDAQ", sector:"항암신약/리보세라닙",currentPrice:30000,  marketCap:"2조" },
   { id:"068760", name:"셀트리온제약",   nameEn:"Celltrion Pharm",   ticker:"068760", market:"KOSDAQ", sector:"바이오시밀러판매",  currentPrice:85000,  marketCap:"5조" },
@@ -527,9 +515,10 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   // ══════════════════════════════════════════════════════════════════════════
   // 추가 종목
   // ══════════════════════════════════════════════════════════════════════════
-  { id:"benf",   name:"브랜드인게이지먼트네트워크", nameEn:"Brand Engagement Network", ticker:"BENF",   market:"NASDAQ", sector:"AI마케팅/챗봇/네트워크",   currentPrice:4350,  marketCap:"0.1조" },
-  { id:"kbio",   name:"케이바이오",         nameEn:"K-Bio Healthcare",          ticker:"099330", market:"KOSDAQ", sector:"바이오/의약품",   currentPrice:6800,  marketCap:"0.2조" },
-  { id:"sgworld",name:"SG세계물산",         nameEn:"SG Worldco",                ticker:"004060", market:"KOSPI",  sector:"건설/인테리어",  currentPrice:2850,  marketCap:"0.2조" },
+  { id:"benf",     name:"브랜드인게이지먼트네트워크", nameEn:"Brand Engagement Network", ticker:"BENF",   market:"NASDAQ", sector:"AI마케팅/챗봇/네트워크",   currentPrice:4350,  marketCap:"0.1조" },
+  { id:"kbio",     name:"케이바이오",         nameEn:"K-Bio Healthcare",          ticker:"099330", market:"KOSDAQ", sector:"바이오/의약품",          currentPrice:6800,  marketCap:"0.2조" },
+  { id:"sgworld",  name:"SG세계물산",         nameEn:"SG Worldco",                ticker:"004060", market:"KOSPI",  sector:"건설/인테리어",           currentPrice:2850,  marketCap:"0.2조" },
+  { id:"jejusemi", name:"제주반도체",         nameEn:"Jeju Semiconductor",        ticker:"080320", market:"KOSDAQ", sector:"메모리반도체/DRAM/SRAM",  currentPrice:6200,  marketCap:"0.3조" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -541,10 +530,11 @@ export interface ValuationData { per: number | null; pbr: number }
 
 export const VALUATION_MAP: Record<string, ValuationData> = {
   // ── NASDAQ: 메가캡 / AI / 반도체 ──────────────────────────────────────────
-  "nvda_skip":  { per: 40,  pbr: 38  }, "googl_skip": { per: 22,  pbr: 6   },
-  "goog":       { per: 22,  pbr: 6   }, "orcl_skip":  { per: 24,  pbr: 18  },
-  "ionq_skip":  { per: null,pbr: 4   }, "sndk_skip":  { per: 18,  pbr: 2   },
-  "eonr_skip":  { per: null,pbr: 3   }, "aapl":       { per: 30,  pbr: 40  },
+  "NVDA":       { per: 40,  pbr: 38  }, "GOOGL":      { per: 22,  pbr: 6   },
+  "goog":       { per: 22,  pbr: 6   }, "GOOG":       { per: 22,  pbr: 6   },
+  "ORCL":       { per: 24,  pbr: 18  }, "IONQ":       { per: null,pbr: 4   },
+  "SNDK":       { per: 18,  pbr: 2   }, "EONR":       { per: null,pbr: 3   },
+  "aapl":       { per: 30,  pbr: 40  }, "AAPL":       { per: 30,  pbr: 40  },
   "msft":       { per: 32,  pbr: 12  }, "amzn":       { per: 38,  pbr: 8   },
   "meta":       { per: 26,  pbr: 8   }, "tsla":       { per: 100, pbr: 12  },
   "amd":        { per: 95,  pbr: 4   }, "intc":       { per: 25,  pbr: 1.1 },
@@ -654,9 +644,9 @@ export const VALUATION_MAP: Record<string, ValuationData> = {
   "bidu":       { per: 14,  pbr: 1.2 }, "jd":         { per: 12,  pbr: 1.2 },
   "se":         { per: null,pbr: 3   }, "grab":       { per: null,pbr: 2   },
   // ── KOSPI: 반도체 / IT ───────────────────────────────────────────────────
-  "005930_skip":{ per: 13,  pbr: 1.3 }, "000660_skip":{ per: 8,   pbr: 1.6 },
-  "012450_skip":{ per: 22,  pbr: 2   }, "005380_skip":{ per: 6,   pbr: 0.5 },
-  "034020_skip":{ per: 15,  pbr: 1   }, "009150":     { per: 12,  pbr: 1.2 },
+  "005930":     { per: 13,  pbr: 1.3 }, "000660":     { per: 8,   pbr: 1.6 },
+  "012450":     { per: 22,  pbr: 2   }, "005380":     { per: 6,   pbr: 0.5 },
+  "034020":     { per: 15,  pbr: 1   }, "009150":     { per: 12,  pbr: 1.2 },
   "011070":     { per: 10,  pbr: 0.9 }, "000990":     { per: 12,  pbr: 1   },
   "035420":     { per: 25,  pbr: 2   }, "035720":     { per: 30,  pbr: 2   },
   "259960":     { per: 18,  pbr: 3   }, "323410":     { per: 20,  pbr: 2   },
@@ -737,7 +727,7 @@ export const VALUATION_MAP: Record<string, ValuationData> = {
   "030000":     { per: 10,  pbr: 1.5 }, "033780":     { per: 10,  pbr: 1.5 },
   "021240":     { per: 12,  pbr: 3   }, "097950":     { per: 12,  pbr: 0.8 },
   // ── KOSDAQ: 바이오 / 제약 ────────────────────────────────────────────────
-  "032820_skip":{ per: null,pbr: 1   }, "196170":     { per: null,pbr: 15  },
+  "032820":     { per: null,pbr: 1   }, "196170":     { per: null,pbr: 15  },
   "028300":     { per: null,pbr: 3   }, "068760":     { per: 20,  pbr: 2.5 },
   "091990":     { per: 25,  pbr: 3   }, "237690":     { per: 25,  pbr: 4   },
   "328130":     { per: null,pbr: 5   }, "950160":     { per: null,pbr: 2   },
@@ -776,9 +766,10 @@ export const VALUATION_MAP: Record<string, ValuationData> = {
   "310210":     { per: null,pbr: 3   }, "196300":     { per: 12,  pbr: 0.8 },
   "298380":     { per: null,pbr: 3   },
   // ── 추가 종목 ────────────────────────────────────────────────────────────
-  "BENF":        { per: null,pbr: 2.5 },
+  "BENF":       { per: null,pbr: 2.5 },
   "099330":     { per: null,pbr: 1.5 },
   "004060":     { per: 14,  pbr: 0.5 },
+  "080320":     { per: 18,  pbr: 2.1 },
 };
 
 // 저평가 판정: PER과 PBR 기준을 시장별로 다르게 적용
