@@ -11,8 +11,8 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useColorScheme } from "react-native";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useColorScheme, View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import Colors from "@/constants/colors";
 import { WatchlistProvider, useWatchlist } from "@/context/WatchlistContext";
 import { SignalProvider } from "@/context/SignalContext";
@@ -22,6 +22,69 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+function DisclaimerScreen() {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[disclaimerStyles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+      <View style={disclaimerStyles.logoWrap}>
+        <Text style={disclaimerStyles.logoIcon}>📈</Text>
+        <Text style={disclaimerStyles.logoTitle}>스윙 트레이더</Text>
+        <Text style={disclaimerStyles.logoSub}>Smart Stock Dashboard</Text>
+      </View>
+
+      <View style={disclaimerStyles.card}>
+        <Text style={disclaimerStyles.cardTitle}>⚠️ 투자 유의사항</Text>
+        <Text style={disclaimerStyles.cardBody}>
+          본 앱에서 제공하는 모든 정보는{"\n"}
+          <Text style={disclaimerStyles.bold}>참고용</Text>이며, 실제 투자 결정 및 그에 따른{"\n"}
+          <Text style={disclaimerStyles.bold}>손익은 전적으로 본인에게 있습니다.</Text>
+        </Text>
+        <View style={disclaimerStyles.divider} />
+        <Text style={disclaimerStyles.subNote}>
+          • 주식 투자에는 원금 손실 위험이 있습니다{"\n"}
+          • 과거 수익률이 미래를 보장하지 않습니다{"\n"}
+          • 본인의 투자 성향과 목표를 고려하세요
+        </Text>
+      </View>
+
+      <View style={disclaimerStyles.loadingRow}>
+        <ActivityIndicator size="small" color="#0064FF" />
+        <Text style={disclaimerStyles.loadingText}>데이터 불러오는 중...</Text>
+      </View>
+    </View>
+  );
+}
+
+const disclaimerStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#0A0E1A",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+  },
+  logoWrap:  { alignItems: "center", gap: 8, marginTop: 40 },
+  logoIcon:  { fontSize: 48 },
+  logoTitle: { fontSize: 26, fontWeight: "700", color: "#FFFFFF", letterSpacing: -0.5 },
+  logoSub:   { fontSize: 13, color: "#64748B" },
+  card: {
+    width: "100%",
+    backgroundColor: "#141B2D",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#1E2D4A",
+    gap: 12,
+  },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: "#F59E0B", textAlign: "center" },
+  cardBody:  { fontSize: 15, color: "#CBD5E1", lineHeight: 24, textAlign: "center" },
+  bold:      { color: "#FFFFFF", fontWeight: "700" },
+  divider:   { height: 1, backgroundColor: "#1E2D4A" },
+  subNote:   { fontSize: 12, color: "#64748B", lineHeight: 20 },
+  loadingRow:{ flexDirection: "row", alignItems: "center", gap: 8 },
+  loadingText:{ fontSize: 13, color: "#64748B" },
+});
 
 function PriceBridge({ children }: { children: React.ReactNode }) {
   const { watchlistStocks } = useWatchlist();
@@ -71,13 +134,19 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  // 스플래시를 바로 숨기고 면책 로딩 화면을 직접 보여줌
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
+    SplashScreen.hideAsync();
+  }, []);
 
-  if (!fontsLoaded && !fontError) return null;
+
+  if (!fontsLoaded && !fontError) {
+    return (
+      <SafeAreaProvider>
+        <DisclaimerScreen />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>

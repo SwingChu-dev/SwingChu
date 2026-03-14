@@ -527,7 +527,7 @@ export const UNIVERSE_STOCKS: UniverseStock[] = [
   // ══════════════════════════════════════════════════════════════════════════
   // 추가 종목
   // ══════════════════════════════════════════════════════════════════════════
-  { id:"benf",   name:"브랜드인게이지먼트", nameEn:"Brand Engagement Network", ticker:"BENF",   market:"NASDAQ", sector:"AI마케팅/챗봇",   currentPrice:4350,  marketCap:"0.1조" },
+  { id:"benf",   name:"브랜드인게이지먼트네트워크", nameEn:"Brand Engagement Network", ticker:"BENF",   market:"NASDAQ", sector:"AI마케팅/챗봇/네트워크",   currentPrice:4350,  marketCap:"0.1조" },
   { id:"kbio",   name:"케이바이오",         nameEn:"K-Bio Healthcare",          ticker:"099330", market:"KOSDAQ", sector:"바이오/의약품",   currentPrice:6800,  marketCap:"0.2조" },
   { id:"sgworld",name:"SG세계물산",         nameEn:"SG Worldco",                ticker:"004060", market:"KOSPI",  sector:"건설/인테리어",  currentPrice:2850,  marketCap:"0.2조" },
 ];
