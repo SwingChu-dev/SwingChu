@@ -2,12 +2,29 @@ import { Router } from "express";
 import YahooFinanceClass from "yahoo-finance2";
 
 const router = Router();
-const yahooFinance = new (YahooFinanceClass as any)();
+const yahooFinance = new (YahooFinanceClass as any)({
+  suppressNotices: ["yahooSurvey"],
+});
 
 function toYahooTicker(ticker: string, market: string): string {
   if (market === "KOSPI")  return `${ticker}.KS`;
   if (market === "KOSDAQ") return `${ticker}.KQ`;
   return ticker;
+}
+
+function classifyMarket(symbol: string, exchange: string): string {
+  if (symbol.endsWith(".KS")) return "KOSPI";
+  if (symbol.endsWith(".KQ")) return "KOSDAQ";
+  const nasdaqExchanges = ["NMS", "NGM", "NCM"];
+  if (nasdaqExchanges.includes(exchange)) return "NASDAQ";
+  const nyseExchanges = ["NYQ", "PCX", "ASE", "BATS", "NYSEArca"];
+  if (nyseExchanges.includes(exchange)) return "NYSE";
+  return exchange;
+}
+
+function cleanTicker(symbol: string): string {
+  if (symbol.endsWith(".KS") || symbol.endsWith(".KQ")) return symbol.slice(0, -3);
+  return symbol;
 }
 
 router.get("/stocks/quotes", async (req, res) => {
@@ -57,23 +74,37 @@ router.get("/stocks/quotes", async (req, res) => {
 
 router.get("/stocks/search", async (req, res) => {
   const q = (req.query.q as string) ?? "";
+  const mkt = (req.query.market as string) ?? "ALL";
   if (q.length < 1) return res.json([]);
 
   try {
     const result = await yahooFinance.search(q, {
-      quotesCount: 20,
+      quotesCount: 40,
       newsCount: 0,
     });
-    const quotes = result.quotes
-      .filter((r: any) => r.quoteType === "EQUITY")
-      .map((r: any) => ({
-        ticker:   r.symbol,
-        name:     r.shortname ?? r.longname ?? r.symbol,
-        exchange: r.exchange,
-        market:   r.exchDisp ?? r.exchange,
-      }));
+
+    let quotes = (result.quotes as any[])
+      .filter((r) => r.quoteType === "EQUITY" && r.symbol)
+      .map((r) => {
+        const market = classifyMarket(r.symbol, r.exchange ?? "");
+        return {
+          ticker:      cleanTicker(r.symbol),
+          yahooTicker: r.symbol,
+          name:        r.shortname ?? r.longname ?? r.symbol,
+          market,
+          exchange:    r.exchDisp ?? r.exchange ?? "",
+        };
+      });
+
+    if (mkt !== "ALL") {
+      quotes = quotes.filter((q) => q.market === mkt);
+    }
+
     return res.json(quotes);
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.message?.includes("Invalid Search Query") || e?.message?.includes("BadRequest")) {
+      return res.json([]);
+    }
     return res.status(500).json({ error: String(e) });
   }
 });
