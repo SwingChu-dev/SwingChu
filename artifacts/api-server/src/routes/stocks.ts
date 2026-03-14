@@ -248,4 +248,68 @@ router.get("/stocks/screen", async (req, res) => {
   return res.json(undervalued);
 });
 
+// ─── 종목 상세 재무/애널리스트 데이터 ─────────────────────────────────────────
+router.get("/stocks/detail", async (req, res) => {
+  const ticker = (req.query.ticker as string) ?? "";
+  const market = (req.query.market as string) ?? "NASDAQ";
+  if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const yahooTicker = toYahooTicker(ticker, market);
+  const isKorean = market === "KOSPI" || market === "KOSDAQ";
+
+  try {
+    const [summary, rawQuote] = await Promise.all([
+      yahooFinance.quoteSummary(yahooTicker, {
+        modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
+      }).catch(() => null),
+      yahooFinance.quote(yahooTicker).catch(() => null),
+    ]);
+
+    const q = rawQuote as any;
+    const fd = (summary as any)?.financialData ?? {};
+    const ks = (summary as any)?.defaultKeyStatistics ?? {};
+    const sd = (summary as any)?.summaryDetail ?? {};
+    const pr = (summary as any)?.price ?? {};
+
+    const currentPrice: number = q?.regularMarketPrice ?? 0;
+    const priceKRW: number = isKorean ? currentPrice : Math.round(currentPrice * USD_KRW);
+    const high52w: number = q?.fiftyTwoWeekHigh ?? 0;
+    const low52w: number  = q?.fiftyTwoWeekLow  ?? 0;
+    const high52wKRW: number = isKorean ? high52w : Math.round(high52w * USD_KRW);
+    const low52wKRW: number  = isKorean ? low52w  : Math.round(low52w  * USD_KRW);
+
+    const per: number | null          = sd?.trailingPE ?? null;
+    const forwardPer: number | null   = sd?.forwardPE  ?? ks?.forwardEpsNtm != null ? null : null;
+    const pbr: number | null          = ks?.priceToBook ?? null;
+    const roeRaw: number | null       = fd?.returnOnEquity ?? null;
+    const roe: number | null          = roeRaw != null ? Math.round(roeRaw * 1000) / 10 : null;
+    const debtEq: number | null       = fd?.debtToEquity ?? null;
+    const debtRatio: number | null    = debtEq != null ? Math.round(debtEq * 10) / 10 : null;
+    const revGrowthRaw: number | null = fd?.revenueGrowth ?? null;
+    const revenueGrowth: number | null = revGrowthRaw != null ? Math.round(revGrowthRaw * 1000) / 10 : null;
+
+    const targetMean: number | null    = fd?.targetMeanPrice  ?? null;
+    const targetHigh: number | null    = fd?.targetHighPrice  ?? null;
+    const targetLow: number | null     = fd?.targetLowPrice   ?? null;
+    const targetMeanKRW: number | null = targetMean ? (isKorean ? Math.round(targetMean) : Math.round(targetMean * USD_KRW)) : null;
+
+    const beta: number | null          = sd?.beta ?? ks?.beta ?? null;
+    const changePercent: number        = q?.regularMarketChangePercent ?? 0;
+    const prevClose: number            = q?.regularMarketPreviousClose ?? 0;
+    const name: string                 = pr?.shortName ?? q?.shortName ?? ticker;
+    const recommendationKey: string    = fd?.recommendationKey ?? "";
+
+    return res.json({
+      ticker, market, name, currentPrice, priceKRW,
+      high52w, low52w, high52wKRW, low52wKRW,
+      changePercent, prevClose,
+      per, forwardPer, pbr, roe, debtRatio, revenueGrowth,
+      targetMean, targetMeanKRW, targetHigh, targetLow,
+      beta, recommendationKey,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
 export default router;
