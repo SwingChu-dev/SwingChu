@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StockInfo, USD_KRW_RATE } from "@/constants/stockData";
 import { SIGNAL_META, SmartMoneySignal } from "@/constants/smartMoney";
 import { LiveQuote } from "@/context/StockPriceContext";
+import { calcBoxPosition } from "@/utils/boxPosition";
 
 // Moved outside component – created once, not per render
 function formatPrice(p: number): string {
@@ -70,7 +71,7 @@ function StockCardInner({
   const deleteOpacity = slideAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
   const contentShift  = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 42] });
 
-  const boxPos   = stock.boxRange.currentPosition;
+  const boxPos   = calcBoxPosition(stock.boxRange, quote);
   const boxColor = boxPos === "저점권" ? c.positiveGreen : boxPos === "고점권" ? c.positive : c.warning;
   const signalMeta = signal ? SIGNAL_META[signal.type] : null;
 

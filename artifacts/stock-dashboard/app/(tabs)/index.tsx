@@ -17,6 +17,7 @@ import { useSignals } from "@/context/SignalContext";
 import { useStockPrice } from "@/context/StockPriceContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
+import { calcBoxPosition } from "@/utils/boxPosition";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 
@@ -53,26 +54,31 @@ export default function HomeScreen() {
 
   const { watchlistStocks, removeStock } = useWatchlist();
   const { newCount, getSignalForStock } = useSignals();
-  const { getQuote, refresh } = useStockPrice();
+  const { getQuote, refresh, quotes } = useStockPrice();
   const vix = useVix();
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
+
+  const getPos = useCallback(
+    (s: any) => calcBoxPosition(s.boxRange, quotes[`${s.ticker}:${s.market}`] ?? null),
+    [quotes]
+  );
 
   const displayed = useMemo(() => {
     switch (filter) {
       case "미국장":  return watchlistStocks.filter((s) => s.region === "미국장");
       case "국내장":  return watchlistStocks.filter((s) => s.region === "국내장");
       case "우량주":  return watchlistStocks.filter((s) => s.grade === "우량주");
-      case "저점권":  return watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권");
+      case "저점권":  return watchlistStocks.filter((s) => getPos(s) === "저점권");
       case "저평가":  return watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가"));
-      case "고점권":  return watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권");
+      case "고점권":  return watchlistStocks.filter((s) => getPos(s) === "고점권");
       default:        return watchlistStocks;
     }
-  }, [filter, watchlistStocks]);
+  }, [filter, watchlistStocks, getPos]);
 
-  const lowCount   = useMemo(() => watchlistStocks.filter((s) => s.boxRange.currentPosition === "저점권").length, [watchlistStocks]);
+  const lowCount   = useMemo(() => watchlistStocks.filter((s) => getPos(s) === "저점권").length, [watchlistStocks, getPos]);
   const underCount = useMemo(() => watchlistStocks.filter((s) => s.financials.evaluation.includes("저평가")).length, [watchlistStocks]);
-  const highCount  = useMemo(() => watchlistStocks.filter((s) => s.boxRange.currentPosition === "고점권").length, [watchlistStocks]);
+  const highCount  = useMemo(() => watchlistStocks.filter((s) => getPos(s) === "고점권").length, [watchlistStocks, getPos]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

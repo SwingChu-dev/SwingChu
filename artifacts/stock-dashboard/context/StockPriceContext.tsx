@@ -22,6 +22,8 @@ export interface LiveQuote {
   volume:        number;
   high:          number;
   low:           number;
+  high52w:       number;
+  low52w:        number;
   prevClose:     number;
   currency:      string;
   name:          string;

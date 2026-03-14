@@ -130,6 +130,8 @@ router.get("/stocks/quotes", async (req, res) => {
             volume:        q.regularMarketVolume ?? 0,
             high:          q.regularMarketDayHigh ?? 0,
             low:           q.regularMarketDayLow ?? 0,
+            high52w:       q.fiftyTwoWeekHigh ?? 0,
+            low52w:        q.fiftyTwoWeekLow ?? 0,
             prevClose:     q.regularMarketPreviousClose ?? 0,
             currency:      q.currency ?? "USD",
             name:          q.shortName ?? q.longName ?? p.ticker,
