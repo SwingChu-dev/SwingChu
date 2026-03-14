@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { UniverseStock } from "@/constants/stockUniverse";
+import { STOCKS } from "@/constants/stockData";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 const USD_KRW  = 1450;
@@ -95,8 +96,16 @@ export default function ExploreScreen() {
     setResults([]);
   };
 
+  // 기본 13종목과 겹치면 predefined ID 사용
+  const resolveId = (item: ScreenResult) => {
+    const predefined = STOCKS.find(
+      (s) => s.ticker.toLowerCase() === item.ticker.toLowerCase()
+    );
+    return predefined ? predefined.id : `${item.ticker.toLowerCase()}_screen`;
+  };
+
   const toggleWatchlist = (item: ScreenResult) => {
-    const id = `${item.ticker.toLowerCase()}_screen`;
+    const id = resolveId(item);
     if (isInWatchlist(id)) {
       removeStock(id);
     } else {
@@ -115,7 +124,7 @@ export default function ExploreScreen() {
   };
 
   const renderItem = ({ item, index }: { item: ScreenResult; index: number }) => {
-    const id       = `${item.ticker.toLowerCase()}_screen`;
+    const id       = resolveId(item);
     const inWL     = isInWatchlist(id);
     const mktColor = MARKET_COLORS[item.market] ?? "#888";
     const up       = item.changePercent >= 0;
