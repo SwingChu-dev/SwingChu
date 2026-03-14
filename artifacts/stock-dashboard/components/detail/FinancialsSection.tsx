@@ -10,11 +10,23 @@ interface FinancialsSectionProps {
 
 const EVAL_COLORS: Record<string, string> = {
   "심각한 거품": "#FF3B3B",
-  "거품": "#FF6B35",
-  "적정": "#F59E0B",
-  "저평가": "#00C896",
+  "거품":        "#FF6B35",
+  "적정":        "#F59E0B",
+  "저평가":      "#00C896",
   "강한 저평가": "#3B82F6",
 };
+
+function fmtNum(v: number, decimals = 1, suffix = "배"): string {
+  if (v == null || v === 0) return "N/A";
+  if (v < 0) return "적자";
+  return `${v.toFixed(decimals)}${suffix}`;
+}
+
+function fmtPct(v: number, showSign = false): string {
+  if (v == null || v === 0) return "N/A";
+  const sign = showSign && v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(1)}%`;
+}
 
 export default function FinancialsSection({ stock }: FinancialsSectionProps) {
   const isDark = useColorScheme() === "dark";
@@ -22,38 +34,53 @@ export default function FinancialsSection({ stock }: FinancialsSectionProps) {
   const { financials } = stock;
   const evalColor = EVAL_COLORS[financials.evaluation] || "#888";
 
-  const isStub = financials.per === 0 && financials.pbr === 0 && financials.roe === 0;
+  const { per, pbr, roe, debtRatio, revenueGrowth } = financials;
 
-  const fmtPer = () => {
-    if (isStub || financials.per == null) return "N/A";
-    if (financials.per < 0) return "적자";
-    return `${financials.per}배`;
-  };
-  const fmtPbr = () => {
-    if (isStub || financials.pbr == null || financials.pbr === 0) return "N/A";
-    return `${financials.pbr}배`;
-  };
-  const fmtRoe = () => {
-    if (isStub || financials.roe == null || financials.roe === 0) return "N/A";
-    if (financials.roe < 0) return `${financials.roe}%`;
-    return `${financials.roe}%`;
-  };
-  const fmtDebt = () => {
-    if (isStub || financials.debtRatio == null || financials.debtRatio === 0) return "N/A";
-    return `${financials.debtRatio}%`;
-  };
-  const fmtRev = () => {
-    if (isStub || financials.revenueGrowth == null || financials.revenueGrowth === 0) return "N/A";
-    return `${financials.revenueGrowth > 0 ? "+" : ""}${financials.revenueGrowth}%`;
-  };
-
-  const metrics = [
-    { label: "PER (주가수익비율)",  value: fmtPer(),  good: !isStub && financials.per > 0 && financials.per < 25,     na: isStub || financials.per  <= 0 },
-    { label: "PBR (주가순자산비율)",value: fmtPbr(),  good: !isStub && financials.pbr > 0 && financials.pbr < 3,      na: isStub || financials.pbr  === 0 },
-    { label: "ROE (자기자본이익률)",value: fmtRoe(),  good: !isStub && financials.roe > 15,                            na: isStub || financials.roe  === 0 },
-    { label: "부채비율",            value: fmtDebt(), good: !isStub && financials.debtRatio > 0 && financials.debtRatio < 100, na: isStub || financials.debtRatio === 0 },
-    { label: "매출 성장률",         value: fmtRev(),  good: !isStub && financials.revenueGrowth > 10,                 na: isStub || financials.revenueGrowth === 0 },
+  const metrics: {
+    label: string;
+    value: string;
+    good: boolean;
+    na: boolean;
+    neutral?: boolean;
+  }[] = [
+    {
+      label: "PER (주가수익비율)",
+      value: fmtNum(per),
+      good:    per > 0 && per < 25,
+      na:      !per || per === 0,
+      neutral: per >= 25,
+    },
+    {
+      label: "PBR (주가순자산비율)",
+      value: fmtNum(pbr, 2),
+      good:    pbr > 0 && pbr < 3,
+      na:      !pbr || pbr === 0,
+      neutral: pbr >= 3,
+    },
+    {
+      label: "ROE (자기자본이익률)",
+      value: fmtPct(roe),
+      good:    roe > 15,
+      na:      !roe || roe === 0,
+      neutral: roe > 0 && roe <= 15,
+    },
+    {
+      label: "부채비율",
+      value: fmtPct(debtRatio),
+      good:    debtRatio > 0 && debtRatio < 100,
+      na:      !debtRatio || debtRatio === 0,
+      neutral: debtRatio >= 100,
+    },
+    {
+      label: "매출 성장률",
+      value: fmtPct(revenueGrowth, true),
+      good:    revenueGrowth > 10,
+      na:      revenueGrowth == null || revenueGrowth === 0,
+      neutral: revenueGrowth > 0 && revenueGrowth <= 10,
+    },
   ];
+
+  const anyLoaded = metrics.some((m) => !m.na);
 
   return (
     <View style={[styles.section, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
@@ -84,6 +111,15 @@ export default function FinancialsSection({ stock }: FinancialsSectionProps) {
         </View>
       </View>
 
+      {!anyLoaded && (
+        <View style={[styles.noDataBanner, { backgroundColor: c.backgroundTertiary }]}>
+          <Ionicons name="cloud-offline-outline" size={16} color={c.textTertiary} />
+          <Text style={[styles.noDataText, { color: c.textTertiary }]}>
+            Yahoo Finance에서 이 종목의 재무 데이터를 제공하지 않습니다.
+          </Text>
+        </View>
+      )}
+
       {metrics.map((m, i) => (
         <View
           key={i}
@@ -102,6 +138,8 @@ export default function FinancialsSection({ stock }: FinancialsSectionProps) {
                     ? c.backgroundTertiary
                     : m.good
                     ? c.positive + "22"
+                    : m.neutral
+                    ? c.warning + "22"
                     : c.negative + "22",
                 },
               ]}
@@ -111,9 +149,11 @@ export default function FinancialsSection({ stock }: FinancialsSectionProps) {
                   styles.metricValue,
                   {
                     color: m.na
-                      ? c.textSecondary
+                      ? c.textTertiary
                       : m.good
                       ? c.positive
+                      : m.neutral
+                      ? c.warning
                       : c.negative,
                   },
                 ]}
@@ -178,6 +218,21 @@ const styles = StyleSheet.create({
   evalValue: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
+  },
+  noDataBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 10,
+    borderRadius: 10,
+  },
+  noDataText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
   },
   metricRow: {
     flexDirection: "row",
