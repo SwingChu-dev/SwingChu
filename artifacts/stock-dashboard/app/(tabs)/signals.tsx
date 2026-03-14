@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,10 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useSignals } from "@/context/SignalContext";
 import { SIGNAL_META, STRENGTH_META, SmartMoneySignal } from "@/constants/smartMoney";
+import { STOCKS } from "@/constants/stockData";
+import { useStockPrice } from "@/context/StockPriceContext";
+import { useWatchlist } from "@/context/WatchlistContext";
+import { generateSmartMoneySignal } from "@/utils/generateSignals";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -308,15 +312,36 @@ export default function SignalsScreen() {
   const isDark = useColorScheme() === "dark";
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
-  const { signals, newCount, markAllSeen } = useSignals();
+  const { signals: staticSignals, newCount: staticNewCount, markAllSeen } = useSignals();
+  const { watchlistStocks } = useWatchlist();
+  const { getQuote }        = useStockPrice();
 
   useEffect(() => {
     const timer = setTimeout(() => markAllSeen(), 1500);
     return () => clearTimeout(timer);
   }, []);
 
-  const newSignals = signals.filter((s) => s.isNew);
-  const oldSignals = signals.filter((s) => !s.isNew);
+  // 탐색 추가 스텁 종목 동적 신호 생성 (관망 제외하고 실질적 신호만)
+  const dynamicSignals: SmartMoneySignal[] = useMemo(() => {
+    const staticIds = new Set(staticSignals.map((s) => s.stockId));
+    return watchlistStocks
+      .filter((s) => !STOCKS.find((p) => p.id === s.id) && !staticIds.has(s.id))
+      .flatMap((stock) => {
+        const quote = getQuote(stock.ticker, stock.market);
+        if (!quote || !quote.ok) return [];
+        const sig = generateSmartMoneySignal(stock, quote);
+        if (!sig || sig.type === "관망") return [];
+        return [sig];
+      });
+  }, [watchlistStocks, getQuote, staticSignals]);
+
+  const signals    = [...staticSignals, ...dynamicSignals];
+  const newCount   = staticNewCount + dynamicSignals.filter((s) => s.isNew).length;
+  const newSignals = staticSignals.filter((s) => s.isNew);
+  const oldSignals = [
+    ...staticSignals.filter((s) => !s.isNew),
+    ...dynamicSignals,
+  ];
 
   return (
     <View style={[styles.root, { backgroundColor: c.background }]}>

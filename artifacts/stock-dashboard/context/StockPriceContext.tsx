@@ -24,6 +24,8 @@ export interface LiveQuote {
   low:           number;
   high52w:       number;
   low52w:        number;
+  avgVolume10d:  number;
+  fiftyDayAvg:   number;
   prevClose:     number;
   currency:      string;
   name:          string;

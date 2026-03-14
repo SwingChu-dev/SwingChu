@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
 import { useStockPrice } from "@/context/StockPriceContext";
+import { useWatchlist } from "@/context/WatchlistContext";
 import {
   SCALP_SIGNALS,
   TYPE_META,
@@ -21,6 +22,7 @@ import {
   ScalpSignal,
   ScalpType,
 } from "@/constants/scalping";
+import { generateScalpSignal } from "@/utils/generateSignals";
 
 type FilterTab = "전체" | "급등포착" | "고점위험" | "눌림목";
 
@@ -348,20 +350,36 @@ export default function ScalpingScreen() {
   const isDark = useColorScheme() === "dark";
   const c      = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
-  const { priceKRW } = useStockPrice();
+  const { priceKRW, getQuote } = useStockPrice();
+  const { watchlistStocks }    = useWatchlist();
   const [activeFilter, setActiveFilter] = useState<FilterTab>("전체");
 
   const filters: FilterTab[] = ["전체", "급등포착", "고점위험", "눌림목"];
 
   // 각 신호에 실제 현재가(stockData + 실시간 API) 적용
   const resolved: ResolvedSignal[] = useMemo(() => {
-    return SCALP_SIGNALS.map((sig) => {
+    // 1) 기존 13 종목 하드코딩 신호
+    const predefinedIds = new Set(SCALP_SIGNALS.map((s) => s.stockId));
+    const predefined = SCALP_SIGNALS.map((sig) => {
       const stock    = STOCKS.find((s) => s.id === sig.stockId);
       const baseFall = stock?.currentPrice ?? 0;
       const live     = priceKRW(sig.ticker, sig.market, baseFall);
       return resolveSignal(sig, live > 0 ? live : baseFall);
     });
-  }, [priceKRW]);
+
+    // 2) 탐색으로 추가한 스텁 종목 동적 신호 생성
+    const stubSignals: ResolvedSignal[] = watchlistStocks
+      .filter((s) => !STOCKS.find((p) => p.id === s.id) && !predefinedIds.has(s.id))
+      .flatMap((stock) => {
+        const quote = getQuote(stock.ticker, stock.market);
+        if (!quote || !quote.ok) return [];
+        const sig = generateScalpSignal(stock, quote);
+        if (!sig) return [];
+        return [resolveSignal(sig, quote.priceKRW > 0 ? quote.priceKRW : stock.currentPrice)];
+      });
+
+    return [...predefined, ...stubSignals];
+  }, [priceKRW, getQuote, watchlistStocks]);
 
   const filtered = activeFilter === "전체"
     ? resolved

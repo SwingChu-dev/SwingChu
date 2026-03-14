@@ -132,6 +132,8 @@ router.get("/stocks/quotes", async (req, res) => {
             low:           q.regularMarketDayLow ?? 0,
             high52w:       q.fiftyTwoWeekHigh ?? 0,
             low52w:        q.fiftyTwoWeekLow ?? 0,
+            avgVolume10d:  q.averageDailyVolume10Day ?? 0,
+            fiftyDayAvg:   q.fiftyDayAverage ?? 0,
             prevClose:     q.regularMarketPreviousClose ?? 0,
             currency:      q.currency ?? "USD",
             name:          q.shortName ?? q.longName ?? p.ticker,
