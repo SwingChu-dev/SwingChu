@@ -12,7 +12,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useWatchlist } from "@/context/WatchlistContext";
-import { UNIVERSE_STOCKS, UniverseStock, UniverseMarket } from "@/constants/stockUniverse";
+import {
+  UNIVERSE_STOCKS,
+  UniverseStock,
+  UniverseMarket,
+  VALUATION_MAP,
+  isUndervalued,
+} from "@/constants/stockUniverse";
 import { STOCKS, USD_KRW_RATE } from "@/constants/stockData";
 
 type MarketFilter = "ALL" | UniverseMarket;
@@ -30,8 +36,7 @@ const MARKET_COLORS: Record<string, string> = {
   KOSDAQ: "#F59E0B",
 };
 
-// Approximate row height for getItemLayout (avoids measuring every row)
-const ITEM_HEIGHT = 78;
+const ITEM_HEIGHT = 84;
 
 function formatPrice(p: number, market: string): string {
   if (p === 0) return "—";
@@ -49,11 +54,13 @@ interface RowProps {
   inWatchlist:boolean;
   onToggle:   () => void;
   c:          any;
+  isDark:     boolean;
 }
 
-const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c }: RowProps) {
-  const mc     = MARKET_COLORS[item.market] || "#888";
-  const isUSD  = item.market === "NASDAQ";
+const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c, isDark }: RowProps) {
+  const mc  = MARKET_COLORS[item.market] || "#888";
+  const val = VALUATION_MAP[item.id];
+  const uv  = isUndervalued(item);
   return (
     <View style={[styles.row, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
       <View style={styles.rowLeft}>
@@ -62,19 +69,36 @@ const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c }: RowP
           <View style={[styles.mktBadge, { backgroundColor: mc + "20" }]}>
             <Text style={[styles.mktText, { color: mc }]}>{item.market}</Text>
           </View>
+          {uv && (
+            <View style={styles.uvBadge}>
+              <Text style={styles.uvText}>저평가</Text>
+            </View>
+          )}
         </View>
         <Text style={[styles.sub, { color: c.textTertiary }]}>
           {item.ticker} · {item.sector}
         </Text>
-        {item.marketCap !== "-" && (
-          <Text style={[styles.cap, { color: c.textTertiary }]}>시총 {item.marketCap}</Text>
-        )}
+        <View style={styles.valRow}>
+          {val ? (
+            <>
+              <Text style={[styles.valLabel, { color: c.textTertiary }]}>
+                PER {val.per !== null ? val.per.toFixed(0) : "—"}
+              </Text>
+              <Text style={[styles.valDot, { color: c.separator }]}>·</Text>
+              <Text style={[styles.valLabel, { color: c.textTertiary }]}>
+                PBR {val.pbr.toFixed(2)}
+              </Text>
+            </>
+          ) : (
+            <Text style={[styles.valLabel, { color: c.textTertiary }]}>밸류에이션 정보 없음</Text>
+          )}
+        </View>
       </View>
 
       <View style={styles.rowRight}>
         <View style={styles.priceBlock}>
           <Text style={[styles.price, { color: c.text }]}>{formatPrice(item.currentPrice, item.market)}</Text>
-          {isUSD && item.currentPrice > 0 && (
+          {item.market === "NASDAQ" && item.currentPrice > 0 && (
             <Text style={[styles.usd, { color: c.textTertiary }]}>
               ${(item.currentPrice / USD_KRW_RATE).toFixed(2)}
             </Text>
@@ -102,7 +126,7 @@ const StockRow = memo(function StockRow({ item, inWatchlist, onToggle, c }: RowP
 }, (prev, next) =>
   prev.inWatchlist === next.inWatchlist &&
   prev.item.id     === next.item.id     &&
-  prev.c           === next.c
+  prev.isDark      === next.isDark
 );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -112,24 +136,27 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const { watchlistIds, removeStock, addFromUniverse } = useWatchlist();
 
-  const [query,  setQuery]  = useState("");
-  const [market, setMarket] = useState<MarketFilter>("ALL");
+  const [query,      setQuery]      = useState("");
+  const [market,     setMarket]     = useState<MarketFilter>("ALL");
+  const [uvOnly,     setUvOnly]     = useState(false);   // 저평가 필터
 
+  // 종목 필터링
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return UNIVERSE_STOCKS.filter((s) => {
       const mOk = market === "ALL" || s.market === market;
-      if (!q) return mOk;
-      return mOk && (
+      const uOk = !uvOnly || isUndervalued(s);
+      if (!mOk || !uOk) return false;
+      if (!q) return true;
+      return (
         s.name.toLowerCase().includes(q)   ||
         s.nameEn.toLowerCase().includes(q) ||
         s.ticker.toLowerCase().includes(q) ||
         s.sector.toLowerCase().includes(q)
       );
     });
-  }, [query, market]);
+  }, [query, market, uvOnly]);
 
-  // Stable watchlistSet for O(1) lookup (avoids Array.includes on every row)
   const watchlistSet = useMemo(() => new Set(watchlistIds), [watchlistIds]);
 
   const isInWatchlist = useCallback((item: UniverseStock): boolean => {
@@ -144,12 +171,12 @@ export default function ExploreScreen() {
     else addFromUniverse(item);
   }, [watchlistSet, removeStock, addFromUniverse]);
 
-  const addedCount = useMemo(
-    () => results.filter((s) => isInWatchlist(s)).length,
-    [results, isInWatchlist]
+  // 저평가 종목 총 개수 (탭·검색 무관)
+  const uvTotal = useMemo(
+    () => UNIVERSE_STOCKS.filter((s) => (market === "ALL" || s.market === market) && isUndervalued(s)).length,
+    [market]
   );
 
-  // Fixed-height rows allow FlatList to skip measuring and jump to any offset instantly
   const getItemLayout = useCallback(
     (_: any, index: number) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }),
     []
@@ -161,30 +188,26 @@ export default function ExploreScreen() {
       inWatchlist={isInWatchlist(item)}
       onToggle={() => handleToggle(item)}
       c={c}
+      isDark={isDark}
     />
-  ), [isInWatchlist, handleToggle, c]);
+  ), [isInWatchlist, handleToggle, c, isDark]);
 
   const keyExtractor = useCallback((item: UniverseStock) => item.id, []);
 
   return (
     <View style={[styles.root, { backgroundColor: c.background }]}>
-      {/* Header */}
+      {/* ─── Header ─── */}
       <View style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: c.background }]}>
         <View>
           <Text style={[styles.headerTitle, { color: c.text }]}>주식 탐색</Text>
           <Text style={[styles.headerSub, { color: c.textSecondary }]}>
-            NASDAQ · KOSPI · KOSDAQ {UNIVERSE_STOCKS.length.toLocaleString()}개 종목
+            {UNIVERSE_STOCKS.length.toLocaleString()}개 종목 · PER/PBR 분석 포함
           </Text>
         </View>
-        {addedCount > 0 && (
-          <View style={[styles.addedBadge, { backgroundColor: "#0064FF" }]}>
-            <Text style={styles.addedBadgeText}>+{addedCount} 추가</Text>
-          </View>
-        )}
       </View>
 
-      {/* Search */}
-      <View style={[styles.searchWrap, { backgroundColor: c.backgroundSecondary }]}>
+      {/* ─── Search ─── */}
+      <View style={[styles.searchWrap, { backgroundColor: c.background }]}>
         <View style={[styles.searchBox, { backgroundColor: isDark ? "#1E2D3D" : "#F0F4F8" }]}>
           <Ionicons name="search" size={16} color={c.textTertiary} />
           <TextInput
@@ -204,7 +227,7 @@ export default function ExploreScreen() {
         </View>
       </View>
 
-      {/* Market filter */}
+      {/* ─── Market filter + 저평가 버튼 ─── */}
       <View style={[styles.filterRow, { borderBottomColor: c.separator }]}>
         {MARKET_TABS.map((t) => (
           <TouchableOpacity
@@ -219,22 +242,47 @@ export default function ExploreScreen() {
               styles.filterTabText,
               { color: market === t.key ? c.tint : c.textSecondary },
               market === t.key && { fontFamily: "Inter_700Bold" },
-            ]}>
-              {t.label}
-            </Text>
+            ]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
+
+        {/* 저평가 토글 버튼 */}
+        <TouchableOpacity
+          style={[
+            styles.uvBtn,
+            uvOnly
+              ? { backgroundColor: "#0064FF", borderColor: "#0064FF" }
+              : { backgroundColor: "transparent", borderColor: isDark ? "#334155" : "#CBD5E1" },
+          ]}
+          onPress={() => setUvOnly((v) => !v)}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={uvOnly ? "diamond" : "diamond-outline"}
+            size={11}
+            color={uvOnly ? "#fff" : c.textSecondary}
+          />
+          <Text style={[styles.uvBtnText, { color: uvOnly ? "#fff" : c.textSecondary }]}>
+            저평가
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Count */}
+      {/* ─── Count row ─── */}
       <View style={[styles.countRow, { backgroundColor: c.background }]}>
         <Text style={[styles.countText, { color: c.textTertiary }]}>
-          {results.length.toLocaleString()}개 종목
-          {query.length > 0 && `  ·  "${query}" 검색결과`}
+          {results.length.toLocaleString()}개
+          {uvOnly && ` · 저평가 ${uvTotal}개 (전체 기준)`}
+          {query.length > 0 && `  "검색: ${query}"`}
         </Text>
+        {uvOnly && (
+          <Text style={[styles.uvCriteria, { color: c.textTertiary }]}>
+            NASDAQ PER{"<"}18·PBR{"<"}3  /  KOSPI PER{"<"}12·PBR{"<"}1.2  /  KOSDAQ PER{"<"}15·PBR{"<"}2
+          </Text>
+        )}
       </View>
 
-      {/* List */}
+      {/* ─── List ─── */}
       <FlatList
         data={results}
         keyExtractor={keyExtractor}
@@ -250,8 +298,15 @@ export default function ExploreScreen() {
         removeClippedSubviews
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons name="search-outline" size={40} color={c.textTertiary} />
-            <Text style={[styles.emptyText, { color: c.textSecondary }]}>검색 결과 없음</Text>
+            <Ionicons name={uvOnly ? "diamond-outline" : "search-outline"} size={40} color={c.textTertiary} />
+            <Text style={[styles.emptyTitle, { color: c.textSecondary }]}>
+              {uvOnly ? "저평가 종목 없음" : "검색 결과 없음"}
+            </Text>
+            {uvOnly && (
+              <Text style={[styles.emptyDesc, { color: c.textTertiary }]}>
+                현재 시장 기준에서 저평가로 분류되는{"\n"}종목이 없습니다
+              </Text>
+            )}
           </View>
         }
       />
@@ -262,16 +317,11 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   headerTitle:    { fontSize: 22, fontFamily: "Inter_700Bold" },
   headerSub:      { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  addedBadge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
-  addedBadgeText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   searchWrap:     { paddingHorizontal: 16, paddingVertical: 8 },
   searchBox: {
     flexDirection: "row",
@@ -284,14 +334,31 @@ const styles = StyleSheet.create({
   searchInput:    { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
   filterRow: {
     flexDirection: "row",
+    alignItems: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 8,
   },
-  filterTab:       { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
+  filterTab:       { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent" },
   filterTabActive: { borderBottomWidth: 2 },
   filterTabText:   { fontSize: 13, fontFamily: "Inter_500Medium" },
-  countRow:        { paddingHorizontal: 20, paddingVertical: 8 },
-  countText:       { fontSize: 12, fontFamily: "Inter_400Regular" },
+  // 저평가 버튼
+  uvBtn: {
+    marginLeft: "auto",
+    marginRight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  uvBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  // count row
+  countRow:      { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  countText:     { fontSize: 12, fontFamily: "Inter_400Regular" },
+  uvCriteria:    { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
+  // row
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -301,12 +368,16 @@ const styles = StyleSheet.create({
     height: ITEM_HEIGHT,
   },
   rowLeft:   { flex: 1, gap: 2, marginRight: 8 },
-  nameRow:   { flexDirection: "row", alignItems: "center", gap: 6 },
-  name:      { fontSize: 15, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
-  mktBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  nameRow:   { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "nowrap" },
+  name:      { fontSize: 14, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  mktBadge:  { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, flexShrink: 0 },
   mktText:   { fontSize: 9, fontFamily: "Inter_700Bold" },
-  sub:       { fontSize: 12, fontFamily: "Inter_400Regular" },
-  cap:       { fontSize: 11, fontFamily: "Inter_400Regular" },
+  uvBadge:   { backgroundColor: "#0064FF18", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0 },
+  uvText:    { fontSize: 9, fontFamily: "Inter_700Bold", color: "#0064FF" },
+  sub:       { fontSize: 11, fontFamily: "Inter_400Regular" },
+  valRow:    { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
+  valLabel:  { fontSize: 11, fontFamily: "Inter_500Medium" },
+  valDot:    { fontSize: 11 },
   rowRight:  { alignItems: "flex-end", gap: 6 },
   priceBlock:{ alignItems: "flex-end", gap: 1 },
   price:     { fontSize: 14, fontFamily: "Inter_600SemiBold" },
@@ -321,6 +392,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   toggleText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  empty:      { alignItems: "center", paddingVertical: 80, gap: 12 },
-  emptyText:  { fontSize: 15, fontFamily: "Inter_500Medium" },
+  empty:      { alignItems: "center", paddingVertical: 80, gap: 10 },
+  emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  emptyDesc:  { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
 });
