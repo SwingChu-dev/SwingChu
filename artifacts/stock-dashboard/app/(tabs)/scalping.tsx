@@ -367,9 +367,9 @@ export default function ScalpingScreen() {
       return resolveSignal(sig, live > 0 ? live : baseFall);
     });
 
-    // 2) 탐색으로 추가한 스텁 종목 동적 신호 생성
+    // 2) 하드코딩 신호가 없는 모든 워치리스트 종목 동적 신호 생성 (기본 13종 중 미포함분 + 탐색 추가분)
     const stubSignals: ResolvedSignal[] = watchlistStocks
-      .filter((s) => !STOCKS.find((p) => p.id === s.id) && !predefinedIds.has(s.id))
+      .filter((s) => !predefinedIds.has(s.id))
       .flatMap((stock) => {
         const quote = getQuote(stock.ticker, stock.market);
         if (!quote || !quote.ok) return [];
