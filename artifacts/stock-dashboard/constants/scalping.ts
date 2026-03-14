@@ -2,18 +2,18 @@ export type ScalpType = "급등포착" | "고점위험" | "눌림목" | "관망"
 export type UrgencyType = "즉시" | "당일" | "이번주";
 export type RiskLevel = "위험" | "주의" | "안전";
 
-export interface ProfitLine {
+export interface ProfitPct {
   label: string;
-  percent: number;
-  price: number;
+  percent: number; // 현재가 대비 퍼센트 (음수 = 하락 목표)
 }
 
+// 모든 가격은 현재가(currentPrice) 대비 % 기반으로 정의.
+// 실제 절대 가격은 scalping.tsx에서 동적으로 계산함.
 export interface ScalpSignal {
   stockId: string;
   stockName: string;
   ticker: string;
   market: string;
-  currentPrice: number;
   type: ScalpType;
   urgency: UrgencyType;
   riskLevel: RiskLevel;
@@ -23,17 +23,17 @@ export interface ScalpSignal {
   volumeSpike: number;
   distanceFrom52High: number;
   expectedMovePercent: number;
-  entryLow: number;
-  entryHigh: number;
-  stopLoss: number;
-  stopLossPercent: number;
-  profitLines: ProfitLine[];
+  // 진입 구간 (현재가 대비 %)
+  entryLowPct: number;  // 음수 = 현재가보다 낮은 진입, 0 = 없음
+  entryHighPct: number; // 양수 = 현재가보다 높은 진입, 0 = 없음
+  // 손절/탈출 (항상 양수, 하락 방향)
+  stopLossPct: number;
+  // 익절/탈출 라인 (퍼센트)
+  profitPcts: ProfitPct[];
   signals: string[];
   summary: string;
   caution?: string;
 }
-
-const p = (base: number, pct: number) => Math.round(base * (1 + pct / 100));
 
 export const SCALP_SIGNALS: ScalpSignal[] = [
   {
@@ -41,7 +41,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "SK하이닉스",
     ticker: "000660",
     market: "KOSPI",
-    currentPrice: 198400,
     type: "급등포착",
     urgency: "즉시",
     riskLevel: "안전",
@@ -51,14 +50,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 2.7,
     distanceFrom52High: -8.2,
     expectedMovePercent: 12.5,
-    entryLow: p(198400, -2),
-    entryHigh: p(198400, 0.5),
-    stopLoss: p(198400, -6),
-    stopLossPercent: 6,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(198400, 3) },
-      { label: "2차 익절", percent: 8, price: p(198400, 8) },
-      { label: "3차 익절", percent: 15, price: p(198400, 15) },
+    entryLowPct: -2,
+    entryHighPct: 0.5,
+    stopLossPct: 6,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["HBM4 독점 수주 확정", "기관 5,640억 순매수", "거래량 2.7배 급증", "52주 신고가 돌파 임박"],
     summary: "HBM4 엔비디아 독점 수주 + 기관 대규모 매집. 신고가 돌파 시 추가 급등 기대.",
@@ -68,7 +66,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "한화에어로스페이스",
     ticker: "012450",
     market: "KOSPI",
-    currentPrice: 785000,
     type: "급등포착",
     urgency: "당일",
     riskLevel: "주의",
@@ -78,25 +75,23 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 4.1,
     distanceFrom52High: -15.3,
     expectedMovePercent: 10,
-    entryLow: p(785000, -3),
-    entryHigh: p(785000, 1),
-    stopLoss: p(785000, -7),
-    stopLossPercent: 7,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(785000, 3) },
-      { label: "2차 익절", percent: 8, price: p(785000, 8) },
-      { label: "3차 익절", percent: 15, price: p(785000, 15) },
+    entryLowPct: -3,
+    entryHighPct: 1,
+    stopLossPct: 7,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["유럽 방산 수주 발표 임박", "거래량 4.1배 선매수", "기관·외국인 동반 순매수", "K-방산 테마 강세"],
     summary: "수주 발표 전 선매수 세력 포착. 이벤트 드리븐 단타 기회. 발표 후 익절 전략 필수.",
     caution: "이벤트 발표 없을 시 빠른 손절 필요",
   },
   {
-    stockId: "doosanenergility",
+    stockId: "doosan",
     stockName: "두산에너빌리티",
     ticker: "034020",
     market: "KOSPI",
-    currentPrice: 23850,
     type: "급등포착",
     urgency: "이번주",
     riskLevel: "안전",
@@ -106,14 +101,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 3.4,
     distanceFrom52High: -31.2,
     expectedMovePercent: 15,
-    entryLow: p(23850, -4),
-    entryHigh: p(23850, 1),
-    stopLoss: p(23850, -8),
-    stopLossPercent: 8,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(23850, 3) },
-      { label: "2차 익절", percent: 8, price: p(23850, 8) },
-      { label: "3차 익절", percent: 15, price: p(23850, 15) },
+    entryLowPct: -4,
+    entryHighPct: 1,
+    stopLossPct: 8,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["52주 저점 부근 기관 매집", "체코 원전 수주 기대", "RSI 44 과매도 회복 중", "SMR 테마 재점화"],
     summary: "원전·SMR 테마 저점 진입 기회. 저점권에서 기관 조용한 매집 확인. 중장기 관점 단타.",
@@ -123,7 +117,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "삼성전자",
     ticker: "005930",
     market: "KOSPI",
-    currentPrice: 57200,
     type: "눌림목",
     urgency: "이번주",
     riskLevel: "안전",
@@ -133,14 +126,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 2.1,
     distanceFrom52High: -28.5,
     expectedMovePercent: 8,
-    entryLow: p(57200, -3),
-    entryHigh: p(57200, 1),
-    stopLoss: p(57200, -7),
-    stopLossPercent: 7,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(57200, 3) },
-      { label: "2차 익절", percent: 8, price: p(57200, 8) },
-      { label: "3차 익절", percent: 15, price: p(57200, 15) },
+    entryLowPct: -3,
+    entryHighPct: 1,
+    stopLossPct: 7,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["52주 저점 근접 반등", "외국인 순매수 5일 연속", "RSI 과매도 회복", "HBM 수주 기대 선반영"],
     summary: "52주 저점 부근 기술적 반등 구간. 외국인 5일 연속 매수. 단기 3-8% 반등 목표 단타.",
@@ -150,7 +142,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "엔비디아",
     ticker: "NVDA",
     market: "NASDAQ",
-    currentPrice: 267355,
     type: "눌림목",
     urgency: "당일",
     riskLevel: "안전",
@@ -160,14 +151,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 3.2,
     distanceFrom52High: -12.4,
     expectedMovePercent: 8,
-    entryLow: p(267355, -3),
-    entryHigh: p(267355, 0.5),
-    stopLoss: p(267355, -7),
-    stopLossPercent: 7,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(267355, 3) },
-      { label: "2차 익절", percent: 8, price: p(267355, 8) },
-      { label: "3차 익절", percent: 15, price: p(267355, 15) },
+    entryLowPct: -3,
+    entryHighPct: 0.5,
+    stopLossPct: 7,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["조정 후 재매집 신호", "기관 매집 3일 연속", "AI 수요 지속 성장", "중간권 지지선 확인"],
     summary: "5% 조정 후 기관 재매집. AI 서버 수요 증가 뉴스 대기 중. 단기 3~8% 반등 단타 유효.",
@@ -177,7 +167,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "알파벳 A",
     ticker: "GOOGL",
     market: "NASDAQ",
-    currentPrice: 445197,
     type: "눌림목",
     urgency: "이번주",
     riskLevel: "안전",
@@ -187,14 +176,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 1.6,
     distanceFrom52High: -14.8,
     expectedMovePercent: 7,
-    entryLow: p(445197, -4),
-    entryHigh: p(445197, 1),
-    stopLoss: p(445197, -8),
-    stopLossPercent: 8,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(445197, 3) },
-      { label: "2차 익절", percent: 8, price: p(445197, 8) },
-      { label: "3차 익절", percent: 15, price: p(445197, 15) },
+    entryLowPct: -4,
+    entryHighPct: 1,
+    stopLossPct: 8,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["자사주 매입 재개 확인", "AI 검색 점유율 방어", "저PER 저평가 구간"],
     summary: "자사주 매입 + 저PER 구간. 급등보다 안정적 상승 기대. 중장기 단타 관점 추천.",
@@ -204,7 +192,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "아이온큐",
     ticker: "IONQ",
     market: "NASDAQ",
-    currentPrice: 52000,
     type: "고점위험",
     urgency: "즉시",
     riskLevel: "위험",
@@ -214,14 +201,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 5.8,
     distanceFrom52High: -3.2,
     expectedMovePercent: -15,
-    entryLow: 0,
-    entryHigh: 0,
-    stopLoss: p(52000, -5),
-    stopLossPercent: 5,
-    profitLines: [
-      { label: "숏 1차", percent: -5, price: p(52000, -5) },
-      { label: "숏 2차", percent: -10, price: p(52000, -10) },
-      { label: "숏 3차", percent: -15, price: p(52000, -15) },
+    entryLowPct: 0,
+    entryHighPct: 0,
+    stopLossPct: 5,
+    profitPcts: [
+      { label: "숏 1차", percent: -5 },
+      { label: "숏 2차", percent: -10 },
+      { label: "숏 3차", percent: -15 },
     ],
     signals: ["RSI 78 심각한 과매수", "세력 이탈 신호 포착", "52주 고점 근접", "거래량 5.8배 + 음봉"],
     summary: "양자컴퓨팅 급등 후 세력 이탈. RSI 78 극도 과매수. 현재 보유자 즉시 익절 고려.",
@@ -232,7 +218,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "오라클",
     ticker: "ORCL",
     market: "NASDAQ",
-    currentPrice: 231000,
     type: "고점위험",
     urgency: "당일",
     riskLevel: "주의",
@@ -242,24 +227,22 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 2.3,
     distanceFrom52High: -5.1,
     expectedMovePercent: -8,
-    entryLow: 0,
-    entryHigh: 0,
-    stopLoss: p(231000, -4),
-    stopLossPercent: 4,
-    profitLines: [
-      { label: "익절 목표 1", percent: -4, price: p(231000, -4) },
-      { label: "익절 목표 2", percent: -8, price: p(231000, -8) },
+    entryLowPct: 0,
+    entryHighPct: 0,
+    stopLossPct: 4,
+    profitPcts: [
+      { label: "익절 목표 1", percent: -4 },
+      { label: "익절 목표 2", percent: -8 },
     ],
     signals: ["기관 순매도 전환", "클라우드 성장 둔화 우려", "RSI 71 과매수", "고점권 분산 패턴"],
     summary: "고점권에서 기관 차익실현. 클라우드 경쟁 심화로 성장 둔화 우려. 보유자 분할 익절 권장.",
     caution: "신규 매수 비추천. 기존 보유분 분할 매도 고려.",
   },
   {
-    stockId: "eonr",
+    stockId: "eon",
     stockName: "EON 리소시스",
     ticker: "EONR",
     market: "NASDAQ",
-    currentPrice: 2116,
     type: "고점위험",
     urgency: "즉시",
     riskLevel: "위험",
@@ -269,13 +252,12 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 7.2,
     distanceFrom52High: 2.1,
     expectedMovePercent: -20,
-    entryLow: 0,
-    entryHigh: 0,
-    stopLoss: p(2116, -8),
-    stopLossPercent: 8,
-    profitLines: [
-      { label: "탈출 목표", percent: -8, price: p(2116, -8) },
-      { label: "최대 하락", percent: -25, price: p(2116, -25) },
+    entryLowPct: 0,
+    entryHighPct: 0,
+    stopLossPct: 8,
+    profitPcts: [
+      { label: "탈출 목표", percent: -8 },
+      { label: "최대 하락", percent: -25 },
     ],
     signals: ["RSI 82 극단적 과매수", "소형주 펌핑 패턴", "52주 고점 돌파 후 매도세", "세력 단기 급등 후 이탈 전형"],
     summary: "소형 투기주 급등 후 고점. 극단적 과매수 + 세력 이탈 전형 패턴. 보유자 즉시 탈출.",
@@ -286,7 +268,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "우리기술투자",
     ticker: "032820",
     market: "KOSDAQ",
-    currentPrice: 4850,
     type: "고점위험",
     urgency: "즉시",
     riskLevel: "위험",
@@ -296,24 +277,22 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 6.1,
     distanceFrom52High: -1.8,
     expectedMovePercent: -12,
-    entryLow: 0,
-    entryHigh: 0,
-    stopLoss: p(4850, -6),
-    stopLossPercent: 6,
-    profitLines: [
-      { label: "탈출 목표", percent: -6, price: p(4850, -6) },
-      { label: "2차 하락", percent: -15, price: p(4850, -15) },
+    entryLowPct: 0,
+    entryHighPct: 0,
+    stopLossPct: 6,
+    profitPcts: [
+      { label: "탈출 목표", percent: -6 },
+      { label: "2차 하락", percent: -15 },
     ],
     signals: ["KOSDAQ 소형주 급등", "거래량 6배 이상 급증", "RSI 76 과매수", "고점권 대량 매도 출현"],
     summary: "소형 KOSDAQ 주 급등 후 고점 도달. 거래량 급증 동반 음봉. 차익실현 물량 출회 조짐.",
     caution: "고점권 신규 진입 위험. 보유자 빠른 익절 권장.",
   },
   {
-    stockId: "sndk",
+    stockId: "sandisk",
     stockName: "샌디스크",
     ticker: "SNDK",
     market: "NASDAQ",
-    currentPrice: 97200,
     type: "관망",
     urgency: "이번주",
     riskLevel: "주의",
@@ -323,13 +302,12 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 1.3,
     distanceFrom52High: -22.1,
     expectedMovePercent: 5,
-    entryLow: p(97200, -5),
-    entryHigh: p(97200, -1),
-    stopLoss: p(97200, -10),
-    stopLossPercent: 10,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(97200, 3) },
-      { label: "2차 익절", percent: 8, price: p(97200, 8) },
+    entryLowPct: -5,
+    entryHighPct: -1,
+    stopLossPct: 10,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
     ],
     signals: ["낸드 시황 회복 기대", "방향성 불명확", "중간권 박스 횡보"],
     summary: "낸드 시황 불확실성으로 방향성 없음. 명확한 트리거 없이 관망 유지.",
@@ -339,7 +317,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     stockName: "현대자동차",
     ticker: "005380",
     market: "KOSPI",
-    currentPrice: 198500,
     type: "눌림목",
     urgency: "이번주",
     riskLevel: "안전",
@@ -349,14 +326,13 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     volumeSpike: 1.8,
     distanceFrom52High: -19.4,
     expectedMovePercent: 8,
-    entryLow: p(198500, -3),
-    entryHigh: p(198500, 1),
-    stopLoss: p(198500, -8),
-    stopLossPercent: 8,
-    profitLines: [
-      { label: "1차 익절", percent: 3, price: p(198500, 3) },
-      { label: "2차 익절", percent: 8, price: p(198500, 8) },
-      { label: "3차 익절", percent: 15, price: p(198500, 15) },
+    entryLowPct: -3,
+    entryHighPct: 1,
+    stopLossPct: 8,
+    profitPcts: [
+      { label: "1차 익절", percent: 3 },
+      { label: "2차 익절", percent: 8 },
+      { label: "3차 익절", percent: 15 },
     ],
     signals: ["전기차 수출 증가 기대", "저PBR 저평가 구간", "외국인 소폭 순매수 전환"],
     summary: "전기차 수출 호조 + 저PBR 구간. 눌림목 매수 후 단기 반등 노리기.",
