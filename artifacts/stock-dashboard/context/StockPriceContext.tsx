@@ -64,7 +64,7 @@ export function StockPriceProvider({ children, watchlist }: Props) {
   const [usdKrw,     setUsdKrw]     = useState<number>(USD_KRW_FALLBACK);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetch = useCallback(async () => {
+  const fetchQuotes = useCallback(async () => {
     if (watchlist.length === 0) return;
     // Include USD/KRW rate in the same batch request
     const stockItems  = watchlist.map((s) => `${s.ticker}:${s.market}`).join(",");
@@ -108,17 +108,17 @@ export function StockPriceProvider({ children, watchlist }: Props) {
   }, [watchlist.map((s) => `${s.ticker}:${s.market}`).join(",")]);
 
   useEffect(() => {
-    fetch();
-    timerRef.current = setInterval(fetch, REFRESH_INTERVAL_MS);
+    fetchQuotes();
+    timerRef.current = setInterval(fetchQuotes, REFRESH_INTERVAL_MS);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [fetch]);
+  }, [fetchQuotes]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state: AppStateStatus) => {
-      if (state === "active") fetch();
+      if (state === "active") fetchQuotes();
     });
     return () => sub.remove();
-  }, [fetch]);
+  }, [fetchQuotes]);
 
   const getQuote = useCallback(
     (ticker: string, market: string) => quotes[`${ticker}:${market}`] ?? null,
@@ -143,7 +143,7 @@ export function StockPriceProvider({ children, watchlist }: Props) {
 
   return (
     <StockPriceContext.Provider
-      value={{ quotes, loading, lastUpdate, usdKrw, refresh: fetch, getQuote, priceKRW, changePct }}
+      value={{ quotes, loading, lastUpdate, usdKrw, refresh: fetchQuotes, getQuote, priceKRW, changePct }}
     >
       {children}
     </StockPriceContext.Provider>

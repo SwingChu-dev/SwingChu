@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile, copyFile } from "fs/promises";
+import { rm, readFile } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,13 +76,6 @@ async function buildAll() {
     logLevel: "info",
   });
 
-  // Copy the Python FDR script to dist/ so it's resolvable at runtime
-  // (bundled CJS __dirname == dist/, not src/)
-  await copyFile(
-    path.resolve(__dirname, "src/korean_fdr.py"),
-    path.resolve(distDir, "korean_fdr.py"),
-  );
-  console.log("copied korean_fdr.py → dist/");
 }
 
 buildAll().catch((err) => {

@@ -12,11 +12,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useEnrichment } from "@/context/EnrichmentContext";
+import { useStockPrice } from "@/context/StockPriceContext";
 import { UniverseStock } from "@/constants/stockUniverse";
 import { STOCKS } from "@/constants/stockData";
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
-const USD_KRW  = 1450;
 
 type Market   = "ALL" | "NASDAQ" | "KOSPI" | "KOSDAQ";
 type ViewMode = "undervalued" | "all";
@@ -50,14 +50,6 @@ const MARKET_COLORS: Record<string, string> = {
   KOSDAQ: "#FF6B35",
 };
 
-function fmtPrice(item: ScreenResult): string {
-  if (item.market === "NASDAQ") {
-    const usd = (item.priceKRW / USD_KRW).toFixed(2);
-    return `$${usd}  (₩${item.priceKRW.toLocaleString()})`;
-  }
-  return `₩${item.priceKRW.toLocaleString()}`;
-}
-
 export default function ExploreScreen() {
   const [market,     setMarket]     = useState<Market>("ALL");
   const [viewMode,   setViewMode]   = useState<ViewMode>("undervalued");
@@ -69,6 +61,15 @@ export default function ExploreScreen() {
 
   const { isInWatchlist, addFromUniverse, removeStock } = useWatchlist();
   const { enrichStock, isEnriching } = useEnrichment();
+  const { usdKrw } = useStockPrice();
+
+  const fmtPrice = (item: ScreenResult): string => {
+    if (item.market === "NASDAQ") {
+      const usd = (item.priceKRW / usdKrw).toFixed(2);
+      return `$${usd}  (₩${item.priceKRW.toLocaleString()})`;
+    }
+    return `₩${item.priceKRW.toLocaleString()}`;
+  };
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchScreen = useCallback(async (

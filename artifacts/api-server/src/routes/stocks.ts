@@ -72,8 +72,7 @@ function cleanTicker(symbol: string): string {
   return symbol;
 }
 
-// ─── Yahoo Finance 기반 한국 주식 헬퍼 (FDR Python 대체) ───────────────────
-// 배포 환경에서 Python/FDR이 없어도 안정적으로 동작하도록 Yahoo Finance(.KS/.KQ) 사용
+// ─── Yahoo Finance 기반 한국 주식 헬퍼 (.KS/.KQ 심볼) ───────────────────────
 interface KrQuote {
   close: number; open: number; high: number; low: number;
   volume: number; changePercent: number; change: number;
@@ -502,7 +501,7 @@ router.get("/stocks/detail", async (req, res) => {
       : (q?.regularMarketPreviousClose ?? 0);
 
     const per: number | null          = sd?.trailingPE ?? null;
-    const forwardPer: number | null   = sd?.forwardPE  ?? ks?.forwardEpsNtm != null ? null : null;
+    const forwardPer: number | null   = sd?.forwardPE ?? null;
     const pbr: number | null          = ks?.priceToBook ?? null;
     const roeRaw: number | null       = fd?.returnOnEquity ?? null;
     const roe: number | null          = roeRaw != null ? Math.round(roeRaw * 1000) / 10 : null;
