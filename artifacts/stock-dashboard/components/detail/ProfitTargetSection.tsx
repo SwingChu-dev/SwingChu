@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, useColorScheme } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { StockInfo } from "@/constants/stockData";
+import { useTechnicals } from "@/hooks/useTechnicals";
 
 interface ProfitTargetSectionProps {
   stock:      StockInfo;
@@ -22,8 +23,14 @@ export default function ProfitTargetSection({ stock, livePrice }: ProfitTargetSe
   const basePrice = livePrice && livePrice > 0 ? livePrice : stock.currentPrice;
   const isLive    = !!(livePrice && livePrice > 0 && livePrice !== stock.currentPrice);
 
-  // 손절 기준가: 박스권 하단 -2%
-  const stopLoss     = Math.round(stock.boxRange.support * 0.98);
+  const { ma5, ma20 } = useTechnicals(stock.ticker, stock.market, basePrice);
+
+  // 손절 기준가: MA5·MA20 하단 -2% (없으면 박스권 하단 -2% 폴백)
+  const hasMa    = ma5 !== null && ma20 !== null;
+  const maBottom = hasMa ? Math.round(Math.min(ma5!, ma20!)) : null;
+  const stopLossBase  = maBottom ?? stock.boxRange.support;
+  const stopLossLabel = hasMa ? "MA5·MA20 하단 -2%" : "박스권 하단 -2%";
+  const stopLoss     = Math.round(stopLossBase * 0.98);
   const stopLossPct  = (((stopLoss - basePrice) / basePrice) * 100).toFixed(1);
   const stopLossGap  = stopLoss - basePrice;
 
@@ -93,7 +100,7 @@ export default function ProfitTargetSection({ stock, livePrice }: ProfitTargetSe
               손절 기준가
             </Text>
             <View style={[styles.stopLossBadge, { backgroundColor: c.negative + "18" }]}>
-              <Text style={[styles.stopLossBadgeText, { color: c.negative }]}>박스권 하단 -2%</Text>
+              <Text style={[styles.stopLossBadgeText, { color: c.negative }]}>{stopLossLabel}</Text>
             </View>
           </View>
           <Text style={[styles.stopLossPrice, { color: c.negative }]}>
@@ -109,7 +116,7 @@ export default function ProfitTargetSection({ stock, livePrice }: ProfitTargetSe
       <View style={[styles.stopTip, { backgroundColor: c.negative + "0C", borderColor: c.negative + "25" }]}>
         <Ionicons name="information-circle-outline" size={14} color={c.negative} />
         <Text style={[styles.stopTipText, { color: c.textSecondary }]}>
-          박스권 하단(₩{stock.boxRange.support.toLocaleString()}) 이탈 확정 시 즉시 손절. 스윙은 언제 도망치느냐가 계좌를 지킵니다.
+          {hasMa ? "MA" : "박스권"} 하단(₩{stopLossBase.toLocaleString()}) 이탈 확정 시 즉시 손절. 스윙은 언제 도망치느냐가 계좌를 지킵니다.
         </Text>
       </View>
     </View>

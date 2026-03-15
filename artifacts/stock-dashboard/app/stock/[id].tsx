@@ -354,7 +354,7 @@ export default function StockDetailScreen() {
 
           {activeTab === "진입"   && <SplitEntrySection  stock={stock} livePrice={displayPrice} />}
           {activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
-          {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} dynBoxPos={dynBoxPos} />}
+          {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
           {activeTab === "전망"   && <ForecastSection     stock={stock} />}
           {activeTab === "재무"   && <FinancialsSection   stock={stock} />}
           {activeTab === "리스크" && <RiskSection         stock={stock} />}
