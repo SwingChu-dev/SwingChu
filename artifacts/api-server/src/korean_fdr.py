@@ -104,9 +104,18 @@ def get_quote(ticker: str) -> dict:
 
 
 def get_multi_quote(tickers: list) -> dict:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    clean = [t.strip() for t in tickers if t.strip()]
     results = {}
-    for t in tickers:
-        results[t] = get_quote(t.strip())
+    # 최대 10개 스레드 병렬 조회
+    with ThreadPoolExecutor(max_workers=min(len(clean), 10)) as ex:
+        futures = {ex.submit(get_quote, t): t for t in clean}
+        for fut in as_completed(futures):
+            t = futures[fut]
+            try:
+                results[t] = fut.result()
+            except Exception as e:
+                results[t] = {"error": str(e)}
     return results
 
 

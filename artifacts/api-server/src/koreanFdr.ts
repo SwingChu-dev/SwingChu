@@ -55,7 +55,7 @@ export interface FdrOhlcv {
 // ─── 내부 유틸 ───────────────────────────────────────────────────────────────
 function runPython(args: string[]): Promise<any> {
   return new Promise((resolve, reject) => {
-    execFile(PYTHON, [SCRIPT, ...args], { timeout: 30_000 }, (err, stdout, stderr) => {
+    execFile(PYTHON, [SCRIPT, ...args], { timeout: 60_000 }, (err, stdout, stderr) => {
       if (err) return reject(new Error(stderr || String(err)));
       try {
         resolve(JSON.parse(stdout));

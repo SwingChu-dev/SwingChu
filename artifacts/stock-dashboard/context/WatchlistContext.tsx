@@ -88,8 +88,16 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     AsyncStorage.multiGet([STORAGE_KEY, CUSTOM_KEY]).then(([[, rawIds], [, rawCustom]]) => {
       if (rawIds) {
         try {
-          const parsed = JSON.parse(rawIds) as string[];
-          if (parsed.length > 0) setWatchlistIds(parsed);
+          const saved = JSON.parse(rawIds) as string[];
+          if (saved.length > 0) {
+            // 새로 추가된 DEFAULT_IDS가 있으면 기존 목록 끝에 병합
+            const newDefaults = DEFAULT_IDS.filter((id) => !saved.includes(id));
+            const merged = newDefaults.length > 0 ? [...saved, ...newDefaults] : saved;
+            setWatchlistIds(merged);
+            if (newDefaults.length > 0) {
+              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+            }
+          }
         } catch {}
       }
       if (rawCustom) {

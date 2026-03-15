@@ -142,6 +142,9 @@ const SCREEN_UNIVERSE: ScreenStock[] = [
   { ticker:"000270", market:"KOSPI", name:"기아",         sector:"전기차/PBV/글로벌시장",marketCap:"320조",   basePer:5,   pbr:0.7, basePrice:80000  },
   { ticker:"105560", market:"KOSPI", name:"KB금융",       sector:"은행지주/보험/카드",    marketCap:"250조",   basePer:7,   pbr:0.6, basePrice:90000  },
   { ticker:"055550", market:"KOSPI", name:"신한지주",    sector:"은행지주/글로벌금융",   marketCap:"220조",   basePer:6,   pbr:0.5, basePrice:55000  },
+  { ticker:"009830", market:"KOSPI", name:"한화솔루션",  sector:"태양광/케미컬/에너지",  marketCap:"5.2조",   basePer:15,  pbr:0.9, basePrice:48700  },
+  { ticker:"088350", market:"KOSPI", name:"한화생명",    sector:"생명보험/IFRS17",       marketCap:"8.6조",   basePer:5,   pbr:0.4, basePrice:4770   },
+  { ticker:"004840", market:"KOSPI", name:"SG세계물산",  sector:"건설/주택/부동산개발",  marketCap:"0.7조",   basePer:8,   pbr:0.6, basePrice:5600   },
   // ── KOSDAQ ───────────────────────────────────────────────────────────────
   { ticker:"247540", market:"KOSDAQ", name:"에코프로비엠",   sector:"양극재/전기차배터리",  marketCap:"100조",   basePer:30,  pbr:5,   basePrice:150000 },
   { ticker:"357780", market:"KOSDAQ", name:"솔브레인",       sector:"반도체소재/식각액",    marketCap:"15조",    basePer:15,  pbr:2,   basePrice:300000 },
@@ -153,6 +156,8 @@ const SCREEN_UNIVERSE: ScreenStock[] = [
   { ticker:"257720", market:"KOSDAQ", name:"실리콘투",       sector:"K뷰티수출/플랫폼",     marketCap:"0.8조",   basePer:10,  pbr:1.5, basePrice:30000  },
   { ticker:"214150", market:"KOSDAQ", name:"클래시스",       sector:"의료미용/HIFU",        marketCap:"3조",     basePer:20,  pbr:3,   basePrice:50000  },
   { ticker:"028300", market:"KOSDAQ", name:"HLB",            sector:"항암신약/리보세라닙",  marketCap:"2조",     basePer:null,pbr:3,   basePrice:30000  },
+  { ticker:"080220", market:"KOSDAQ", name:"제주반도체",     sector:"팹리스/메모리반도체",  marketCap:"0.4조",   basePer:18,  pbr:2.1, basePrice:43750  },
+  { ticker:"038530", market:"KOSDAQ", name:"케이바이오",     sector:"의료기기/바이오헬스",  marketCap:"0.1조",   basePer:null,pbr:0.8, basePrice:346    },
 ];
 
 // 저평가 기준 (시장별)
