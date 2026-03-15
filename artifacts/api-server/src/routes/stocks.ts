@@ -99,7 +99,7 @@ const SCREEN_UNIVERSE: ScreenStock[] = [
   // ── KOSDAQ ───────────────────────────────────────────────────────────────
   { ticker:"196170", market:"KOSDAQ", name:"알테오젠",         sector:"피하주사플랫폼/바이오",  marketCap:"12조",    basePer:null, pbr:15,  basePrice:200000 },
   { ticker:"032820", market:"KOSDAQ", name:"우리기술",         sector:"원전계측/소형주",        marketCap:"0.3조",   basePer:null, pbr:1,   basePrice:24000  },
-  { ticker:"080320", market:"KOSDAQ", name:"제주반도체",       sector:"메모리반도체/DRAM",      marketCap:"0.3조",   basePer:18,   pbr:2.1, basePrice:6200   },
+  { ticker:"080320", market:"KOSDAQ", name:"제주반도체",       sector:"메모리반도체/DRAM",      marketCap:"0.5조",   basePer:18,   pbr:2.1, basePrice:43750  },
   { ticker:"257720", market:"KOSDAQ", name:"실리콘투",         sector:"K뷰티수출/플랫폼",       marketCap:"0.8조",   basePer:10,   pbr:1.5, basePrice:30000  },
   { ticker:"214150", market:"KOSDAQ", name:"클래시스",         sector:"의료미용/HIFU",          marketCap:"3조",     basePer:20,   pbr:3,   basePrice:50000  },
   { ticker:"028300", market:"KOSDAQ", name:"HLB",              sector:"항암신약/리보세라닙",    marketCap:"2조",     basePer:null, pbr:3,   basePrice:30000  },

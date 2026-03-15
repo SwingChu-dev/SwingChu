@@ -27,7 +27,6 @@ export interface StockDetail {
   recommendationKey: string;
 }
 
-const USD_KRW = 1450;
 
 function evalFinancials(
   per: number | null,

@@ -103,7 +103,9 @@ export function generateScalpSignal(
       : `당일 ${changePct.toFixed(1)}% 하락`
   );
   if (quote.fiftyDayAvg > 0) {
-    const rate = stock.market === "NASDAQ" ? 1450 : 1;
+    const rate = (stock.market === "NASDAQ" && quote.price > 0)
+      ? quote.priceKRW / quote.price
+      : 1;
     const ma50krw = quote.fiftyDayAvg * rate;
     signals.push(quote.priceKRW > ma50krw ? "50일 이평선 상방" : "50일 이평선 하방");
   }
