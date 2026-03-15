@@ -22,12 +22,15 @@ import ForecastSection from "@/components/detail/ForecastSection";
 import FinancialsSection from "@/components/detail/FinancialsSection";
 import RiskSection from "@/components/detail/RiskSection";
 import DayFeaturesSection from "@/components/detail/DayFeaturesSection";
+import NewsSection from "@/components/detail/NewsSection";
+import BacktestSection from "@/components/detail/BacktestSection";
+import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
 
-type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "리스크" | "요일";
+type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "리스크" | "요일" | "뉴스" | "백테스트";
 
-const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "리스크", "요일"];
+const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "리스크", "요일", "뉴스", "백테스트"];
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#3B82F6",
@@ -43,6 +46,7 @@ export default function StockDetailScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("진입");
+  const [showAlertModal, setShowAlertModal] = useState(false);
   const { allKnownStocks } = useWatchlist();
   const { priceKRW: liveKRW, changePct: liveChangePct, getQuote } = useStockPrice();
 
@@ -145,6 +149,13 @@ export default function StockDetailScreen() {
             </View>
           </View>
         </View>
+        {/* 알림 버튼 */}
+        <TouchableOpacity
+          onPress={() => setShowAlertModal(true)}
+          style={[styles.alertBtn, { backgroundColor: c.backgroundTertiary }]}
+        >
+          <Ionicons name="notifications-outline" size={20} color={c.text} />
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.statsBar, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
@@ -204,7 +215,7 @@ export default function StockDetailScreen() {
         ))}
       </ScrollView>
 
-      {isStub && detailLoading ? (
+      {isStub && detailLoading && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={c.tint} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>
@@ -217,27 +228,30 @@ export default function StockDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
         >
-          <View style={styles.descriptionBox}>
-            <Text style={[styles.description, { color: c.textSecondary }]}>
-              {stock.description}
-            </Text>
-          </View>
-          {isStub && detailError && (
-            <View style={[styles.errorBanner, { backgroundColor: "#FF645222" }]}>
-              <Ionicons name="warning-outline" size={16} color="#FF6452" />
-              <Text style={[styles.errorBannerText, { color: "#FF6452" }]}>
-                일부 재무 데이터를 불러오지 못했습니다. 기본값으로 표시합니다.
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.themesRow}>
-            {stock.themes.map((t) => (
-              <View key={t} style={[styles.themeTag, { backgroundColor: c.backgroundTertiary }]}>
-                <Text style={[styles.themeText, { color: c.textSecondary }]}>{t}</Text>
+          {activeTab !== "뉴스" && activeTab !== "백테스트" && (
+            <>
+              <View style={styles.descriptionBox}>
+                <Text style={[styles.description, { color: c.textSecondary }]}>
+                  {stock.description}
+                </Text>
               </View>
-            ))}
-          </View>
+              {isStub && detailError && (
+                <View style={[styles.errorBanner, { backgroundColor: "#FF645222" }]}>
+                  <Ionicons name="warning-outline" size={16} color="#FF6452" />
+                  <Text style={[styles.errorBannerText, { color: "#FF6452" }]}>
+                    일부 재무 데이터를 불러오지 못했습니다. 기본값으로 표시합니다.
+                  </Text>
+                </View>
+              )}
+              <View style={styles.themesRow}>
+                {stock.themes.map((t) => (
+                  <View key={t} style={[styles.themeTag, { backgroundColor: c.backgroundTertiary }]}>
+                    <Text style={[styles.themeText, { color: c.textSecondary }]}>{t}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
 
           {activeTab === "진입"   && <SplitEntrySection  stock={stock} />}
           {activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
@@ -246,10 +260,23 @@ export default function StockDetailScreen() {
           {activeTab === "재무"   && <FinancialsSection   stock={stock} />}
           {activeTab === "리스크" && <RiskSection         stock={stock} />}
           {activeTab === "요일"   && <DayFeaturesSection  stock={stock} />}
+          {activeTab === "뉴스"   && (
+            <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />
+          )}
+          {activeTab === "백테스트" && <BacktestSection stock={stock} />}
 
           <View style={styles.bottomPad} />
         </ScrollView>
       )}
+
+      <AlertSettingsModal
+        visible={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        ticker={stock.ticker}
+        market={stock.market}
+        name={stock.name}
+        currentPrice={displayPrice}
+      />
     </View>
   );
 }
@@ -267,6 +294,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   backBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    justifyContent: "center", alignItems: "center",
+  },
+  alertBtn: {
     width: 38, height: 38, borderRadius: 19,
     justifyContent: "center", alignItems: "center",
   },

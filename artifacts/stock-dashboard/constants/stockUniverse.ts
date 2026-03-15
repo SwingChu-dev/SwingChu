@@ -13,5 +13,5 @@ export interface UniverseStock {
 
 export const PREDEFINED_IDS = new Set([
   "nvda","googl","orcl","ionq","sandisk","eon",
-  "samsung","skhynix","hanwha","hyundai","doosan","woritech","jejusemi",
+  "samsung","skhynix","hanwha","hyundai","doosan","woritech",
 ]);

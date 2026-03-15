@@ -99,7 +99,6 @@ const SCREEN_UNIVERSE: ScreenStock[] = [
   // ── KOSDAQ ───────────────────────────────────────────────────────────────
   { ticker:"196170", market:"KOSDAQ", name:"알테오젠",         sector:"피하주사플랫폼/바이오",  marketCap:"12조",    basePer:null, pbr:15,  basePrice:200000 },
   { ticker:"032820", market:"KOSDAQ", name:"우리기술",         sector:"원전계측/소형주",        marketCap:"0.3조",   basePer:null, pbr:1,   basePrice:24000  },
-  { ticker:"080320", market:"KOSDAQ", name:"제주반도체",       sector:"메모리반도체/DRAM",      marketCap:"0.5조",   basePer:18,   pbr:2.1, basePrice:43750  },
   { ticker:"257720", market:"KOSDAQ", name:"실리콘투",         sector:"K뷰티수출/플랫폼",       marketCap:"0.8조",   basePer:10,   pbr:1.5, basePrice:30000  },
   { ticker:"214150", market:"KOSDAQ", name:"클래시스",         sector:"의료미용/HIFU",          marketCap:"3조",     basePer:20,   pbr:3,   basePrice:50000  },
   { ticker:"028300", market:"KOSDAQ", name:"HLB",              sector:"항암신약/리보세라닙",    marketCap:"2조",     basePer:null, pbr:3,   basePrice:30000  },
@@ -330,6 +329,98 @@ router.get("/stocks/detail", async (req, res) => {
       targetMean, targetMeanKRW, targetHigh, targetLow,
       beta, recommendationKey,
     });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── 뉴스 + 감성 분석 ─────────────────────────────────────────────────────────
+const POS_WORDS = [
+  "gain","rise","surge","beat","record","strong","up","bull","positive","outperform",
+  "revenue","profit","growth","upgrade","buy","higher","rally","breakout","soar","boost",
+  "상승","급등","호재","성장","이익","매수","상향","돌파","신고가","실적 개선",
+];
+const NEG_WORDS = [
+  "fall","drop","decline","miss","loss","down","bear","sell","weak","underperform",
+  "cut","warning","recall","lawsuit","downgrade","plunge","crash","lower","risk",
+  "하락","급락","악재","손실","매도","하향","경고","리스크","적자","폭락",
+];
+
+function analyzeSentiment(title: string): "호재" | "악재" | "중립" {
+  const text = (title ?? "").toLowerCase();
+  let pos = 0, neg = 0;
+  for (const w of POS_WORDS) if (text.includes(w)) pos++;
+  for (const w of NEG_WORDS) if (text.includes(w)) neg++;
+  if (pos > neg) return "호재";
+  if (neg > pos) return "악재";
+  return "중립";
+}
+
+router.get("/stocks/news", async (req, res) => {
+  const ticker = (req.query.ticker as string) ?? "";
+  const market  = (req.query.market  as string) ?? "NASDAQ";
+  if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const yahooTicker = toYahooTicker(ticker, market);
+  try {
+    const result = await yahooFinance.search(yahooTicker, {
+      newsCount: 10,
+      quotesCount: 0,
+      enableNavLinks: false,
+    }).catch(() => ({ news: [] }));
+
+    const news = ((result as any).news ?? []).map((n: any) => ({
+      title:       n.title ?? "",
+      publisher:   n.publisher ?? "",
+      link:        n.link ?? "",
+      publishedAt: n.providerPublishTime
+        ? (typeof n.providerPublishTime === "number"
+            ? n.providerPublishTime * 1000
+            : new Date(n.providerPublishTime).getTime())
+        : null,
+      sentiment:   analyzeSentiment(n.title ?? ""),
+    }));
+
+    return res.json({ ticker, market, news });
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
+// ─── 과거 주가 데이터 (백테스팅용) ─────────────────────────────────────────────
+const PERIOD_DAYS: Record<string, number> = { "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365 };
+
+router.get("/stocks/history", async (req, res) => {
+  const ticker = (req.query.ticker as string) ?? "";
+  const market  = (req.query.market  as string) ?? "NASDAQ";
+  const period  = (req.query.period  as string) ?? "6mo";
+  if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const yahooTicker = toYahooTicker(ticker, market);
+  const isKorean = market === "KOSPI" || market === "KOSDAQ";
+  const days = PERIOD_DAYS[period] ?? 180;
+  const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const liveRate = await getLiveUsdKrw();
+
+  try {
+    const period2 = new Date();
+    const raw = await yahooFinance.historical(yahooTicker, {
+      period1: period1.toISOString().split("T")[0],
+      period2: period2.toISOString().split("T")[0],
+    }).catch(() => []);
+
+    const data = (raw as any[])
+      .filter((d: any) => d.close != null)
+      .map((d: any) => ({
+        date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
+        open:   isKorean ? Math.round(d.open)  : Math.round(d.open  * liveRate),
+        high:   isKorean ? Math.round(d.high)  : Math.round(d.high  * liveRate),
+        low:    isKorean ? Math.round(d.low)   : Math.round(d.low   * liveRate),
+        close:  isKorean ? Math.round(d.close) : Math.round(d.close * liveRate),
+        volume: d.volume ?? 0,
+      }));
+
+    return res.json({ ticker, market, period, data });
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }

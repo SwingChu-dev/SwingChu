@@ -16,7 +16,10 @@ import { useColorScheme, View, Text, StyleSheet, ActivityIndicator } from "react
 import Colors from "@/constants/colors";
 import { WatchlistProvider, useWatchlist } from "@/context/WatchlistContext";
 import { SignalProvider } from "@/context/SignalContext";
-import { StockPriceProvider } from "@/context/StockPriceContext";
+import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
+import { PortfolioProvider } from "@/context/PortfolioContext";
+import { AlertProvider, useAlerts } from "@/context/AlertContext";
+import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
@@ -92,37 +95,54 @@ function PriceBridge({ children }: { children: React.ReactNode }) {
   return <StockPriceProvider watchlist={watchlist}>{children}</StockPriceProvider>;
 }
 
+function AlertChecker() {
+  const { quotes } = useStockPrice();
+  const { checkPrices } = useAlerts();
+  React.useEffect(() => {
+    const map: Record<string, { priceKRW: number }> = {};
+    Object.entries(quotes).forEach(([key, q]) => {
+      map[key] = { priceKRW: q.priceKRW };
+    });
+    if (Object.keys(map).length > 0) checkPrices(map);
+  }, [quotes]);
+  return null;
+}
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const c = isDark ? Colors.dark : Colors.light;
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: c.background },
-        animation: "slide_from_right",
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="stock/[id]"
-        options={{
+    <>
+      <AlertChecker />
+      <AlertBanner />
+      <Stack
+        screenOptions={{
           headerShown: false,
+          contentStyle: { backgroundColor: c.background },
           animation: "slide_from_right",
         }}
-      />
-      <Stack.Screen
-        name="add-stock"
-        options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.75, 1],
-          sheetGrabberVisible: true,
-          headerShown: false,
-        }}
-      />
-    </Stack>
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="stock/[id]"
+          options={{
+            headerShown: false,
+            animation: "slide_from_right",
+          }}
+        />
+        <Stack.Screen
+          name="add-stock"
+          options={{
+            presentation: "formSheet",
+            sheetAllowedDetents: [0.75, 1],
+            sheetGrabberVisible: true,
+            headerShown: false,
+          }}
+        />
+      </Stack>
+    </>
   );
 }
 
@@ -158,9 +178,13 @@ export default function RootLayout() {
             <KeyboardProvider>
               <WatchlistProvider>
                 <PriceBridge>
-                  <SignalProvider>
-                    <RootLayoutNav />
-                  </SignalProvider>
+                  <AlertProvider>
+                    <PortfolioProvider>
+                      <SignalProvider>
+                        <RootLayoutNav />
+                      </SignalProvider>
+                    </PortfolioProvider>
+                  </AlertProvider>
                 </PriceBridge>
               </WatchlistProvider>
             </KeyboardProvider>

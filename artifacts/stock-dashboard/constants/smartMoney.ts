@@ -159,23 +159,6 @@ export const SMART_MONEY_SIGNALS: SmartMoneySignal[] = [
     detectedAt: h(6),
     isNew: false,
   },
-  {
-    id: "sig_jejusemi_1",
-    stockId: "jejusemi",
-    stockName: "제주반도체",
-    ticker: "080320",
-    market: "KOSDAQ",
-    type: "매집중",
-    strength: "약",
-    volumeRatio: 2.1,
-    institutionalNet: 420,
-    foreignerNet: -80,
-    priceVsSupport: 5.8,
-    signals: ["AI·HBM 메모리 수요 확대 수혜", "52주 저점 부근 조용한 매집", "거래량 2배 이상 증가 + 하락 후 반등"],
-    summary: "국내 유일 DRAM·SRAM 설계 소형주. AI 메모리 테마 부각 시 급등 가능. 저점 부근에서 조용한 매집 패턴 포착.",
-    detectedAt: h(8),
-    isNew: false,
-  },
 ];
 
 export const SIGNAL_META: Record<SignalType, { color: string; bg: string; icon: string; desc: string }> = {

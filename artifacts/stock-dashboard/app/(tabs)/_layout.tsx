@@ -145,6 +145,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="portfolio"
+        options={{
+          title: "포트폴리오",
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView
+                name={focused ? "briefcase.fill" : "briefcase"}
+                tintColor={color}
+                size={24}
+              />
+            ) : (
+              <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="analysis"
         options={{
           title: "분석",

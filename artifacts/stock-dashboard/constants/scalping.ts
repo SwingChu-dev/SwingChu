@@ -337,31 +337,6 @@ export const SCALP_SIGNALS: ScalpSignal[] = [
     signals: ["전기차 수출 증가 기대", "저PBR 저평가 구간", "외국인 소폭 순매수 전환"],
     summary: "전기차 수출 호조 + 저PBR 구간. 눌림목 매수 후 단기 반등 노리기.",
   },
-  {
-    stockId: "jejusemi",
-    stockName: "제주반도체",
-    ticker: "080320",
-    market: "KOSDAQ",
-    type: "눌림목",
-    urgency: "이번주",
-    riskLevel: "주의",
-    surgeScore: 47,
-    riskScore: 38,
-    rsi: 36,
-    volumeSpike: 1.6,
-    distanceFrom52High: -42.5,
-    expectedMovePercent: 12,
-    entryLowPct: -8,
-    entryHighPct: -2,
-    stopLossPct: 12,
-    profitPcts: [
-      { label: "1차 익절", percent: 8 },
-      { label: "2차 익절", percent: 18 },
-      { label: "3차 익절", percent: 30 },
-    ],
-    signals: ["AI 메모리 수요 회복 기대", "52주 저점 부근 과매도 구간", "삼성·SK하이닉스 파운드리 수혜", "소형주 저점 매집 징후"],
-    summary: "DRAM·SRAM 설계 국내 유일 소형주. AI·HBM 메모리 수요 확대 수혜 기대. 52주 저점 부근 과매도 구간에서 단기 반등 가능성.",
-  },
 ];
 
 export const TYPE_META: Record<ScalpType, { color: string; bg: string; darkBg: string; icon: string; desc: string }> = {
