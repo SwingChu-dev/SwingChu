@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, copyFile } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +33,7 @@ const allowlist = [
   "uuid",
   "ws",
   "xlsx",
+  "yahoo-finance2",
   "zod",
   "zod-validation-error",
 ];
@@ -60,13 +61,28 @@ async function buildAll() {
     bundle: true,
     format: "cjs",
     outfile: path.resolve(distDir, "index.cjs"),
+    // Inject a CJS-compatible import.meta.url shim at the top of the bundle.
+    // esbuild define can only take literals, so we use banner to set a variable
+    // that define then references by name.
+    banner: {
+      js: `const __importMetaUrl = require("url").pathToFileURL(__filename).href;`,
+    },
     define: {
       "process.env.NODE_ENV": '"production"',
+      "import.meta.url": "__importMetaUrl",
     },
     minify: true,
     external: externals,
     logLevel: "info",
   });
+
+  // Copy the Python FDR script to dist/ so it's resolvable at runtime
+  // (bundled CJS __dirname == dist/, not src/)
+  await copyFile(
+    path.resolve(__dirname, "src/korean_fdr.py"),
+    path.resolve(distDir, "korean_fdr.py"),
+  );
+  console.log("copied korean_fdr.py → dist/");
 }
 
 buildAll().catch((err) => {

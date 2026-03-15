@@ -2,8 +2,20 @@ import { execFile } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCRIPT = path.join(__dirname, "korean_fdr.py");
+// Works in both ESM (tsx dev) and CJS (esbuild prod) contexts.
+// In prod: import.meta.url is injected by build.ts define → fileURLToPath resolves correctly.
+// In dev:  import.meta.url is natively available from ESM.
+// Fallback: if both fail (e.g. edge-case undefined), resolve from process.cwd().
+const _scriptDir: string = (() => {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    // Last-resort: resolve relative to workspace root (process.cwd())
+    return path.resolve(process.cwd(), "artifacts/api-server/src");
+  }
+})();
+
+const SCRIPT = path.join(_scriptDir, "korean_fdr.py");
 const PYTHON = "python3";
 
 // ─── 간단한 TTL 캐시 ─────────────────────────────────────────────────────────
