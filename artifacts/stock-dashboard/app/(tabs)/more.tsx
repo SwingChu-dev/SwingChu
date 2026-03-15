@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useSignals } from "@/context/SignalContext";
+import { useKis } from "@/context/KisContext";
 
 interface MenuItemProps {
   icon: React.ComponentProps<typeof Ionicons>["name"];
@@ -71,6 +72,7 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { newCount } = useSignals();
+  const { isConnected, totalCount } = useKis();
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -98,6 +100,23 @@ export default function MoreScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {/* 계좌 연동 */}
+        <SectionHeader title="계좌 연동" />
+        <View style={styles.section}>
+          <MenuItem
+            icon="business-outline"
+            iconColor="#FF6B35"
+            title="KIS 관심종목 연동"
+            description={
+              isConnected
+                ? `한국투자증권 연결됨 · ${totalCount}개 종목`
+                : "한국투자증권 Open API로 관심종목 동기화"
+            }
+            badge={isConnected ? totalCount : undefined}
+            onPress={() => router.push("/kis-connect" as any)}
+          />
+        </View>
+
         {/* 분석 도구 */}
         <SectionHeader title="분석 도구" />
         <View style={styles.section}>

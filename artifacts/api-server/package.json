@@ -15,6 +15,7 @@
     "cors": "^2",
     "drizzle-orm": "catalog:",
     "express": "^5",
+    "node-cache": "^5.1.2",
     "yahoo-finance2": "^3.13.2"
   },
   "devDependencies": {
