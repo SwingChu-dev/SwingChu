@@ -63,7 +63,11 @@ Express 5 API server with Yahoo Finance integration for Korean stock trading app
   - `GET /stocks/history` — 1yr OHLC for backtesting (1h TTL)
   - `GET /stocks/search` — ticker search (5m TTL)
   - `GET /stocks/analyze` — **AI analysis**: 1yr drawdown-percentile split entries + analyst-target profit targets + full StockInfo fields (1h TTL)
-- Korean stocks use `.KS`/`.KQ` Yahoo ticker suffix; USD/KRW rate cached 5m
+- **Data sources**: Korean stocks (KOSPI/KOSDAQ) → FinanceDataReader (KRX직접); US stocks → Yahoo Finance
+  - `src/korean_fdr.py` — Python script wrapping `FinanceDataReader`; commands: `history`, `quote`, `multi_quote`
+  - `src/koreanFdr.ts` — Node.js subprocess client with TTL cache; exports `fdrQuote`, `fdrMultiQuote`, `fdrHistory`
+  - Financial ratios (PER, PBR, ROE, etc.) still from Yahoo Finance quoteSummary for all markets
+- USD/KRW rate cached 5m via Yahoo Finance (`USDKRW=X`)
 - `calcEntries()` uses rolling 20-day peak drawdown distribution (35/62/87th percentile) → real volatility-based split entry levels
 - `calcProfitTargets()` uses analyst target mean as anchor for pt3
 
