@@ -127,6 +127,7 @@ const SCREEN_UNIVERSE: ScreenStock[] = [
   { ticker:"IONQ",  market:"NASDAQ", name:"아이온큐",           sector:"양자컴퓨팅",            marketCap:"10조",    basePer:null, pbr:6,   basePrice: Math.round(20*USD_KRW)  },
   { ticker:"SNDK",  market:"NASDAQ", name:"샌디스크",           sector:"낸드플래시/SSD",        marketCap:"200조",   basePer:15,   pbr:2,   basePrice: Math.round(60*USD_KRW)  },
   { ticker:"EONR",  market:"NASDAQ", name:"이온R",              sector:"에너지저장/배터리",     marketCap:"5조",     basePer:null, pbr:2,   basePrice: Math.round(8*USD_KRW)   },
+  { ticker:"BNAI",  market:"NASDAQ", name:"브랜드인게이지먼트", sector:"AI브랜드테크/챗봇",     marketCap:"2조",     basePer:null, pbr:50,  basePrice: Math.round(38*USD_KRW)  },
   // ── KOSPI ────────────────────────────────────────────────────────────────
   { ticker:"005930", market:"KOSPI", name:"삼성전자",   sector:"반도체/스마트폰/가전",   marketCap:"1,090조", basePer:12,  pbr:1.1, basePrice:80000  },
   { ticker:"000660", market:"KOSPI", name:"SK하이닉스", sector:"DRAM/HBM/AI메모리",     marketCap:"1,080조", basePer:8,   pbr:2,   basePrice:150000 },
