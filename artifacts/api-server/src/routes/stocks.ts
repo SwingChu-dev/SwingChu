@@ -6,6 +6,51 @@ const yahooFinance = new (YahooFinanceClass as any)({
   suppressNotices: ["yahooSurvey"],
 });
 
+// ─── TTL 캐시 (API 호출 제한 방지) ─────────────────────────────────────────
+interface CacheEntry<T> { data: T; expiresAt: number }
+
+class TtlCache<T> {
+  private store = new Map<string, CacheEntry<T>>();
+
+  get(key: string): T | null {
+    const entry = this.store.get(key);
+    if (!entry || Date.now() > entry.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+
+  set(key: string, data: T, ttlMs: number): void {
+    // 캐시 사이즈 200개 초과 시 오래된 항목 정리
+    if (this.store.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of this.store) {
+        if (v.expiresAt < now) this.store.delete(k);
+      }
+    }
+    this.store.set(key, { data, expiresAt: Date.now() + ttlMs });
+  }
+}
+
+const TTL = {
+  QUOTES:  30 * 1000,          // 30초 — 실시간 시세
+  DETAIL:  5  * 60 * 1000,     // 5분  — 종목 상세 (재무)
+  SCREEN:  10 * 60 * 1000,     // 10분 — 저평가 스크리닝
+  NEWS:    15 * 60 * 1000,     // 15분 — 뉴스 감성
+  HISTORY: 60 * 60 * 1000,     // 1시간 — 과거 OHLC (일봉)
+  SEARCH:  5  * 60 * 1000,     // 5분  — 검색 결과
+};
+
+const quotesCache  = new TtlCache<any[]>();
+const detailCache  = new TtlCache<any>();
+const screenCache  = new TtlCache<any[]>();
+const newsCache    = new TtlCache<any>();
+const historyCache = new TtlCache<any>();
+const searchCache  = new TtlCache<any[]>();
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function toYahooTicker(ticker: string, market: string): string {
   if (market === "KOSPI")  return `${ticker}.KS`;
   if (market === "KOSDAQ") return `${ticker}.KQ`;
@@ -36,7 +81,7 @@ interface ScreenStock {
   marketCap: string;
   basePer:   number | null;
   pbr:       number;
-  basePrice: number; // KRW 기준 참조가격 (동적 PER 계산용)
+  basePrice: number;
 }
 
 // ─── Live USD/KRW rate cache (refreshes every 5 minutes) ───────────────────
@@ -78,34 +123,35 @@ const SCREEN_UNIVERSE: ScreenStock[] = [
   { ticker:"LRCX",  market:"NASDAQ", name:"램리서치",           sector:"반도체 장비/세정",      marketCap:"300조",   basePer:22,   pbr:9,   basePrice: Math.round(220*USD_KRW) },
   { ticker:"MRVL",  market:"NASDAQ", name:"마벨테크놀로지",     sector:"네트워크반도체/AI칩",   marketCap:"350조",   basePer:55,   pbr:4,   basePrice: Math.round(55*USD_KRW)  },
   { ticker:"PYPL",  market:"NASDAQ", name:"페이팔",             sector:"핀테크/간편결제",       marketCap:"200조",   basePer:15,   pbr:3,   basePrice: Math.round(60*USD_KRW)  },
-  { ticker:"IONQ",  market:"NASDAQ", name:"아이온큐",           sector:"양자컴퓨팅",            marketCap:"10조",    basePer:null, pbr:4,   basePrice: Math.round(33*USD_KRW)  },
-  { ticker:"SNDK",  market:"NASDAQ", name:"샌디스크",           sector:"낸드플래시/스토리지",   marketCap:"30조",    basePer:18,   pbr:2,   basePrice: Math.round(45*USD_KRW)  },
+  { ticker:"IONQ",  market:"NASDAQ", name:"아이온큐",           sector:"양자컴퓨팅",            marketCap:"10조",    basePer:null, pbr:6,   basePrice: Math.round(20*USD_KRW)  },
+  { ticker:"SNDK",  market:"NASDAQ", name:"샌디스크",           sector:"낸드플래시/SSD",        marketCap:"200조",   basePer:15,   pbr:2,   basePrice: Math.round(60*USD_KRW)  },
+  { ticker:"EONR",  market:"NASDAQ", name:"이온R",              sector:"에너지저장/배터리",     marketCap:"5조",     basePer:null, pbr:2,   basePrice: Math.round(8*USD_KRW)   },
   // ── KOSPI ────────────────────────────────────────────────────────────────
-  { ticker:"005930", market:"KOSPI", name:"삼성전자",          sector:"반도체/가전/디스플레이", marketCap:"1,097조", basePer:13,   pbr:1.3, basePrice:59800  },
-  { ticker:"000660", market:"KOSPI", name:"SK하이닉스",        sector:"DRAM/HBM/낸드",         marketCap:"660조",   basePer:8,    pbr:1.6, basePrice:190000 },
-  { ticker:"005490", market:"KOSPI", name:"POSCO홀딩스",       sector:"철강/이차전지소재",      marketCap:"28조",    basePer:6,    pbr:0.4, basePrice:300000 },
-  { ticker:"005380", market:"KOSPI", name:"현대차",            sector:"완성차/전기차/수소",     marketCap:"34조",    basePer:6,    pbr:0.5, basePrice:210000 },
-  { ticker:"012450", market:"KOSPI", name:"한화에어로스페이스", sector:"방산/우주항공/엔진",    marketCap:"20조",    basePer:22,   pbr:2,   basePrice:400000 },
-  { ticker:"034020", market:"KOSPI", name:"두산에너빌리티",    sector:"원전/가스터빈/수소",     marketCap:"8조",     basePer:15,   pbr:1.0, basePrice:22000  },
-  { ticker:"105560", market:"KOSPI", name:"KB금융",            sector:"은행/보험/증권",         marketCap:"30조",    basePer:5,    pbr:0.45,basePrice:80000  },
-  { ticker:"055550", market:"KOSPI", name:"신한지주",          sector:"은행/보험/카드",         marketCap:"25조",    basePer:6,    pbr:0.47,basePrice:50000  },
-  { ticker:"086790", market:"KOSPI", name:"하나금융지주",      sector:"은행/증권/보험",         marketCap:"15조",    basePer:5,    pbr:0.42,basePrice:60000  },
-  { ticker:"316140", market:"KOSPI", name:"우리금융지주",      sector:"은행/카드/캐피탈",       marketCap:"8조",     basePer:4,    pbr:0.35,basePrice:15000  },
-  { ticker:"035420", market:"KOSPI", name:"NAVER",             sector:"검색/웹툰/쇼핑/클라우드",marketCap:"27조",    basePer:25,   pbr:2,   basePrice:170000 },
-  { ticker:"009540", market:"KOSPI", name:"HD한국조선해양",    sector:"LNG선/조선/해양플랜트", marketCap:"20조",    basePer:10,   pbr:1.5, basePrice:200000 },
-  { ticker:"015760", market:"KOSPI", name:"한국전력",          sector:"전력/에너지/그리드",     marketCap:"13조",    basePer:null, pbr:0.3, basePrice:20000  },
-  { ticker:"032830", market:"KOSPI", name:"삼성생명",          sector:"생명보험/자산관리",      marketCap:"12조",    basePer:8,    pbr:0.5, basePrice:90000  },
-  { ticker:"051910", market:"KOSPI", name:"LG화학",            sector:"배터리소재/석유화학",    marketCap:"19조",    basePer:20,   pbr:0.9, basePrice:250000 },
+  { ticker:"005930", market:"KOSPI", name:"삼성전자",   sector:"반도체/스마트폰/가전",   marketCap:"1,090조", basePer:12,  pbr:1.1, basePrice:80000  },
+  { ticker:"000660", market:"KOSPI", name:"SK하이닉스", sector:"DRAM/HBM/AI메모리",     marketCap:"1,080조", basePer:8,   pbr:2,   basePrice:150000 },
+  { ticker:"005380", market:"KOSPI", name:"현대차",     sector:"전기차/자율주행/SDV",   marketCap:"520조",   basePer:5,   pbr:0.7, basePrice:200000 },
+  { ticker:"012450", market:"KOSPI", name:"한화에어로", sector:"방산/우주발사체/엔진",   marketCap:"350조",   basePer:35,  pbr:8,   basePrice:600000 },
+  { ticker:"034020", market:"KOSPI", name:"두산에너빌", sector:"원자력/터빈/SMR",        marketCap:"120조",   basePer:20,  pbr:2,   basePrice:100000 },
+  { ticker:"207940", market:"KOSPI", name:"삼성바이오",  sector:"바이오CDMO/위탁생산",   marketCap:"670조",   basePer:50,  pbr:7,   basePrice:900000 },
+  { ticker:"068270", market:"KOSPI", name:"셀트리온",    sector:"바이오시밀러/항체",     marketCap:"220조",   basePer:30,  pbr:3,   basePrice:180000 },
+  { ticker:"051910", market:"KOSPI", name:"LG화학",      sector:"전지재료/석유화학",     marketCap:"250조",   basePer:20,  pbr:1.2, basePrice:350000 },
+  { ticker:"006400", market:"KOSPI", name:"삼성SDI",     sector:"2차전지/전기차배터리",  marketCap:"270조",   basePer:18,  pbr:1.5, basePrice:400000 },
+  { ticker:"003550", market:"KOSPI", name:"LG",           sector:"지주/전자/화학/에너지",marketCap:"120조",   basePer:8,   pbr:0.8, basePrice:80000  },
+  { ticker:"028260", market:"KOSPI", name:"삼성물산",    sector:"건설/패션/바이오지주",  marketCap:"250조",   basePer:15,  pbr:0.9, basePrice:180000 },
+  { ticker:"000270", market:"KOSPI", name:"기아",         sector:"전기차/PBV/글로벌시장",marketCap:"320조",   basePer:5,   pbr:0.7, basePrice:80000  },
+  { ticker:"105560", market:"KOSPI", name:"KB금융",       sector:"은행지주/보험/카드",    marketCap:"250조",   basePer:7,   pbr:0.6, basePrice:90000  },
+  { ticker:"055550", market:"KOSPI", name:"신한지주",    sector:"은행지주/글로벌금융",   marketCap:"220조",   basePer:6,   pbr:0.5, basePrice:55000  },
   // ── KOSDAQ ───────────────────────────────────────────────────────────────
-  { ticker:"196170", market:"KOSDAQ", name:"알테오젠",         sector:"피하주사플랫폼/바이오",  marketCap:"12조",    basePer:null, pbr:15,  basePrice:200000 },
-  { ticker:"032820", market:"KOSDAQ", name:"우리기술",         sector:"원전계측/소형주",        marketCap:"0.3조",   basePer:null, pbr:1,   basePrice:24000  },
-  { ticker:"257720", market:"KOSDAQ", name:"실리콘투",         sector:"K뷰티수출/플랫폼",       marketCap:"0.8조",   basePer:10,   pbr:1.5, basePrice:30000  },
-  { ticker:"214150", market:"KOSDAQ", name:"클래시스",         sector:"의료미용/HIFU",          marketCap:"3조",     basePer:20,   pbr:3,   basePrice:50000  },
-  { ticker:"028300", market:"KOSDAQ", name:"HLB",              sector:"항암신약/리보세라닙",    marketCap:"2조",     basePer:null, pbr:3,   basePrice:30000  },
-  { ticker:"336570", market:"KOSDAQ", name:"원텍",             sector:"의료미용레이저",          marketCap:"0.3조",   basePer:20,   pbr:2.5, basePrice:15000  },
-  { ticker:"293490", market:"KOSDAQ", name:"카카오게임즈",     sector:"모바일게임/IP",          marketCap:"1조",     basePer:25,   pbr:1.5, basePrice:16000  },
-  { ticker:"068760", market:"KOSDAQ", name:"셀트리온제약",     sector:"바이오시밀러/의약품",    marketCap:"3조",     basePer:20,   pbr:2,   basePrice:100000 },
-  { ticker:"091990", market:"KOSDAQ", name:"셀트리온헬스케어", sector:"바이오시밀러유통",       marketCap:"5조",     basePer:25,   pbr:3,   basePrice:70000  },
+  { ticker:"247540", market:"KOSDAQ", name:"에코프로비엠",   sector:"양극재/전기차배터리",  marketCap:"100조",   basePer:30,  pbr:5,   basePrice:150000 },
+  { ticker:"357780", market:"KOSDAQ", name:"솔브레인",       sector:"반도체소재/식각액",    marketCap:"15조",    basePer:15,  pbr:2,   basePrice:300000 },
+  { ticker:"039030", market:"KOSDAQ", name:"이오테크닉스",   sector:"레이저장비/반도체",    marketCap:"4조",     basePer:20,  pbr:2.5, basePrice:120000 },
+  { ticker:"086520", market:"KOSDAQ", name:"에코프로",       sector:"양극재지주/배터리",    marketCap:"80조",    basePer:35,  pbr:6,   basePrice:80000  },
+  { ticker:"036460", market:"KOSDAQ", name:"한국가스공사",   sector:"LNG/수소인프라",       marketCap:"8조",     basePer:10,  pbr:0.7, basePrice:40000  },
+  { ticker:"196170", market:"KOSDAQ", name:"알테오젠",       sector:"피하주사플랫폼/바이오",marketCap:"12조",    basePer:null,pbr:15,  basePrice:200000 },
+  { ticker:"032820", market:"KOSDAQ", name:"우리기술",       sector:"원전계측/소형주",      marketCap:"0.3조",   basePer:null,pbr:1,   basePrice:24000  },
+  { ticker:"257720", market:"KOSDAQ", name:"실리콘투",       sector:"K뷰티수출/플랫폼",     marketCap:"0.8조",   basePer:10,  pbr:1.5, basePrice:30000  },
+  { ticker:"214150", market:"KOSDAQ", name:"클래시스",       sector:"의료미용/HIFU",        marketCap:"3조",     basePer:20,  pbr:3,   basePrice:50000  },
+  { ticker:"028300", market:"KOSDAQ", name:"HLB",            sector:"항암신약/리보세라닙",  marketCap:"2조",     basePer:null,pbr:3,   basePrice:30000  },
 ];
 
 // 저평가 기준 (시장별)
@@ -121,6 +167,10 @@ router.get("/stocks/quotes", async (req, res) => {
   const raw = (req.query.items as string) ?? "";
   const items = raw.split(",").map((s) => s.trim()).filter(Boolean);
   if (items.length === 0) return res.json([]);
+
+  const cacheKey = items.slice().sort().join(",");
+  const cached = quotesCache.get(cacheKey);
+  if (cached) return res.json(cached);
 
   const parsed = items.map((item) => {
     const [ticker, market = "NASDAQ"] = item.split(":");
@@ -162,6 +212,7 @@ router.get("/stocks/quotes", async (req, res) => {
         }
       })
     );
+    quotesCache.set(cacheKey, results, TTL.QUOTES);
     return res.json(results);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
@@ -172,6 +223,10 @@ router.get("/stocks/search", async (req, res) => {
   const q = (req.query.q as string) ?? "";
   const mkt = (req.query.market as string) ?? "ALL";
   if (q.length < 1) return res.json([]);
+
+  const cacheKey = `${q.toLowerCase()}:${mkt}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
 
   try {
     const result = await yahooFinance.search(q, {
@@ -196,6 +251,7 @@ router.get("/stocks/search", async (req, res) => {
       quotes = quotes.filter((q) => q.market === mkt);
     }
 
+    searchCache.set(cacheKey, quotes, TTL.SEARCH);
     return res.json(quotes);
   } catch (e: any) {
     if (e?.message?.includes("Invalid Search Query") || e?.message?.includes("BadRequest")) {
@@ -208,6 +264,10 @@ router.get("/stocks/search", async (req, res) => {
 // ─── 저평가 우량주 스크리닝 ───────────────────────────────────────────────────
 router.get("/stocks/screen", async (req, res) => {
   const market = (req.query.market as string) ?? "ALL";
+
+  const cached = screenCache.get(market);
+  if (cached) return res.json(cached);
+
   const liveRate = await getLiveUsdKrw();
 
   const candidates = SCREEN_UNIVERSE.filter(
@@ -226,7 +286,6 @@ router.get("/stocks/screen", async (req, res) => {
           : Math.round(livePrice * liveRate);
       const changePercent = q.regularMarketChangePercent ?? 0;
 
-      // 동적 PER: 현재가 기준으로 재계산 (기준가 대비 가격 변화 반영)
       let currentPer: number | null = null;
       if (c.basePer !== null && c.basePrice > 0) {
         currentPer = parseFloat(((priceKRW * c.basePer) / c.basePrice).toFixed(1));
@@ -237,7 +296,6 @@ router.get("/stocks/screen", async (req, res) => {
       const pbrOk   = c.pbr < crit.maxPbr;
       const isUndervalued = perOk && pbrOk;
 
-      // 저평가 점수 (낮을수록 더 저평가)
       const perScore = currentPer !== null ? currentPer / crit.maxPer : 0.5;
       const pbrScore = c.pbr / crit.maxPbr;
       const score    = parseFloat(((perScore + pbrScore) / 2).toFixed(3));
@@ -266,6 +324,7 @@ router.get("/stocks/screen", async (req, res) => {
     .filter((s) => s.isUndervalued)
     .sort((a, b) => a.score - b.score);
 
+  screenCache.set(market, undervalued, TTL.SCREEN);
   return res.json(undervalued);
 });
 
@@ -274,6 +333,10 @@ router.get("/stocks/detail", async (req, res) => {
   const ticker = (req.query.ticker as string) ?? "";
   const market = (req.query.market as string) ?? "NASDAQ";
   if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const cacheKey = `${ticker}:${market}`;
+  const cached = detailCache.get(cacheKey);
+  if (cached) return res.json(cached);
 
   const yahooTicker = toYahooTicker(ticker, market);
   const isKorean = market === "KOSPI" || market === "KOSDAQ";
@@ -321,14 +384,17 @@ router.get("/stocks/detail", async (req, res) => {
     const name: string                 = pr?.shortName ?? q?.shortName ?? ticker;
     const recommendationKey: string    = fd?.recommendationKey ?? "";
 
-    return res.json({
+    const payload = {
       ticker, market, name, currentPrice, priceKRW,
       high52w, low52w, high52wKRW, low52wKRW,
       changePercent, prevClose,
       per, forwardPer, pbr, roe, debtRatio, revenueGrowth,
       targetMean, targetMeanKRW, targetHigh, targetLow,
       beta, recommendationKey,
-    });
+    };
+
+    detailCache.set(cacheKey, payload, TTL.DETAIL);
+    return res.json(payload);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -361,6 +427,10 @@ router.get("/stocks/news", async (req, res) => {
   const market  = (req.query.market  as string) ?? "NASDAQ";
   if (!ticker) return res.status(400).json({ error: "ticker required" });
 
+  const cacheKey = `${ticker}:${market}`;
+  const cached = newsCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   const yahooTicker = toYahooTicker(ticker, market);
   try {
     const result = await yahooFinance.search(yahooTicker, {
@@ -381,7 +451,9 @@ router.get("/stocks/news", async (req, res) => {
       sentiment:   analyzeSentiment(n.title ?? ""),
     }));
 
-    return res.json({ ticker, market, news });
+    const payload = { ticker, market, news };
+    newsCache.set(cacheKey, payload, TTL.NEWS);
+    return res.json(payload);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
@@ -395,6 +467,10 @@ router.get("/stocks/history", async (req, res) => {
   const market  = (req.query.market  as string) ?? "NASDAQ";
   const period  = (req.query.period  as string) ?? "6mo";
   if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const cacheKey = `${ticker}:${market}:${period}`;
+  const cached = historyCache.get(cacheKey);
+  if (cached) return res.json(cached);
 
   const yahooTicker = toYahooTicker(ticker, market);
   const isKorean = market === "KOSPI" || market === "KOSDAQ";
@@ -420,7 +496,9 @@ router.get("/stocks/history", async (req, res) => {
         volume: d.volume ?? 0,
       }));
 
-    return res.json({ ticker, market, period, data });
+    const payload = { ticker, market, period, data };
+    historyCache.set(cacheKey, payload, TTL.HISTORY);
+    return res.json(payload);
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }

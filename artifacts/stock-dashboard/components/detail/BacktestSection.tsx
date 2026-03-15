@@ -34,6 +34,8 @@ interface BacktestResult {
   entry2Pct: number;
   entry3Pct: number;
   totalReturn: number;
+  grossReturn: number;
+  totalCost: number;
   maxDrawdown: number;
   hitRate: number;
   tradeCount: number;
@@ -50,8 +52,21 @@ const PERIOD_LABELS: Record<typeof PERIODS[number], string> = {
   "1y": "1년",
 };
 
-function runBacktest(data: DayData[], stock: StockInfo): BacktestResult | null {
+interface BacktestParams {
+  commissionPct: number;
+  slippagePct: number;
+}
+
+function runBacktest(
+  data: DayData[],
+  stock: StockInfo,
+  params: BacktestParams
+): BacktestResult | null {
   if (data.length < 10) return null;
+
+  const { commissionPct, slippagePct } = params;
+  const oneWayCost = commissionPct + slippagePct;   // 편도 비용 (%)
+  const roundTripCost = 2 * oneWayCost;            // 왕복 비용 (%)
 
   const startPrice = data[0].close;
   const endPrice = data[data.length - 1].close;
@@ -67,7 +82,8 @@ function runBacktest(data: DayData[], stock: StockInfo): BacktestResult | null {
 
   let wins = 0;
   let tradeCount = 0;
-  let totalReturn = 0;
+  let grossReturn = 0;
+  let netReturn = 0;
   let maxDrawdown = 0;
 
   for (let i = 5; i < data.length - 5; i++) {
@@ -77,33 +93,48 @@ function runBacktest(data: DayData[], stock: StockInfo): BacktestResult | null {
 
     if (dropFromHigh <= -e2) {
       tradeCount++;
+
+      // 30/30/40 가중 평균 진입가
       const avgEntry =
         0.3 * cur * (1 - e1 / 100) +
         0.3 * cur * (1 - e2 / 100) +
         0.4 * cur * (1 - e3 / 100);
 
+      // 슬리피지 반영: 실제 체결가는 진입가보다 불리하게
+      const effectiveEntry = avgEntry * (1 + oneWayCost / 100);
+
       const future = data.slice(i + 1, Math.min(i + 30, data.length));
-      const peak = future.reduce((m, d) => Math.max(m, d.high), 0);
+      const peak   = future.reduce((m, d) => Math.max(m, d.high), 0);
       const trough = future.reduce((m, d) => Math.min(m, d.low), cur);
 
-      const gain = peak > 0 ? ((peak - avgEntry) / avgEntry) * 100 : 0;
-      const dd = ((trough - avgEntry) / avgEntry) * 100;
+      // 슬리피지 반영: 실제 매도가는 고점보다 불리하게
+      const effectivePeak = peak > 0 ? peak * (1 - oneWayCost / 100) : 0;
+
+      const gross = peak > 0 ? ((peak - avgEntry) / avgEntry) * 100 : 0;
+      const net   = effectivePeak > 0 ? ((effectivePeak - effectiveEntry) / effectiveEntry) * 100 : 0;
+      const dd    = ((trough - avgEntry) / avgEntry) * 100;
 
       if (dd < maxDrawdown) maxDrawdown = dd;
 
-      const wouldHit = gain >= pt1;
+      const wouldHit = gross >= pt1;
       if (wouldHit) {
         wins++;
-        const blended =
-          0.3 * pt1 + 0.3 * Math.min(gain, pt2) + 0.4 * Math.min(gain, pt3);
-        totalReturn += blended;
+        const blendedGross =
+          0.3 * pt1 + 0.3 * Math.min(gross, pt2) + 0.4 * Math.min(gross, pt3);
+        const blendedNet = blendedGross - roundTripCost;
+        grossReturn += blendedGross;
+        netReturn   += blendedNet;
       } else {
-        totalReturn += dd;
+        grossReturn += dd;
+        netReturn   += dd - roundTripCost;
       }
     }
   }
 
   const hitRate = tradeCount > 0 ? (wins / tradeCount) * 100 : 0;
+  const avgGross = tradeCount > 0 ? grossReturn / tradeCount : 0;
+  const avgNet   = tradeCount > 0 ? netReturn   / tradeCount : 0;
+  const totalCostImpact = avgGross - avgNet;
 
   return {
     entryDate: data[0].date,
@@ -116,7 +147,9 @@ function runBacktest(data: DayData[], stock: StockInfo): BacktestResult | null {
     entry1Pct: -e1,
     entry2Pct: -e2,
     entry3Pct: -e3,
-    totalReturn: tradeCount > 0 ? totalReturn / tradeCount : 0,
+    totalReturn:  avgNet,
+    grossReturn:  avgGross,
+    totalCost:    totalCostImpact,
     maxDrawdown,
     hitRate,
     tradeCount,
@@ -130,16 +163,34 @@ interface Props {
   stock: StockInfo;
 }
 
+const COMMISSION_OPTIONS = [
+  { label: "0.015%", value: 0.015 },
+  { label: "0.025%", value: 0.025 },
+  { label: "0.1%",   value: 0.1   },
+  { label: "0.25%",  value: 0.25  },
+];
+const SLIPPAGE_OPTIONS = [
+  { label: "0.02%", value: 0.02 },
+  { label: "0.05%", value: 0.05 },
+  { label: "0.1%",  value: 0.1  },
+  { label: "0.2%",  value: 0.2  },
+];
+
 export default function BacktestSection({ stock }: Props) {
   const isDark = useColorScheme() === "dark";
   const c = isDark ? Colors.dark : Colors.light;
 
+  const isKorean = stock.market === "KOSPI" || stock.market === "KOSDAQ";
   const [period, setPeriod] = useState<typeof PERIODS[number]>("6mo");
+  const [commissionPct, setCommissionPct] = useState(isKorean ? 0.015 : 0.1);
+  const [slippagePct, setSlippagePct] = useState(0.05);
+  const [showCostPanel, setShowCostPanel] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [rawData, setRawData] = useState<DayData[]>([]);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [error, setError] = useState(false);
 
-  const runTest = useCallback(
+  const fetchData = useCallback(
     (p: typeof PERIODS[number]) => {
       setLoading(true);
       setError(false);
@@ -152,8 +203,9 @@ export default function BacktestSection({ stock }: Props) {
           return r.json();
         })
         .then((d) => {
-          const res = runBacktest(d.data ?? [], stock);
-          setResult(res);
+          const data: DayData[] = d.data ?? [];
+          setRawData(data);
+          setResult(runBacktest(data, stock, { commissionPct, slippagePct }));
           setLoading(false);
         })
         .catch(() => {
@@ -161,12 +213,21 @@ export default function BacktestSection({ stock }: Props) {
           setLoading(false);
         });
     },
-    [stock]
+    [stock, commissionPct, slippagePct]
   );
 
   useEffect(() => {
-    runTest(period);
+    fetchData(period);
   }, [period]);
+
+  // 수수료/슬리피지 바뀌면 데이터 재사용해 빠르게 재계산
+  useEffect(() => {
+    if (rawData.length > 0) {
+      setResult(runBacktest(rawData, stock, { commissionPct, slippagePct }));
+    }
+  }, [commissionPct, slippagePct, rawData]);
+
+  const roundTripCost = 2 * (commissionPct + slippagePct);
 
   return (
     <View style={styles.wrapper}>
@@ -195,6 +256,95 @@ export default function BacktestSection({ stock }: Props) {
         ))}
       </View>
 
+      {/* 수수료·슬리피지 패널 */}
+      <TouchableOpacity
+        style={[styles.costToggle, { backgroundColor: c.card, borderColor: c.separator }]}
+        onPress={() => setShowCostPanel(!showCostPanel)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.costToggleLeft}>
+          <Ionicons name="settings-outline" size={15} color="#0064FF" />
+          <Text style={[styles.costToggleTxt, { color: c.text }]}>거래 비용 설정</Text>
+          <View style={[styles.costBadge, { backgroundColor: isDark ? "#1A2B4A" : "#E8F0FF" }]}>
+            <Text style={styles.costBadgeTxt}>왕복 {roundTripCost.toFixed(3)}%</Text>
+          </View>
+        </View>
+        <Ionicons
+          name={showCostPanel ? "chevron-up" : "chevron-down"}
+          size={14}
+          color={c.textSecondary}
+        />
+      </TouchableOpacity>
+
+      {showCostPanel && (
+        <View style={[styles.costPanel, { backgroundColor: isDark ? "#141B2D" : "#F7F9FF", borderColor: c.separator }]}>
+          <View style={styles.costSection}>
+            <Text style={[styles.costSectionLabel, { color: c.textSecondary }]}>
+              수수료 (편도)
+            </Text>
+            <View style={styles.optionRow}>
+              {COMMISSION_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.optionBtn,
+                    { borderColor: c.separator, backgroundColor: c.card },
+                    opt.value === commissionPct && { backgroundColor: "#0064FF", borderColor: "#0064FF" },
+                  ]}
+                  onPress={() => setCommissionPct(opt.value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionTxt,
+                      { color: c.textSecondary },
+                      opt.value === commissionPct && { color: "#fff" },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.costSection}>
+            <Text style={[styles.costSectionLabel, { color: c.textSecondary }]}>
+              슬리피지 (편도, 체결 오차)
+            </Text>
+            <View style={styles.optionRow}>
+              {SLIPPAGE_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.optionBtn,
+                    { borderColor: c.separator, backgroundColor: c.card },
+                    opt.value === slippagePct && { backgroundColor: "#F59E0B", borderColor: "#F59E0B" },
+                  ]}
+                  onPress={() => setSlippagePct(opt.value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionTxt,
+                      { color: c.textSecondary },
+                      opt.value === slippagePct && { color: "#fff" },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={[styles.costNote, { backgroundColor: isDark ? "#1C1C1E" : "#fff" }]}>
+            <Ionicons name="information-circle-outline" size={13} color="#0064FF" />
+            <Text style={[styles.costNoteTxt, { color: c.textSecondary }]}>
+              국내 MTS: 약 0.015% · 해외주식: 약 0.1~0.25% · 슬리피지는 호가창 스프레드에 따라 달라집니다
+            </Text>
+          </View>
+        </View>
+      )}
+
       {loading && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={c.tint} />
@@ -222,44 +372,77 @@ export default function BacktestSection({ stock }: Props) {
               <Text style={[styles.stratTitle, { color: c.text }]}>30/30/40 분할 매수 전략</Text>
             </View>
             <Text style={[styles.stratDesc, { color: c.textSecondary }]}>
-              {PERIOD_LABELS[period]} 과거 데이터 기준, {result.tradeCount}번의 진입 기회 시뮬레이션
+              {PERIOD_LABELS[period]} 기준 {result.tradeCount}번 진입 기회 · 왕복 비용 {roundTripCost.toFixed(3)}% 적용
             </Text>
           </View>
 
-          {/* 핵심 지표 */}
+          {/* 핵심 지표 — 수수료 반영 수익 vs 미반영 수익 */}
           <View style={styles.metricsGrid}>
             {[
               {
-                label: "평균 수익률",
+                label: "순 수익률",
+                sub:   "(수수료·슬리피지 후)",
                 value: `${result.totalReturn >= 0 ? "+" : ""}${result.totalReturn.toFixed(1)}%`,
                 color: result.totalReturn >= 0 ? "#F04452" : "#1B63E8",
                 icon: "trending-up-outline" as const,
+                highlight: true,
+              },
+              {
+                label: "비용 차감분",
+                sub:   "(왕복 비용 영향)",
+                value: `-${result.totalCost.toFixed(2)}%`,
+                color: "#F59E0B",
+                icon: "receipt-outline" as const,
+                highlight: false,
               },
               {
                 label: "전략 적중률",
+                sub:   "(익절 목표 달성)",
                 value: `${result.hitRate.toFixed(0)}%`,
                 color: result.hitRate >= 60 ? "#F04452" : "#F59E0B",
                 icon: "checkmark-circle-outline" as const,
+                highlight: false,
               },
               {
                 label: "최대 손실",
+                sub:   "(MDD)",
                 value: `${result.maxDrawdown.toFixed(1)}%`,
                 color: "#1B63E8",
                 icon: "arrow-down-outline" as const,
-              },
-              {
-                label: "기간 등락",
-                value: `${result.periodReturn >= 0 ? "+" : ""}${result.periodReturn.toFixed(1)}%`,
-                color: result.periodReturn >= 0 ? "#F04452" : "#1B63E8",
-                icon: "stats-chart-outline" as const,
+                highlight: false,
               },
             ].map((m) => (
-              <View key={m.label} style={[styles.metricBox, { backgroundColor: c.card }]}>
+              <View
+                key={m.label}
+                style={[
+                  styles.metricBox,
+                  { backgroundColor: c.card },
+                  m.highlight && { borderWidth: 1.5, borderColor: "#0064FF" },
+                ]}
+              >
                 <Ionicons name={m.icon} size={18} color={m.color} />
                 <Text style={[styles.metricValue, { color: m.color }]}>{m.value}</Text>
-                <Text style={[styles.metricLabel, { color: c.textSecondary }]}>{m.label}</Text>
+                <Text style={[styles.metricLabel, { color: c.text }]}>{m.label}</Text>
+                <Text style={[styles.metricSub, { color: c.textTertiary }]}>{m.sub}</Text>
               </View>
             ))}
+          </View>
+
+          {/* 기간 등락 비교 */}
+          <View style={[styles.compareRow, { backgroundColor: c.card }]}>
+            <View style={styles.compareItem}>
+              <Text style={[styles.compareLabel, { color: c.textSecondary }]}>기간 단순 등락</Text>
+              <Text style={[styles.compareValue, { color: result.periodReturn >= 0 ? "#F04452" : "#1B63E8" }]}>
+                {result.periodReturn >= 0 ? "+" : ""}{result.periodReturn.toFixed(1)}%
+              </Text>
+            </View>
+            <View style={[styles.compareDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.compareItem}>
+              <Text style={[styles.compareLabel, { color: c.textSecondary }]}>전략 순 수익률</Text>
+              <Text style={[styles.compareValue, { color: result.totalReturn >= 0 ? "#F04452" : "#1B63E8" }]}>
+                {result.totalReturn >= 0 ? "+" : ""}{result.totalReturn.toFixed(1)}%
+              </Text>
+            </View>
           </View>
 
           {/* 현재가 기준 진입·익절 레벨 */}
@@ -301,7 +484,7 @@ export default function BacktestSection({ stock }: Props) {
           <View style={[styles.disclaimer, { backgroundColor: c.backgroundTertiary }]}>
             <Ionicons name="information-circle-outline" size={14} color={c.textTertiary} />
             <Text style={[styles.disclaimerText, { color: c.textTertiary }]}>
-              과거 수익률이 미래를 보장하지 않습니다. 시뮬레이션은 참고용입니다.
+              과거 수익률이 미래를 보장하지 않습니다. 수수료·슬리피지가 반영된 시뮬레이션입니다.
             </Text>
           </View>
         </>
@@ -319,15 +502,40 @@ const styles = StyleSheet.create({
   periodBtn:     { flex: 1, borderWidth: 1, borderRadius: 8, paddingVertical: 8, alignItems: "center" },
   periodTxt:     { fontSize: 13, fontFamily: "Inter_500Medium" },
 
+  costToggle:    {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1,
+  },
+  costToggleLeft:{ flexDirection: "row", alignItems: "center", gap: 8 },
+  costToggleTxt: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  costBadge:     { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  costBadgeTxt:  { fontSize: 11, color: "#0064FF", fontFamily: "Inter_600SemiBold" },
+
+  costPanel:     { borderRadius: 12, padding: 12, gap: 12, borderWidth: 1 },
+  costSection:   { gap: 8 },
+  costSectionLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  optionRow:     { flexDirection: "row", gap: 6 },
+  optionBtn:     { flex: 1, borderWidth: 1, borderRadius: 8, paddingVertical: 7, alignItems: "center" },
+  optionTxt:     { fontSize: 12, fontFamily: "Inter_500Medium" },
+  costNote:      { flexDirection: "row", alignItems: "flex-start", gap: 5, padding: 8, borderRadius: 8 },
+  costNoteTxt:   { fontSize: 11, flex: 1, lineHeight: 16 },
+
   stratCard:     { borderRadius: 14, padding: 14, gap: 6 },
   stratHeader:   { flexDirection: "row", alignItems: "center", gap: 6 },
   stratTitle:    { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   stratDesc:     { fontSize: 12, lineHeight: 18 },
 
   metricsGrid:   { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  metricBox:     { flex: 1, minWidth: "45%", borderRadius: 12, padding: 14, alignItems: "center", gap: 4 },
+  metricBox:     { flex: 1, minWidth: "45%", borderRadius: 12, padding: 14, alignItems: "center", gap: 2 },
   metricValue:   { fontSize: 20, fontFamily: "Inter_700Bold" },
-  metricLabel:   { fontSize: 11, textAlign: "center" },
+  metricLabel:   { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
+  metricSub:     { fontSize: 10, textAlign: "center" },
+
+  compareRow:    { flexDirection: "row", borderRadius: 12, overflow: "hidden" },
+  compareItem:   { flex: 1, padding: 14, alignItems: "center", gap: 4 },
+  compareLabel:  { fontSize: 11 },
+  compareValue:  { fontSize: 17, fontFamily: "Inter_700Bold" },
+  compareDivider:{ width: StyleSheet.hairlineWidth },
 
   priceCard:     { borderRadius: 14, padding: 14, gap: 10 },
   priceCardTitle:{ fontSize: 14, fontFamily: "Inter_600SemiBold" },

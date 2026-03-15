@@ -76,17 +76,14 @@ export default function TabLayout() {
         },
       }}
     >
+      {/* ── 5개 주요 탭 ─────────────────────────────────────── */}
       <Tabs.Screen
         name="index"
         options={{
           title: "관심종목",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView
-                name={focused ? "star.fill" : "star"}
-                tintColor={color}
-                size={24}
-              />
+              <SymbolView name={focused ? "star.fill" : "star"} tintColor={color} size={24} />
             ) : (
               <Ionicons name={focused ? "star" : "star-outline"} size={22} color={color} />
             ),
@@ -109,36 +106,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="signals"
-        options={{
-          title: "세력감지",
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              {isIOS ? (
-                <SymbolView
-                  name={focused ? "eye.fill" : "eye"}
-                  tintColor={color}
-                  size={24}
-                />
-              ) : (
-                <Ionicons name={focused ? "eye" : "eye-outline"} size={22} color={color} />
-              )}
-              <TabBadge count={newCount} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="scalping"
         options={{
           title: "단타레이더",
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView
-                name={focused ? "bolt.fill" : "bolt"}
-                tintColor={color}
-                size={24}
-              />
+              <SymbolView name={focused ? "bolt.fill" : "bolt"} tintColor={color} size={24} />
             ) : (
               <Ionicons name={focused ? "flash" : "flash-outline"} size={22} color={color} />
             ),
@@ -156,40 +129,60 @@ export default function TabLayout() {
                 size={24}
               />
             ) : (
-              <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={22} color={color} />
+              <Ionicons
+                name={focused ? "briefcase" : "briefcase-outline"}
+                size={22}
+                color={color}
+              />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: "더보기",
+          tabBarIcon: ({ color, focused }) => (
+            <View>
+              {isIOS ? (
+                <SymbolView
+                  name={focused ? "ellipsis.circle.fill" : "ellipsis.circle"}
+                  tintColor={color}
+                  size={24}
+                />
+              ) : (
+                <Ionicons
+                  name={focused ? "ellipsis-horizontal-circle" : "ellipsis-horizontal-circle-outline"}
+                  size={22}
+                  color={color}
+                />
+              )}
+              {/* 세력감지 미확인 신호 배지 */}
+              <TabBadge count={newCount} />
+            </View>
+          ),
+        }}
+      />
+
+      {/* ── 더보기에서 접근하는 숨겨진 탭 (탭바에 표시 안 됨) ── */}
+      <Tabs.Screen
+        name="signals"
+        options={{
+          title: "세력감지",
+          tabBarButton: () => null,
         }}
       />
       <Tabs.Screen
         name="analysis"
         options={{
           title: "분석",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "chart.bar.fill" : "chart.bar"}
-                tintColor={color}
-                size={24}
-              />
-            ) : (
-              <Ionicons name={focused ? "bar-chart" : "bar-chart-outline"} size={22} color={color} />
-            ),
+          tabBarButton: () => null,
         }}
       />
       <Tabs.Screen
         name="strategy"
         options={{
           title: "전략",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "shield.fill" : "shield"}
-                tintColor={color}
-                size={24}
-              />
-            ) : (
-              <Ionicons name={focused ? "shield" : "shield-outline"} size={22} color={color} />
-            ),
+          tabBarButton: () => null,
         }}
       />
     </Tabs>
