@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -99,15 +99,24 @@ export default function ExploreScreen() {
     }
   }, []);
 
+  // 시장 탭이나 뷰모드가 바뀌면 자동으로 재탐색 (이미 한 번 탐색한 이후에만)
+  const prevFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!prevFetchedRef.current) return; // 첫 탐색 전에는 자동 실행 안 함
+    fetchScreen(market, viewMode);
+  }, [market, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (fetched) prevFetchedRef.current = true;
+  }, [fetched]);
+
   const handleMarket = (mkt: Market) => {
     setMarket(mkt);
-    setFetched(false);
     setResults([]);
   };
 
   const handleViewMode = (mode: ViewMode) => {
     setViewMode(mode);
-    setFetched(false);
     setResults([]);
   };
 
@@ -243,7 +252,7 @@ export default function ExploreScreen() {
         </View>
         <TouchableOpacity
           style={[styles.scanBtn, loading && { opacity: 0.5 }]}
-          onPress={() => fetchScreen(market, viewMode)}
+          onPress={() => { setFetched(true); fetchScreen(market, viewMode); }}
           disabled={loading}
         >
           <Ionicons name="search" size={16} color="#fff" />
@@ -337,7 +346,7 @@ export default function ExploreScreen() {
               ? "\"탐색\" 버튼을 눌러\n유니버스 전 종목의 실시간 시세를 조회하세요"
               : "\"탐색\" 버튼을 눌러\n실시간 밸류에이션 분석을 시작하세요"}
           </Text>
-          <TouchableOpacity style={styles.bigScanBtn} onPress={() => fetchScreen(market, viewMode)}>
+          <TouchableOpacity style={styles.bigScanBtn} onPress={() => { setFetched(true); fetchScreen(market, viewMode); }}>
             <Ionicons name="search" size={18} color="#fff" />
             <Text style={styles.bigScanBtnText}>지금 탐색하기</Text>
           </TouchableOpacity>
