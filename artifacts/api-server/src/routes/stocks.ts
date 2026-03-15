@@ -1,6 +1,5 @@
 import { Router } from "express";
 import YahooFinanceClass from "yahoo-finance2";
-import { fdrQuote, fdrMultiQuote, fdrHistory } from "../koreanFdr";
 
 const router = Router();
 const yahooFinance = new (YahooFinanceClass as any)({
@@ -71,6 +70,69 @@ function classifyMarket(symbol: string, exchange: string): string {
 function cleanTicker(symbol: string): string {
   if (symbol.endsWith(".KS") || symbol.endsWith(".KQ")) return symbol.slice(0, -3);
   return symbol;
+}
+
+// ─── Yahoo Finance 기반 한국 주식 헬퍼 (FDR Python 대체) ───────────────────
+// 배포 환경에서 Python/FDR이 없어도 안정적으로 동작하도록 Yahoo Finance(.KS/.KQ) 사용
+interface KrQuote {
+  close: number; open: number; high: number; low: number;
+  volume: number; changePercent: number; change: number;
+  prevClose: number; high52w: number; low52w: number; date: string;
+}
+
+async function yahooKrQuote(ticker: string, market: string): Promise<KrQuote | null> {
+  const yt = toYahooTicker(ticker, market);
+  try {
+    const q = await (yahooFinance as any).quote(yt);
+    if (!q || !q.regularMarketPrice) return null;
+    return {
+      close:         q.regularMarketPrice ?? 0,
+      open:          q.regularMarketOpen ?? 0,
+      high:          q.regularMarketDayHigh ?? 0,
+      low:           q.regularMarketDayLow ?? 0,
+      volume:        q.regularMarketVolume ?? 0,
+      changePercent: q.regularMarketChangePercent ?? 0,
+      change:        q.regularMarketChange ?? 0,
+      prevClose:     q.regularMarketPreviousClose ?? 0,
+      high52w:       q.fiftyTwoWeekHigh ?? 0,
+      low52w:        q.fiftyTwoWeekLow ?? 0,
+      date:          new Date().toISOString().split("T")[0],
+    };
+  } catch { return null; }
+}
+
+async function yahooKrMultiQuote(
+  pairs: { ticker: string; market: string }[]
+): Promise<Record<string, KrQuote>> {
+  const result: Record<string, KrQuote> = {};
+  await Promise.allSettled(
+    pairs.map(async ({ ticker, market }) => {
+      const q = await yahooKrQuote(ticker, market);
+      if (q) result[ticker] = q;
+    })
+  );
+  return result;
+}
+
+async function yahooKrHistory(
+  ticker: string, market: string, days: number
+): Promise<{ date: string; open: number; high: number; low: number; close: number; volume: number }[]> {
+  const yt = toYahooTicker(ticker, market);
+  const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const period2 = new Date().toISOString().split("T")[0];
+  try {
+    const raw = await (yahooFinance as any).historical(yt, { period1, period2 }).catch(() => []);
+    return (raw as any[])
+      .filter((d: any) => d.close != null)
+      .map((d: any) => ({
+        date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
+        open:   Math.round(d.open   ?? 0),
+        high:   Math.round(d.high   ?? 0),
+        low:    Math.round(d.low    ?? 0),
+        close:  Math.round(d.close  ?? 0),
+        volume: d.volume ?? 0,
+      }));
+  } catch { return []; }
 }
 
 // ─── 저평가 우량주 스크리닝 유니버스 (45종목) ────────────────────────────────
@@ -186,12 +248,12 @@ router.get("/stocks/quotes", async (req, res) => {
 
   const liveRate = await getLiveUsdKrw();
 
-  // 한국 주식은 FDR, 미국 주식은 Yahoo Finance
+  // 한국 주식은 Yahoo Finance(.KS/.KQ), 미국 주식도 Yahoo Finance
   const krTickers = parsed.filter(p => p.market === "KOSPI" || p.market === "KOSDAQ");
 
   const krFdrMap = krTickers.length > 0
-    ? await fdrMultiQuote(krTickers.map(p => p.ticker))
-    : {} as Record<string, any>;
+    ? await yahooKrMultiQuote(krTickers.map(p => ({ ticker: p.ticker, market: p.market })))
+    : {} as Record<string, KrQuote>;
 
   try {
     const results = await Promise.all(
@@ -316,11 +378,11 @@ router.get("/stocks/screen", async (req, res) => {
     (s) => market === "ALL" || s.market === market
   );
 
-  // 한국 주식 일괄 FDR 조회
+  // 한국 주식 일괄 Yahoo Finance(.KS/.KQ) 조회
   const krCandidates = candidates.filter(c => c.market === "KOSPI" || c.market === "KOSDAQ");
   const krFdrMap = krCandidates.length > 0
-    ? await fdrMultiQuote(krCandidates.map(c => c.ticker))
-    : {} as Record<string, any>;
+    ? await yahooKrMultiQuote(krCandidates.map(c => ({ ticker: c.ticker, market: c.market })))
+    : {} as Record<string, KrQuote>;
 
   const results = await Promise.allSettled(
     candidates.map(async (c) => {
@@ -331,7 +393,7 @@ router.get("/stocks/screen", async (req, res) => {
 
       if (isKorean) {
         const fq = krFdrMap[c.ticker];
-        if (!fq) throw new Error(`FDR no data for ${c.ticker}`);
+        if (!fq) throw new Error(`Yahoo no data for ${c.ticker}`);
         livePrice    = fq.close;
         changePercent = fq.changePercent;
       } else {
@@ -408,14 +470,13 @@ router.get("/stocks/detail", async (req, res) => {
   const liveRate = await getLiveUsdKrw();
 
   try {
-    // 재무 데이터는 Yahoo Finance (FDR은 재무비율 미제공)
-    // 한국 주식 가격/52w는 FDR로 우선 조회
-    const [summary, rawQuote, fdrQ] = await Promise.all([
+    // 재무 데이터는 Yahoo Finance; 한국 주식 가격/52w도 Yahoo(.KS/.KQ)로 통일
+    const [summary, rawQuote, krQ] = await Promise.all([
       yahooFinance.quoteSummary(yahooTicker, {
         modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
       }).catch(() => null),
       isKorean ? Promise.resolve(null) : yahooFinance.quote(yahooTicker).catch(() => null),
-      isKorean ? fdrQuote(ticker) : Promise.resolve(null),
+      isKorean ? yahooKrQuote(ticker, market) : Promise.resolve(null),
     ]);
 
     const q  = rawQuote as any;
@@ -424,20 +485,20 @@ router.get("/stocks/detail", async (req, res) => {
     const sd = (summary as any)?.summaryDetail ?? {};
     const pr = (summary as any)?.price ?? {};
 
-    // 가격/시세: 한국은 FDR, 미국은 Yahoo
+    // 가격/시세: 한국은 Yahoo(.KS/.KQ), 미국은 Yahoo 직접
     const currentPrice: number = isKorean
-      ? (fdrQ?.close ?? 0)
+      ? (krQ?.close ?? pr?.regularMarketPrice ?? 0)
       : (q?.regularMarketPrice ?? 0);
     const priceKRW: number = isKorean ? currentPrice : Math.round(currentPrice * liveRate);
-    const high52w: number = isKorean ? (fdrQ?.high52w ?? 0) : (q?.fiftyTwoWeekHigh ?? 0);
-    const low52w:  number = isKorean ? (fdrQ?.low52w  ?? 0) : (q?.fiftyTwoWeekLow  ?? 0);
+    const high52w: number = isKorean ? (krQ?.high52w ?? pr?.fiftyTwoWeekHigh ?? 0) : (q?.fiftyTwoWeekHigh ?? 0);
+    const low52w:  number = isKorean ? (krQ?.low52w  ?? pr?.fiftyTwoWeekLow  ?? 0) : (q?.fiftyTwoWeekLow  ?? 0);
     const high52wKRW: number = isKorean ? high52w : Math.round(high52w * liveRate);
     const low52wKRW:  number = isKorean ? low52w  : Math.round(low52w  * liveRate);
     const changePercent: number = isKorean
-      ? (fdrQ?.changePercent ?? 0)
+      ? (krQ?.changePercent ?? 0)
       : (q?.regularMarketChangePercent ?? 0);
     const prevClose: number = isKorean
-      ? (fdrQ?.prevClose ?? 0)
+      ? (krQ?.prevClose ?? 0)
       : (q?.regularMarketPreviousClose ?? 0);
 
     const per: number | null          = sd?.trailingPE ?? null;
@@ -557,9 +618,9 @@ router.get("/stocks/history", async (req, res) => {
     let data: any[];
 
     if (isKorean) {
-      // 한국 주식 — FinanceDataReader (KRX 직접 조회, KOSDAQ 누락 없음)
-      const fdrRows = await fdrHistory(ticker, days);
-      data = fdrRows.map(d => ({
+      // 한국 주식 — Yahoo Finance(.KS/.KQ) 일봉 데이터
+      const krRows = await yahooKrHistory(ticker, market, days);
+      data = krRows.map(d => ({
         date:   d.date,
         open:   d.open,
         high:   d.high,
@@ -656,16 +717,16 @@ router.get("/stocks/analyze", async (req, res) => {
     const period1 = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     const period2 = new Date().toISOString().split("T")[0];
 
-    // 한국 주식: 과거 OHLCV는 FDR, 재무/애널리스트는 Yahoo Finance 병렬 조회
-    const [summary, rawHistoryYahoo, fdrRows, fdrQ] = await Promise.all([
+    // 한국 주식: 과거 OHLCV + 현재가도 Yahoo Finance(.KS/.KQ)로 통일
+    const [summary, rawHistoryYahoo, krRows, krQ] = await Promise.all([
       yahooFinance.quoteSummary(yahooTicker, {
         modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price", "summaryProfile"] as any,
       }).catch(() => null),
       isKorean
         ? Promise.resolve([] as any[])
         : yahooFinance.historical(yahooTicker, { period1, period2 }).catch(() => []),
-      isKorean ? fdrHistory(ticker, 365) : Promise.resolve([]),
-      isKorean ? fdrQuote(ticker) : Promise.resolve(null),
+      isKorean ? yahooKrHistory(ticker, market, 365) : Promise.resolve([]),
+      isKorean ? yahooKrQuote(ticker, market) : Promise.resolve(null),
     ]);
 
     const fd = (summary as any)?.financialData      ?? {};
@@ -674,16 +735,16 @@ router.get("/stocks/analyze", async (req, res) => {
     const pr = (summary as any)?.price               ?? {};
     const sp = (summary as any)?.summaryProfile      ?? {};
 
-    // 현재가/52w: 한국은 FDR, 미국은 Yahoo
+    // 현재가/52w: 한국은 Yahoo(.KS/.KQ), 미국은 Yahoo 직접
     const currentPrice: number = isKorean
-      ? (fdrQ?.close ?? pr?.regularMarketPrice ?? 0)
+      ? (krQ?.close ?? pr?.regularMarketPrice ?? 0)
       : (pr?.regularMarketPrice ?? 0);
     const priceKRW: number = isKorean ? currentPrice : Math.round(currentPrice * liveRate);
     const high52w: number  = isKorean
-      ? (fdrQ?.high52w ?? pr?.fiftyTwoWeekHigh ?? sd?.fiftyTwoWeekHigh ?? 0)
+      ? (krQ?.high52w ?? pr?.fiftyTwoWeekHigh ?? sd?.fiftyTwoWeekHigh ?? 0)
       : (pr?.fiftyTwoWeekHigh ?? sd?.fiftyTwoWeekHigh ?? 0);
     const low52w:  number  = isKorean
-      ? (fdrQ?.low52w ?? pr?.fiftyTwoWeekLow ?? sd?.fiftyTwoWeekLow ?? 0)
+      ? (krQ?.low52w ?? pr?.fiftyTwoWeekLow ?? sd?.fiftyTwoWeekLow ?? 0)
       : (pr?.fiftyTwoWeekLow ?? sd?.fiftyTwoWeekLow ?? 0);
     const high52wKRW = isKorean ? Math.round(high52w) : Math.round(high52w * liveRate);
     const low52wKRW  = isKorean ? Math.round(low52w)  : Math.round(low52w  * liveRate);
@@ -709,9 +770,9 @@ router.get("/stocks/analyze", async (req, res) => {
       || [sectorEn, industryEn].filter(Boolean).join("/") || "기타";
     const name: string = fromUniverse?.name ?? pr?.shortName ?? pr?.longName ?? ticker;
 
-    // 과거 OHLCV 정규화: 한국은 FDR(KRW 그대로), 미국은 Yahoo(USD→KRW)
+    // 과거 OHLCV 정규화: 한국은 Yahoo(.KS/.KQ, KRW 그대로), 미국은 Yahoo(USD→KRW)
     const histData = isKorean
-      ? fdrRows
+      ? krRows
           .filter(d => d.close > 0 && d.high > 0)
           .map(d => ({ high: d.high, low: d.low, close: d.close }))
       : (rawHistoryYahoo as any[])
