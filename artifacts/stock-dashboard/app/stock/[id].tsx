@@ -57,14 +57,15 @@ export default function StockDetailScreen() {
   const isPredefined = !!STOCKS.find((s) => s.id === id);
   const isStub = !isPredefined && !!baseStock;
 
-  const enrichedData   = id ? getEnriched(id) : null;
+  const enrichedData        = id ? getEnriched(id) : null;
   const isCurrentlyEnriching = id ? isEnriching(id) : false;
-  const enrichmentFailed     = id ? hasFailed(id) : false;
+  const enrichmentFailed    = id ? hasFailed(id) : false;
 
   const [detail, setDetail] = useState<StockDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
 
+  // stub 종목: 자동으로 detail + enrichment 실행
   useEffect(() => {
     if (!isStub || !baseStock) return;
     if (enrichedData) return;
@@ -100,13 +101,14 @@ export default function StockDetailScreen() {
 
   const liveQuote = getQuote(baseStock.ticker, baseStock.market);
 
-  const stock: StockInfo = isStub
-    ? enrichedData
-      ? buildStockInfo(baseStock, enrichedData)
-      : detail
-      ? buildEnrichedStock(baseStock, detail, liveQuote)
-      : baseStock
-    : baseStock;
+  // enrichedData가 있으면 predefined/stub 모두 AI 분석 결과 우선 적용
+  const stock: StockInfo = enrichedData
+    ? buildStockInfo(baseStock, enrichedData)
+    : isStub
+      ? detail
+        ? buildEnrichedStock(baseStock, detail, liveQuote)
+        : baseStock
+      : baseStock;
 
   const marketColor    = MARKET_COLORS[stock.market] || "#888";
   const firstForecast  = stock.forecasts[0];
@@ -120,6 +122,11 @@ export default function StockDetailScreen() {
   const boxPosColor =
     dynBoxPos === "저점권" ? c.positive :
     dynBoxPos === "고점권" ? c.negative : c.warning;
+
+  // AI 배너 표시 여부 (predefined + stub 공통)
+  const showAiBanner = isCurrentlyEnriching || !!enrichedData || enrichmentFailed;
+  // predefined 종목이고 아직 AI 분석 없을 때 "AI 분석하기" 버튼 표시
+  const showAiPrompt = isPredefined && !enrichedData && !isCurrentlyEnriching && !enrichmentFailed;
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -161,7 +168,6 @@ export default function StockDetailScreen() {
             </View>
           </View>
         </View>
-        {/* 알림 버튼 */}
         <TouchableOpacity
           onPress={() => setShowAlertModal(true)}
           style={[styles.alertBtn, { backgroundColor: c.backgroundTertiary }]}
@@ -170,7 +176,25 @@ export default function StockDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {isStub && (isCurrentlyEnriching || enrichedData || enrichmentFailed) && (
+      {/* AI 분석하기 버튼 — predefined 종목이고 아직 분석 안 된 경우 */}
+      {showAiPrompt && (
+        <TouchableOpacity
+          style={[styles.aiPromptBanner, { backgroundColor: "#0064FF0D" }]}
+          onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="sparkles-outline" size={14} color="#0064FF" />
+          <Text style={[styles.aiBannerText, { color: "#0064FF" }]}>
+            AI가 실시간 데이터로 전략을 재계산할 수 있어요
+          </Text>
+          <View style={styles.aiReanalyzeBtn}>
+            <Text style={styles.aiReanalyzeText}>AI 분석</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* AI 상태 배너 — 분석 중 / 완료 / 실패 */}
+      {showAiBanner && (
         <View style={[styles.aiBanner, {
           backgroundColor: isCurrentlyEnriching ? "#F59E0B18"
             : enrichmentFailed ? "#F0445218"
@@ -268,6 +292,7 @@ export default function StockDetailScreen() {
         ))}
       </ScrollView>
 
+      {/* stub 종목: AI 분석 중 전체 로딩 화면 */}
       {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#F59E0B" />
@@ -286,6 +311,7 @@ export default function StockDetailScreen() {
           </Text>
         </View>
       ) : (
+        /* predefined 종목: AI 분석 중에도 기존 데이터 표시 (로딩 화면 없음) */
         <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
@@ -314,6 +340,16 @@ export default function StockDetailScreen() {
                 ))}
               </View>
             </>
+          )}
+
+          {/* predefined 종목: AI 분석 중 탭 위에 오버레이 배너 */}
+          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && (
+            <View style={[styles.aiOverlayBanner, { backgroundColor: "#F59E0B14" }]}>
+              <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.75 }] }} />
+              <Text style={[styles.aiOverlayText, { color: "#F59E0B" }]}>
+                AI 분석 중 — 완료 후 전략이 자동 업데이트됩니다
+              </Text>
+            </View>
           )}
 
           {activeTab === "진입"   && <SplitEntrySection  stock={stock} />}
@@ -397,6 +433,11 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   loadingWrap: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
   loadingText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  aiPromptBanner: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 16, paddingVertical: 9,
+    borderBottomWidth: 1, borderBottomColor: "#0064FF18",
+  },
   aiBanner: {
     flexDirection:     "row",
     alignItems:        "center",
@@ -411,6 +452,12 @@ const styles = StyleSheet.create({
   aiRetryText:     { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#F04452" },
   aiReanalyzeBtn:  { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: "#0064FF22" },
   aiReanalyzeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0064FF" },
+  aiOverlayBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    marginHorizontal: 16, marginBottom: 8, marginTop: 4,
+    padding: 10, borderRadius: 10,
+  },
+  aiOverlayText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
   descriptionBox:{ paddingHorizontal: 16, paddingVertical: 12 },
   description:   { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   errorBanner: {
