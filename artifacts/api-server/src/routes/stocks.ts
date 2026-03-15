@@ -294,11 +294,14 @@ router.get("/stocks/search", async (req, res) => {
   }
 });
 
-// ─── 저평가 우량주 스크리닝 ───────────────────────────────────────────────────
+// ─── 저평가 우량주 스크리닝 + 전체 유니버스 조회 ─────────────────────────────
 router.get("/stocks/screen", async (req, res) => {
   const market = (req.query.market as string) ?? "ALL";
+  // filter=all → 전체 종목 반환 / filter=undervalued(기본) → 저평가만
+  const filter = (req.query.filter as string) ?? "undervalued";
 
-  const cached = screenCache.get(market);
+  const cacheKey = `${market}:${filter}`;
+  const cached = screenCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   const liveRate = await getLiveUsdKrw();
@@ -366,14 +369,22 @@ router.get("/stocks/screen", async (req, res) => {
     })
   );
 
-  const undervalued = results
+  const fulfilled = results
     .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-    .map((r) => r.value)
-    .filter((s) => s.isUndervalued)
-    .sort((a, b) => a.score - b.score);
+    .map((r) => r.value);
 
-  screenCache.set(market, undervalued, TTL.SCREEN);
-  return res.json(undervalued);
+  let output: any[];
+  if (filter === "all") {
+    // 전체 반환: 저평가 먼저(점수 낮을수록 더 저평가), 그 다음 일반 종목 변동률 순
+    const uv  = fulfilled.filter(s => s.isUndervalued).sort((a, b) => a.score - b.score);
+    const rest = fulfilled.filter(s => !s.isUndervalued).sort((a, b) => b.changePercent - a.changePercent);
+    output = [...uv, ...rest];
+  } else {
+    output = fulfilled.filter(s => s.isUndervalued).sort((a, b) => a.score - b.score);
+  }
+
+  screenCache.set(cacheKey, output, TTL.SCREEN);
+  return res.json(output);
 });
 
 // ─── 종목 상세 재무/애널리스트 데이터 ─────────────────────────────────────────

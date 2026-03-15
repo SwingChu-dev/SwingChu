@@ -18,7 +18,8 @@ import { STOCKS } from "@/constants/stockData";
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 const USD_KRW  = 1450;
 
-type Market = "ALL" | "NASDAQ" | "KOSPI" | "KOSDAQ";
+type Market   = "ALL" | "NASDAQ" | "KOSPI" | "KOSDAQ";
+type ViewMode = "undervalued" | "all";
 
 interface ScreenResult {
   ticker:        string;
@@ -59,6 +60,7 @@ function fmtPrice(item: ScreenResult): string {
 
 export default function ExploreScreen() {
   const [market,     setMarket]     = useState<Market>("ALL");
+  const [viewMode,   setViewMode]   = useState<ViewMode>("undervalued");
   const [results,    setResults]    = useState<ScreenResult[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,7 +71,11 @@ export default function ExploreScreen() {
   const { enrichStock, isEnriching } = useEnrichment();
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchScreen = useCallback(async (mkt: Market, isRefresh = false) => {
+  const fetchScreen = useCallback(async (
+    mkt: Market,
+    mode: ViewMode,
+    isRefresh = false,
+  ) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -79,7 +85,8 @@ export default function ExploreScreen() {
     setError(null);
 
     try {
-      const resp = await fetch(`${API_BASE}/stocks/screen?market=${mkt}`, { signal: ctrl.signal });
+      const url = `${API_BASE}/stocks/screen?market=${mkt}&filter=${mode}`;
+      const resp = await fetch(url, { signal: ctrl.signal });
       if (!resp.ok) throw new Error(`서버 오류 ${resp.status}`);
       const data: ScreenResult[] = await resp.json();
       setResults(data);
@@ -98,7 +105,12 @@ export default function ExploreScreen() {
     setResults([]);
   };
 
-  // 기본 13종목과 겹치면 predefined ID 사용
+  const handleViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setFetched(false);
+    setResults([]);
+  };
+
   const resolveId = (item: ScreenResult) => {
     const predefined = STOCKS.find(
       (s) => s.ticker.toLowerCase() === item.ticker.toLowerCase()
@@ -151,6 +163,13 @@ export default function ExploreScreen() {
               <View style={[styles.mktBadge, { backgroundColor: mktColor + "33" }]}>
                 <Text style={[styles.mktBadgeText, { color: mktColor }]}>{item.market}</Text>
               </View>
+              {/* 전체보기 모드에서 저평가 뱃지 */}
+              {viewMode === "all" && item.isUndervalued && (
+                <View style={styles.uvBadge}>
+                  <Ionicons name="trending-down" size={10} color="#2DB55D" />
+                  <Text style={styles.uvBadgeText}>저평가</Text>
+                </View>
+              )}
               {enriching && (
                 <View style={styles.aiBadge}>
                   <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.65 }] }} />
@@ -196,28 +215,69 @@ export default function ExploreScreen() {
           <View style={styles.metricDivider} />
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>저평가 점수</Text>
-            <Text style={[styles.metricValue, { color: "#0064FF" }]}>{uvScore}점</Text>
+            <Text style={[
+              styles.metricValue,
+              { color: item.isUndervalued ? "#2DB55D" : "#888" }
+            ]}>
+              {item.isUndervalued ? uvScore + "점" : "-"}
+            </Text>
           </View>
         </View>
       </View>
     );
   };
 
+  const isAllMode = viewMode === "all";
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       {/* 헤더 */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>저평가 우량주 탐색기</Text>
-          <Text style={styles.headerSub}>실시간 PER·PBR 기반 스크리닝</Text>
+          <Text style={styles.headerTitle}>
+            {isAllMode ? "전체 주식 탐색" : "저평가 우량주 탐색기"}
+          </Text>
+          <Text style={styles.headerSub}>
+            {isAllMode ? "유니버스 전 종목 실시간 조회" : "실시간 PER·PBR 기반 스크리닝"}
+          </Text>
         </View>
         <TouchableOpacity
           style={[styles.scanBtn, loading && { opacity: 0.5 }]}
-          onPress={() => fetchScreen(market)}
+          onPress={() => fetchScreen(market, viewMode)}
           disabled={loading}
         >
           <Ionicons name="search" size={16} color="#fff" />
           <Text style={styles.scanBtnText}>탐색</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 뷰모드 토글 */}
+      <View style={styles.modeToggle}>
+        <TouchableOpacity
+          style={[styles.modeBtn, viewMode === "undervalued" && styles.modeBtnActive]}
+          onPress={() => handleViewMode("undervalued")}
+        >
+          <Ionicons
+            name="trending-down-outline"
+            size={13}
+            color={viewMode === "undervalued" ? "#fff" : "#888"}
+          />
+          <Text style={[styles.modeBtnText, viewMode === "undervalued" && styles.modeBtnTextActive]}>
+            저평가만
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeBtn, viewMode === "all" && styles.modeBtnAllActive]}
+          onPress={() => handleViewMode("all")}
+        >
+          <Ionicons
+            name="apps-outline"
+            size={13}
+            color={viewMode === "all" ? "#fff" : "#888"}
+          />
+          <Text style={[styles.modeBtnText, viewMode === "all" && styles.modeBtnTextActive]}>
+            전체보기
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -236,36 +296,48 @@ export default function ExploreScreen() {
         ))}
       </View>
 
-      {/* 기준 안내 */}
-      <View style={styles.criteriaBar}>
-        <Ionicons name="information-circle-outline" size={13} color="#555" />
-        <Text style={styles.criteriaText}>
-          나스닥 PER{"<"}25·PBR{"<"}5  |  코스피 PER{"<"}12·PBR{"<"}1.2  |  코스닥 PER{"<"}15·PBR{"<"}2.5
-        </Text>
-      </View>
+      {/* 기준 안내 (저평가 모드만) */}
+      {!isAllMode && (
+        <View style={styles.criteriaBar}>
+          <Ionicons name="information-circle-outline" size={13} color="#555" />
+          <Text style={styles.criteriaText}>
+            나스닥 PER{"<"}25·PBR{"<"}5  |  코스피 PER{"<"}12·PBR{"<"}1.2  |  코스닥 PER{"<"}15·PBR{"<"}2.5
+          </Text>
+        </View>
+      )}
 
       {/* 본문 */}
       {loading && !refreshing ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#0064FF" />
-          <Text style={styles.loadingText}>야후 파이낸스 실시간 데이터 분석 중...</Text>
+          <Text style={styles.loadingText}>
+            {isAllMode ? "전체 종목 실시간 데이터 조회 중..." : "실시간 저평가 스크리닝 중..."}
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.center}>
           <Ionicons name="alert-circle-outline" size={48} color="#F04452" />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchScreen(market)}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchScreen(market, viewMode)}>
             <Text style={styles.retryText}>다시 시도</Text>
           </TouchableOpacity>
         </View>
       ) : !fetched ? (
         <View style={styles.center}>
-          <Ionicons name="analytics-outline" size={64} color="#1B63E8" />
-          <Text style={styles.emptyTitle}>저평가 우량주를 탐색합니다</Text>
-          <Text style={styles.emptyDesc}>
-            {"\"탐색\" 버튼을 눌러\n실시간 밸류에이션 분석을 시작하세요"}
+          <Ionicons
+            name={isAllMode ? "apps-outline" : "analytics-outline"}
+            size={64}
+            color="#1B63E8"
+          />
+          <Text style={styles.emptyTitle}>
+            {isAllMode ? "전체 종목을 조회합니다" : "저평가 우량주를 탐색합니다"}
           </Text>
-          <TouchableOpacity style={styles.bigScanBtn} onPress={() => fetchScreen(market)}>
+          <Text style={styles.emptyDesc}>
+            {isAllMode
+              ? "\"탐색\" 버튼을 눌러\n유니버스 전 종목의 실시간 시세를 조회하세요"
+              : "\"탐색\" 버튼을 눌러\n실시간 밸류에이션 분석을 시작하세요"}
+          </Text>
+          <TouchableOpacity style={styles.bigScanBtn} onPress={() => fetchScreen(market, viewMode)}>
             <Ionicons name="search" size={18} color="#fff" />
             <Text style={styles.bigScanBtnText}>지금 탐색하기</Text>
           </TouchableOpacity>
@@ -273,9 +345,13 @@ export default function ExploreScreen() {
       ) : results.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="checkmark-circle-outline" size={48} color="#2DB55D" />
-          <Text style={styles.emptyTitle}>현재 저평가 종목 없음</Text>
+          <Text style={styles.emptyTitle}>
+            {isAllMode ? "조회된 종목 없음" : "현재 저평가 종목 없음"}
+          </Text>
           <Text style={styles.emptyDesc}>
-            선택한 시장에서 기준을 충족하는{"\n"}저평가 우량주가 없습니다.
+            {isAllMode
+              ? "선택한 시장에서 데이터를 가져오지 못했습니다."
+              : "선택한 시장에서 기준을 충족하는\n저평가 우량주가 없습니다."}
           </Text>
         </View>
       ) : (
@@ -287,15 +363,21 @@ export default function ExploreScreen() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => fetchScreen(market, true)}
+              onRefresh={() => fetchScreen(market, viewMode, true)}
               tintColor="#0064FF"
             />
           }
           ListHeaderComponent={
             <View style={styles.resultHeader}>
-              <Ionicons name="trending-down-outline" size={16} color="#0064FF" />
+              <Ionicons
+                name={isAllMode ? "apps" : "trending-down-outline"}
+                size={16}
+                color="#0064FF"
+              />
               <Text style={styles.resultHeaderText}>
-                {results.length}종목 발견 · 점수 높을수록 더 저평가
+                {isAllMode
+                  ? `전체 ${results.length}종목  ·  저평가 ${results.filter(r => r.isUndervalued).length}개 포함`
+                  : `${results.length}종목 발견 · 점수 높을수록 더 저평가`}
               </Text>
             </View>
           }
@@ -314,12 +396,12 @@ const styles = StyleSheet.create({
     alignItems:        "center",
     paddingHorizontal: 20,
     paddingTop:        12,
-    paddingBottom:     14,
+    paddingBottom:     12,
     borderBottomWidth: 1,
     borderBottomColor: "#1A2035",
   },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: "#FFFFFF" },
-  headerSub:   { fontSize: 12, color: "#666", marginTop: 2 },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: "#FFFFFF" },
+  headerSub:   { fontSize: 11, color: "#666", marginTop: 2 },
   scanBtn: {
     flexDirection:     "row",
     alignItems:        "center",
@@ -330,6 +412,29 @@ const styles = StyleSheet.create({
     borderRadius:      12,
   },
   scanBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
+  // 뷰모드 토글
+  modeToggle: {
+    flexDirection:     "row",
+    paddingHorizontal: 16,
+    paddingTop:        10,
+    gap:               8,
+  },
+  modeBtn: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               5,
+    paddingHorizontal: 14,
+    paddingVertical:   7,
+    borderRadius:      20,
+    backgroundColor:   "#141827",
+    borderWidth:       1,
+    borderColor:       "#1A2035",
+  },
+  modeBtnActive:    { backgroundColor: "#0064FF", borderColor: "#0064FF" },
+  modeBtnAllActive: { backgroundColor: "#FF6B35", borderColor: "#FF6B35" },
+  modeBtnText:      { fontSize: 13, fontWeight: "600", color: "#888" },
+  modeBtnTextActive:{ color: "#fff" },
 
   tabs: {
     flexDirection:     "row",
@@ -425,6 +530,18 @@ const styles = StyleSheet.create({
   mktBadgeText: { fontSize: 11, fontWeight: "700" },
   tickerText:   { fontSize: 12, color: "#666", marginTop: 3 },
   wlBtn:        { padding: 4 },
+
+  uvBadge: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               3,
+    backgroundColor:   "#2DB55D22",
+    paddingHorizontal: 6,
+    paddingVertical:   2,
+    borderRadius:      6,
+  },
+  uvBadgeText: { fontSize: 10, color: "#2DB55D", fontWeight: "700" },
+
   aiBadge: {
     flexDirection:   "row",
     alignItems:      "center",
