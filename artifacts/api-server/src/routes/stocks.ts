@@ -504,4 +504,277 @@ router.get("/stocks/history", async (req, res) => {
   }
 });
 
+// ─── 종합 AI 분석: 1년 과거 데이터 기반 분할매수·익절·재무·리스크 자동 계산 ──────
+const analyzeCache = new TtlCache<any>();
+
+function pctile(sorted: number[], p: number): number {
+  if (!sorted.length) return 0;
+  const idx = Math.max(0, Math.min(sorted.length - 1, Math.round((p / 100) * (sorted.length - 1))));
+  return sorted[idx];
+}
+
+function calcEntries(data: {high:number;close:number}[], beta: number | null): [number,number,number] {
+  const dds: number[] = [];
+  for (let i = 20; i < data.length; i++) {
+    let peak = 0;
+    for (let j = i - 20; j < i; j++) peak = Math.max(peak, data[j].high);
+    if (peak <= 0) continue;
+    const dd = ((peak - data[i].close) / peak) * 100;
+    if (dd > 1.5) dds.push(dd);
+  }
+  if (dds.length < 10) {
+    const b = Math.max(0.3, Math.abs(beta ?? 1.0));
+    return [
+      Math.max(3,  Math.min(15, Math.round(b * 5.5))),
+      Math.max(7,  Math.min(25, Math.round(b * 10.5))),
+      Math.max(13, Math.min(40, Math.round(b * 17))),
+    ];
+  }
+  dds.sort((a, b) => a - b);
+  const e1 = Math.max(3,  Math.min(15, Math.round(pctile(dds, 35) * 2) / 2));
+  const e2 = Math.max(7,  Math.min(25, Math.round(pctile(dds, 62) * 2) / 2));
+  const e3 = Math.max(13, Math.min(45, Math.round(pctile(dds, 87) * 2) / 2));
+  return [e1, e2, e3];
+}
+
+function calcProfitTargets(e1: number, e2: number, e3: number, targetUpPct: number | null): [number, number, number] {
+  const pt1 = Math.max(3,  Math.min(12, Math.round(e1 * 0.8  * 2) / 2));
+  const blended = (0.3 * e1 + 0.3 * e2) / 0.6;
+  const pt2 = Math.max(8,  Math.min(25, Math.round(blended * 0.65 * 2) / 2));
+  const pt3 = targetUpPct !== null && targetUpPct > pt2
+    ? Math.max(15, Math.min(60, Math.round(targetUpPct * 2) / 2))
+    : Math.max(15, Math.min(50, Math.round(e3 * 0.75 * 2) / 2));
+  return [pt1, pt2, pt3];
+}
+
+router.get("/stocks/analyze", async (req, res) => {
+  const ticker = (req.query.ticker as string) ?? "";
+  const market  = (req.query.market  as string) ?? "NASDAQ";
+  if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const cacheKey = `analyze:${ticker}:${market}`;
+  const cached = analyzeCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const yahooTicker = toYahooTicker(ticker, market);
+  const isKorean = market === "KOSPI" || market === "KOSDAQ";
+  const liveRate = await getLiveUsdKrw();
+
+  try {
+    const period1 = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const period2 = new Date().toISOString().split("T")[0];
+
+    const [summary, rawHistory] = await Promise.all([
+      yahooFinance.quoteSummary(yahooTicker, {
+        modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price", "summaryProfile"] as any,
+      }).catch(() => null),
+      yahooFinance.historical(yahooTicker, { period1, period2 }).catch(() => []),
+    ]);
+
+    const fd = (summary as any)?.financialData      ?? {};
+    const ks = (summary as any)?.defaultKeyStatistics ?? {};
+    const sd = (summary as any)?.summaryDetail       ?? {};
+    const pr = (summary as any)?.price               ?? {};
+    const sp = (summary as any)?.summaryProfile      ?? {};
+
+    const currentPrice: number    = pr?.regularMarketPrice ?? 0;
+    const priceKRW: number        = isKorean ? currentPrice : Math.round(currentPrice * liveRate);
+    const high52w: number         = pr?.fiftyTwoWeekHigh ?? sd?.fiftyTwoWeekHigh ?? 0;
+    const low52w:  number         = pr?.fiftyTwoWeekLow  ?? sd?.fiftyTwoWeekLow  ?? 0;
+    const high52wKRW              = isKorean ? Math.round(high52w) : Math.round(high52w * liveRate);
+    const low52wKRW               = isKorean ? Math.round(low52w)  : Math.round(low52w  * liveRate);
+
+    const per: number | null          = sd?.trailingPE     ?? null;
+    const pbr: number | null          = ks?.priceToBook    ?? null;
+    const roeRaw: number | null       = fd?.returnOnEquity ?? null;
+    const roe: number | null          = roeRaw != null ? +(roeRaw * 100).toFixed(1) : null;
+    const debtEq: number | null       = fd?.debtToEquity   ?? null;
+    const debtRatio: number | null    = debtEq  != null ? +(debtEq).toFixed(1) : null;
+    const revGrowthRaw: number | null = fd?.revenueGrowth  ?? null;
+    const revenueGrowth: number | null= revGrowthRaw != null ? +(revGrowthRaw * 100).toFixed(1) : null;
+    const beta: number | null         = sd?.beta ?? ks?.beta ?? null;
+    const targetMean: number | null   = fd?.targetMeanPrice ?? null;
+    const targetMeanKRW: number | null= targetMean
+      ? (isKorean ? Math.round(targetMean) : Math.round(targetMean * liveRate)) : null;
+    const recKey: string              = fd?.recommendationKey ?? "";
+
+    const fromUniverse = SCREEN_UNIVERSE.find(s => s.ticker === ticker && s.market === market);
+    const sectorEn     = sp?.sector   ?? "";
+    const industryEn   = sp?.industry ?? "";
+    const sector: string = fromUniverse?.sector
+      || [sectorEn, industryEn].filter(Boolean).join("/") || "기타";
+    const name: string = fromUniverse?.name ?? pr?.shortName ?? pr?.longName ?? ticker;
+
+    const histData = (rawHistory as any[])
+      .filter((d: any) => d.close != null && d.high != null)
+      .map((d: any) => ({
+        high:  isKorean ? d.high  : d.high  * liveRate,
+        low:   isKorean ? d.low   : d.low   * liveRate,
+        close: isKorean ? d.close : d.close * liveRate,
+      }));
+
+    const [e1, e2, e3] = calcEntries(histData, beta);
+    const splitEntries = [
+      { ratio: 30, dropPercent: e1, targetPrice: Math.round(priceKRW * (1 - e1 / 100)) },
+      { ratio: 30, dropPercent: e2, targetPrice: Math.round(priceKRW * (1 - e2 / 100)) },
+      { ratio: 40, dropPercent: e3, targetPrice: Math.round(priceKRW * (1 - e3 / 100)) },
+    ];
+
+    const targetUpPct = targetMeanKRW && priceKRW > 0
+      ? +((targetMeanKRW - priceKRW) / priceKRW * 100).toFixed(1) : null;
+    const [pt1, pt2, pt3] = calcProfitTargets(e1, e2, e3, targetUpPct);
+    const profitTargets = [
+      { percent: pt1, price: Math.round(priceKRW * (1 + pt1 / 100)) },
+      { percent: pt2, price: Math.round(priceKRW * (1 + pt2 / 100)) },
+      { percent: pt3, price: Math.round(priceKRW * (1 + pt3 / 100)) },
+    ];
+
+    const support    = low52wKRW  > 0 ? low52wKRW  : Math.round(priceKRW * 0.72);
+    const resistance = high52wKRW > 0 ? high52wKRW : Math.round(priceKRW * 1.35);
+    let boxPos: "저점권"|"중간권"|"고점권" = "중간권";
+    if (support > 0 && resistance > support) {
+      const rng = (priceKRW - support) / (resistance - support);
+      if (rng <= 0.30) boxPos = "저점권";
+      else if (rng >= 0.70) boxPos = "고점권";
+    }
+
+    const anchor    = targetMeanKRW ?? Math.round(priceKRW * 1.12);
+    const anchorPct = priceKRW > 0 ? (anchor - priceKRW) / priceKRW * 100 : 12;
+    const forecasts = [
+      { period: "1일 후",    price: Math.round(priceKRW * 1.003),                            changePercent: 0.3 },
+      { period: "1주 후",    price: Math.round(priceKRW * (1 + anchorPct * 0.07 / 100)),     changePercent: +(anchorPct * 0.07).toFixed(1) },
+      { period: "1개월 후",  price: Math.round(priceKRW * (1 + anchorPct * 0.25 / 100)),     changePercent: +(anchorPct * 0.25).toFixed(1) },
+      { period: "3개월 후",  price: Math.round(priceKRW * (1 + anchorPct * 0.50 / 100)),     changePercent: +(anchorPct * 0.50).toFixed(1) },
+      { period: "6개월 후",  price: Math.round(priceKRW * (1 + anchorPct * 0.75 / 100)),     changePercent: +(anchorPct * 0.75).toFixed(1) },
+      { period: "12개월 후", price: anchor,                                                   changePercent: +anchorPct.toFixed(1) },
+      { period: "1800일",    price: Math.round(priceKRW * (1 + anchorPct * 5   / 100)),     changePercent: +(anchorPct * 5).toFixed(1) },
+    ];
+
+    function evalFin(per: number|null, pbr: number|null, mkt: string): string {
+      if (!per || per <= 0 || !pbr || pbr <= 0) return "적정";
+      if (mkt === "NASDAQ") {
+        if (per < 15 && pbr < 3)  return "강한 저평가";
+        if (per < 20 && pbr < 5)  return "저평가";
+        if (per > 60 || pbr > 20) return "심각한 거품";
+        if (per > 40 || pbr > 12) return "거품";
+        if (per < 25 && pbr < 6)  return "저평가";
+      } else if (mkt === "KOSPI") {
+        if (per < 8  && pbr < 0.8) return "강한 저평가";
+        if (per < 12 && pbr < 1.2) return "저평가";
+        if (per > 25 || pbr > 3)   return "거품";
+      } else {
+        if (per < 12 && pbr < 1.5) return "저평가";
+        if (per > 35 || pbr > 5)   return "거품";
+      }
+      return "적정";
+    }
+    const evaluation = evalFin(per, pbr, market);
+
+    const fPer = per ? `PER ${per.toFixed(1)}배` : "";
+    const fPbr = pbr ? `PBR ${pbr.toFixed(2)}배` : "";
+    const fRoe = roe != null ? `ROE ${roe.toFixed(1)}%` : "";
+    const fDbt = debtRatio != null ? `부채비율 ${debtRatio}%` : "";
+    const fGrw = revenueGrowth != null ? `매출성장 ${revenueGrowth > 0 ? "+" : ""}${revenueGrowth}%` : "";
+    const finSummary =
+      [fPer, fPbr, fRoe, fDbt, fGrw].filter(Boolean).join(" · ") +
+      (targetMeanKRW ? ` · 목표가 ₩${targetMeanKRW.toLocaleString()}` : "") +
+      `. 재무 평가: ${evaluation}.`;
+
+    const grade: "우량주"|"중형주"|"소형주" =
+      roe != null && roe > 15 && (debtRatio == null || debtRatio < 200) ? "우량주"
+      : roe != null && roe < 3 ? "소형주"
+      : "중형주";
+
+    const region = isKorean ? "국내장" : "미국장";
+
+    const mktRisk = market === "NASDAQ"
+      ? "미국 연준(Fed) 금리 결정, 달러 강세/약세, 지정학적 갈등(중동·러-우)이 주요 외부 리스크."
+      : market === "KOSPI"
+      ? "외국인 수급 변동, 원/달러 환율, 미중 무역 갈등, 국내 정치 불확실성이 주요 리스크."
+      : "개인 투자자 수급 의존도 높음. 테마 소멸 시 급락 위험. 코스닥 특례기업 심사 이슈 주의.";
+
+    const betaStr = beta != null
+      ? beta > 1.5
+        ? `고변동성(β=${beta.toFixed(2)}) — 시장 대비 ${((beta - 1) * 100).toFixed(0)}% 높은 변동성. 분할매수 필수.`
+        : beta > 1.0
+        ? `중간 변동성(β=${beta.toFixed(2)}) — 시장 평균 이상 변동. 포지션 사이징 주의.`
+        : `저변동성(β=${beta.toFixed(2)}) — 안정적 종목이나 시장 하락 시 연동 하락 주의.`
+      : "베타 데이터 미수집. 최근 차트로 변동성 직접 확인 필요.";
+
+    const techStr = boxPos === "저점권"
+      ? `52주 저점(₩${low52wKRW.toLocaleString()}) 근처. RSI 과매도 구간 진입 시 강한 반등 기대. 분할매수 적기.`
+      : boxPos === "고점권"
+      ? `52주 고점(₩${high52wKRW.toLocaleString()}) 근처. 신고점 돌파 시 추세 지속이나 저항 실패 시 눌림목 조정.`
+      : `박스권 중간 구간. 지지선(₩${low52wKRW.toLocaleString()}) 이탈 여부가 핵심 기술적 신호.`;
+
+    const strategyStr =
+      `분할매수: 1차 -${e1}%, 2차 -${e2}%, 3차 -${e3}% (30:30:40 비율). ` +
+      `목표 수익: 1차 +${pt1}%, 2차 +${pt2}%, 3차 +${pt3}%. ` +
+      (targetMeanKRW && priceKRW > 0
+        ? `애널리스트 평균 목표가 ₩${targetMeanKRW.toLocaleString()} (${targetUpPct?.toFixed(1)}% 상승여력).`
+        : `손절: 3차 진입가 -7% 이탈 시 전량 청산.`);
+
+    const entryRec = recKey === "strongBuy" || recKey === "buy"
+      ? `${e1}% 하락 시 1차 진입(₩${Math.round(priceKRW * (1 - e1/100)).toLocaleString()}). 애널리스트 매수 추천 — RSI 45 이하 확인 후 진입.`
+      : recKey === "sell"
+      ? `신중한 접근 권장. ${e2}% 이상 하락 확인 후 2차 진입 검토. 손절 철저 준수.`
+      : `${e1}% 하락 시 1차 진입(₩${Math.round(priceKRW * (1 - e1/100)).toLocaleString()}). RSI 과매도 + 거래량 증가 확인 후 진입 최적.`;
+
+    const dayFeatures = isKorean ? [
+      { day: "월요일", feature: "외국인·기관 매매 방향 결정 요일. 주말 글로벌 이슈 소화로 갭 등락이 잦습니다.", caution: "갭 하락 시 섣부른 추격 매수 금지. 매매 방향 확인 후 진입." },
+      { day: "화요일", feature: "수급 안정화 구간. 기관 프로그램 매매 집중되는 경향이 있습니다.", caution: "오전 9:00~9:30 변동성 구간 주의." },
+      { day: "수요일", feature: "한 주 중 가장 안정적인 수급 패턴. 추세가 유지되는 경향.", caution: "FOMC 발표 주간에는 야간 미국 장 영향에 주의." },
+      { day: "목요일", feature: "기관 분기말·월말 수급 조정 구간. 프로그램 매도 증가 가능.", caution: "선물·옵션 만기일(매월 두 번째 목요일) 변동성 급증 주의." },
+      { day: "금요일", feature: "포지션 청산 경향. 주말 리스크 회피로 오후 매도세 강화.", caution: "금요일 오후 보유 포지션 점검 필수. 주말 뉴스 리스크 대비." },
+    ] : [
+      { day: "월요일", feature: "주말 글로벌 뉴스 소화. 선물 시장 방향 선행 파악 중요.", caution: "갭 변동성 구간. 개장 30분 내 급등락 시 섣부른 진입 금지." },
+      { day: "화요일", feature: "수급 안정화. 기술적 신호 신뢰도 높아지는 구간.", caution: "실적 발표 시즌에는 어닝 서프라이즈/쇼크 주의." },
+      { day: "수요일", feature: "FOMC 성명 발표 주간에 변동성 최고조. 평소엔 추세 지속 구간.", caution: "FOMC 발표 전후 ±2% 이상 변동 가능. 레버리지 축소 권장." },
+      { day: "목요일", feature: "주간 실업수당 청구건수 발표일. 고용 지표 영향 있음.", caution: "월별 CPI·PPI 발표일 겹칠 시 변동성 급증." },
+      { day: "금요일", feature: "고용보고서(NFP) 발표일. 포지션 정리로 거래량 감소하는 경향.", caution: "주말 포지션 리스크 최소화. 오후 장 유동성 감소 주의." },
+    ];
+
+    const witchDay = !isKorean
+      ? `마녀의 날(분기별 옵션·선물 동시 만기) 전날 오후부터 ${ticker} 변동성 급증. 포지션의 50%는 만기 전날 익절 또는 스탑로스 설정. 만기 당일 오전 급락 시 단기 반등 매수 기회.`
+      : `옵션 만기일(매월 두 번째 목요일) 전후 수급 왜곡 주의. ${ticker} 포지션은 만기 3일 전부터 비중 조절 권장.`;
+
+    const upside = targetMeanKRW && priceKRW > 0
+      ? ` 애널리스트 평균 목표가 ₩${targetMeanKRW.toLocaleString()} (${targetUpPct?.toFixed(0)}% 상승여력).` : "";
+    const recStr: Record<string, string> = {
+      strongBuy: " 강력 매수 추천.", buy: " 매수 추천.", hold: " 중립 의견.", sell: " 매도 의견.",
+    };
+    const description =
+      `${name}(${ticker}) — ${sector}. ${region} ${grade}. ` +
+      `52주 범위 ₩${low52wKRW.toLocaleString()}~₩${high52wKRW.toLocaleString()}, 현재 ${boxPos} 위치. ` +
+      [fPer, fPbr, fRoe].filter(Boolean).join(" · ") +
+      `${upside}${recStr[recKey] ?? ""}`;
+
+    const themes: string[] = fromUniverse?.sector
+      ? [fromUniverse.sector]
+      : [sectorEn, industryEn].filter(Boolean).slice(0, 2);
+    if (!themes.length) themes.push(sector);
+
+    const result = {
+      ticker, market, name, grade, region,
+      themes, description, splitEntries, profitTargets,
+      boxRange: { support, resistance, currentPosition: boxPos },
+      forecasts,
+      financials: {
+        per: per ?? 0, pbr: pbr ?? 0, roe: roe ?? 0,
+        debtRatio: debtRatio ?? 0, revenueGrowth: revenueGrowth ?? 0,
+        evaluation, summary: finSummary,
+      },
+      dayFeatures,
+      risk: { geopolitical: mktRisk, technicalBounce: betaStr, strategy: strategyStr },
+      witchDayStrategy: witchDay,
+      entryRecommendation: entryRec,
+    };
+
+    analyzeCache.set(cacheKey, result, TTL.HISTORY);
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
 export default router;

@@ -52,15 +52,31 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+Express 5 API server with Yahoo Finance integration for Korean stock trading app.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+- Routes: `src/routes/stocks.ts` — all stock API endpoints (TTL cached):
+  - `GET /stocks/quotes` — real-time prices (30s TTL)
+  - `GET /stocks/detail` — financial details / 52w range (5m TTL)
+  - `GET /stocks/screen` — undervalue screener (10m TTL)
+  - `GET /stocks/news` — news + sentiment (15m TTL)
+  - `GET /stocks/history` — 1yr OHLC for backtesting (1h TTL)
+  - `GET /stocks/search` — ticker search (5m TTL)
+  - `GET /stocks/analyze` — **AI analysis**: 1yr drawdown-percentile split entries + analyst-target profit targets + full StockInfo fields (1h TTL)
+- Korean stocks use `.KS`/`.KQ` Yahoo ticker suffix; USD/KRW rate cached 5m
+- `calcEntries()` uses rolling 20-day peak drawdown distribution (35/62/87th percentile) → real volatility-based split entry levels
+- `calcProfitTargets()` uses analyst target mean as anchor for pt3
+
+### `artifacts/stock-dashboard` (`@workspace/stock-dashboard`)
+
+Expo React Native mobile app — Korean swing trading dashboard. Toss Securities UI style.
+
+- **Predefined stocks (12)**: NVDA, GOOGL, ORCL, IONQ, SNDK, EONR [NASDAQ], 005930, 000660, 012450, 005380, 034020 [KOSPI], 032820 [KOSDAQ]
+- **AsyncStorage keys**: `@watchlist_ids_v2`, `@custom_stocks_v2`, `@portfolio_v2`, `@price_alerts_v1`, `@seen_signal_ids`, `@enriched_v1`
+- **Provider chain**: WatchlistProvider → EnrichmentProvider → PriceBridge → AlertProvider → PortfolioProvider → SignalProvider → RootLayoutNav
+- **EnrichmentContext** (`context/EnrichmentContext.tsx`): bookmarked non-predefined stocks auto-trigger `enrichStock()` → `/api/stocks/analyze` → AsyncStorage `@enriched_v1` (24h TTL)
+- **Stock detail** (`app/stock/[id].tsx`): 9 tabs — 진입, 익절, 박스권, 전망, 재무, 리스크, 요일, 뉴스, 백테스트; data priority: enrichedData → detail API → stub
+- **Design**: `#0064FF` primary, `#F04452` rise, `#1B63E8` fall, `TOSS_ORANGE` warning
 
 ### `lib/db` (`@workspace/db`)
 

@@ -19,6 +19,7 @@ import { SignalProvider } from "@/context/SignalContext";
 import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
 import { PortfolioProvider } from "@/context/PortfolioContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
+import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -177,15 +178,17 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <WatchlistProvider>
-                <PriceBridge>
-                  <AlertProvider>
-                    <PortfolioProvider>
-                      <SignalProvider>
-                        <RootLayoutNav />
-                      </SignalProvider>
-                    </PortfolioProvider>
-                  </AlertProvider>
-                </PriceBridge>
+                <EnrichmentProvider>
+                  <PriceBridge>
+                    <AlertProvider>
+                      <PortfolioProvider>
+                        <SignalProvider>
+                          <RootLayoutNav />
+                        </SignalProvider>
+                      </PortfolioProvider>
+                    </AlertProvider>
+                  </PriceBridge>
+                </EnrichmentProvider>
               </WatchlistProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

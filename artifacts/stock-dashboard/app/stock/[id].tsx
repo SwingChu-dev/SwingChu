@@ -15,6 +15,7 @@ import Colors from "@/constants/colors";
 import { STOCKS, StockInfo, USD_KRW_RATE } from "@/constants/stockData";
 import { useStockPrice } from "@/context/StockPriceContext";
 import { useWatchlist } from "@/context/WatchlistContext";
+import { useEnrichment } from "@/context/EnrichmentContext";
 import SplitEntrySection from "@/components/detail/SplitEntrySection";
 import ProfitTargetSection from "@/components/detail/ProfitTargetSection";
 import BoxRangeSection from "@/components/detail/BoxRangeSection";
@@ -49,18 +50,25 @@ export default function StockDetailScreen() {
   const [showAlertModal, setShowAlertModal] = useState(false);
   const { allKnownStocks } = useWatchlist();
   const { priceKRW: liveKRW, changePct: liveChangePct, getQuote } = useStockPrice();
+  const { getEnriched, isEnriching, hasFailed, reEnrichStock, buildStockInfo } = useEnrichment();
 
   const baseStock = allKnownStocks.find((s) => s.id === id) ?? STOCKS.find((s) => s.id === id);
 
   const isPredefined = !!STOCKS.find((s) => s.id === id);
   const isStub = !isPredefined && !!baseStock;
 
+  const enrichedData   = id ? getEnriched(id) : null;
+  const isCurrentlyEnriching = id ? isEnriching(id) : false;
+  const enrichmentFailed     = id ? hasFailed(id) : false;
+
   const [detail, setDetail] = useState<StockDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(isStub);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
 
   useEffect(() => {
     if (!isStub || !baseStock) return;
+    if (enrichedData) return;
+    if (isCurrentlyEnriching) return;
     setDetailLoading(true);
     setDetailError(false);
     globalThis
@@ -77,7 +85,7 @@ export default function StockDetailScreen() {
         setDetailError(true);
         setDetailLoading(false);
       });
-  }, [isStub, baseStock?.id]);
+  }, [isStub, baseStock?.id, !!enrichedData, isCurrentlyEnriching]);
 
   if (!baseStock) {
     return (
@@ -92,8 +100,12 @@ export default function StockDetailScreen() {
 
   const liveQuote = getQuote(baseStock.ticker, baseStock.market);
 
-  const stock: StockInfo = isStub && detail
-    ? buildEnrichedStock(baseStock, detail, liveQuote)
+  const stock: StockInfo = isStub
+    ? enrichedData
+      ? buildStockInfo(baseStock, enrichedData)
+      : detail
+      ? buildEnrichedStock(baseStock, detail, liveQuote)
+      : baseStock
     : baseStock;
 
   const marketColor    = MARKET_COLORS[stock.market] || "#888";
@@ -158,6 +170,47 @@ export default function StockDetailScreen() {
         </TouchableOpacity>
       </View>
 
+      {isStub && (isCurrentlyEnriching || enrichedData || enrichmentFailed) && (
+        <View style={[styles.aiBanner, {
+          backgroundColor: isCurrentlyEnriching ? "#F59E0B18"
+            : enrichmentFailed ? "#F0445218"
+            : "#0064FF18",
+        }]}>
+          {isCurrentlyEnriching ? (
+            <>
+              <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.8 }] }} />
+              <Text style={[styles.aiBannerText, { color: "#F59E0B" }]}>
+                AI 분석 중 — 1년 실데이터 기반 전략 계산 중...
+              </Text>
+            </>
+          ) : enrichmentFailed ? (
+            <>
+              <Ionicons name="warning-outline" size={14} color="#F04452" />
+              <Text style={[styles.aiBannerText, { color: "#F04452" }]}>AI 분석 실패</Text>
+              <TouchableOpacity
+                onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
+                style={styles.aiRetryBtn}
+              >
+                <Text style={styles.aiRetryText}>재시도</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Ionicons name="sparkles" size={14} color="#0064FF" />
+              <Text style={[styles.aiBannerText, { color: "#0064FF" }]}>
+                AI 분석 완료 — 1년 실데이터 기반 · 분할매수·익절·재무 자동 계산
+              </Text>
+              <TouchableOpacity
+                onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
+                style={styles.aiReanalyzeBtn}
+              >
+                <Text style={styles.aiReanalyzeText}>재분석</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
+
       <View style={[styles.statsBar, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
         <View style={styles.statItem}>
           <Text style={[styles.statLabel, { color: c.textTertiary }]}>박스권</Text>
@@ -215,7 +268,17 @@ export default function StockDetailScreen() {
         ))}
       </ScrollView>
 
-      {isStub && detailLoading && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
+      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color="#F59E0B" />
+          <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
+            AI가 1년 실데이터를 분석하고 있습니다...
+          </Text>
+          <Text style={[styles.loadingText, { color: c.textSecondary, fontSize: 12, textAlign: "center" }]}>
+            분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
+          </Text>
+        </View>
+      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={c.tint} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>
@@ -334,6 +397,20 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   loadingWrap: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
   loadingText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  aiBanner: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               6,
+    paddingHorizontal: 16,
+    paddingVertical:   8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1A2035",
+  },
+  aiBannerText:    { flex: 1, fontSize: 11, fontFamily: "Inter_400Regular" },
+  aiRetryBtn:      { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: "#F0445222" },
+  aiRetryText:     { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#F04452" },
+  aiReanalyzeBtn:  { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, backgroundColor: "#0064FF22" },
+  aiReanalyzeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0064FF" },
   descriptionBox:{ paddingHorizontal: 16, paddingVertical: 12 },
   description:   { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   errorBanner: {

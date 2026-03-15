@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useWatchlist } from "@/context/WatchlistContext";
+import { useEnrichment } from "@/context/EnrichmentContext";
 import { UniverseStock } from "@/constants/stockUniverse";
 import { STOCKS } from "@/constants/stockData";
 
@@ -65,6 +66,7 @@ export default function ExploreScreen() {
   const [error,      setError]      = useState<string | null>(null);
 
   const { isInWatchlist, addFromUniverse, removeStock } = useWatchlist();
+  const { enrichStock, isEnriching } = useEnrichment();
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchScreen = useCallback(async (mkt: Market, isRefresh = false) => {
@@ -120,17 +122,22 @@ export default function ExploreScreen() {
         marketCap:    item.marketCap,
       };
       addFromUniverse(us);
+      const predefined = STOCKS.find((s) => s.ticker.toLowerCase() === item.ticker.toLowerCase());
+      if (!predefined) {
+        enrichStock(id, item.ticker, item.market);
+      }
     }
   };
 
   const renderItem = ({ item, index }: { item: ScreenResult; index: number }) => {
-    const id       = resolveId(item);
-    const inWL     = isInWatchlist(id);
-    const mktColor = MARKET_COLORS[item.market] ?? "#888";
-    const up       = item.changePercent >= 0;
-    const clrChange= up ? "#F04452" : "#1B63E8";
-    const sign     = up ? "+" : "";
-    const uvScore  = 100 - Math.round(item.score * 100);
+    const id          = resolveId(item);
+    const inWL        = isInWatchlist(id);
+    const enriching   = inWL && isEnriching(id);
+    const mktColor    = MARKET_COLORS[item.market] ?? "#888";
+    const up          = item.changePercent >= 0;
+    const clrChange   = up ? "#F04452" : "#1B63E8";
+    const sign        = up ? "+" : "";
+    const uvScore     = 100 - Math.round(item.score * 100);
 
     return (
       <View style={styles.card}>
@@ -144,6 +151,12 @@ export default function ExploreScreen() {
               <View style={[styles.mktBadge, { backgroundColor: mktColor + "33" }]}>
                 <Text style={[styles.mktBadgeText, { color: mktColor }]}>{item.market}</Text>
               </View>
+              {enriching && (
+                <View style={styles.aiBadge}>
+                  <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.65 }] }} />
+                  <Text style={styles.aiBadgeText}>AI 분석 중</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.tickerText}>{item.ticker}  ·  {item.sector}</Text>
           </View>
@@ -412,6 +425,16 @@ const styles = StyleSheet.create({
   mktBadgeText: { fontSize: 11, fontWeight: "700" },
   tickerText:   { fontSize: 12, color: "#666", marginTop: 3 },
   wlBtn:        { padding: 4 },
+  aiBadge: {
+    flexDirection:   "row",
+    alignItems:      "center",
+    gap:             3,
+    backgroundColor: "#F59E0B22",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius:    6,
+  },
+  aiBadgeText: { fontSize: 10, color: "#F59E0B", fontWeight: "700" },
 
   priceRow: {
     flexDirection:  "row",
