@@ -29,12 +29,12 @@ export interface PriceForecast {
 }
 
 export interface FinancialAnalysis {
-  per: number;
-  pbr: number;
+  per: number | null;
+  pbr: number | null;
   roe: number;
   debtRatio: number;
   revenueGrowth: number;
-  evaluation: "심각한 거품" | "거품" | "적정" | "저평가" | "강한 저평가";
+  evaluation: "심각한 거품" | "거품" | "적정" | "저평가" | "강한 저평가" | "성장주";
   summary: string;
 }
 

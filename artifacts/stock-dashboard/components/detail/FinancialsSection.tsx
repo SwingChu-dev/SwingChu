@@ -14,6 +14,7 @@ const EVAL_COLORS: Record<string, string> = {
   "적정":        "#F59E0B",
   "저평가":      "#00C896",
   "강한 저평가": "#3B82F6",
+  "성장주":      "#8B5CF6",
 };
 
 function fmtNum(v: number, decimals = 1, suffix = "배"): string {
@@ -45,17 +46,17 @@ export default function FinancialsSection({ stock }: FinancialsSectionProps) {
   }[] = [
     {
       label: "PER (주가수익비율)",
-      value: fmtNum(per),
-      good:    per > 0 && per < 25,
-      na:      !per || per === 0,
-      neutral: per >= 25,
+      value: fmtNum(per ?? 0),
+      good:    per != null && per > 0 && per < 25,
+      na:      per == null || per === 0,
+      neutral: per != null && per >= 25,
     },
     {
       label: "PBR (주가순자산비율)",
-      value: fmtNum(pbr, 2),
-      good:    pbr > 0 && pbr < 3,
-      na:      !pbr || pbr === 0,
-      neutral: pbr >= 3,
+      value: fmtNum(pbr ?? 0, 2),
+      good:    pbr != null && pbr > 0 && pbr < 3,
+      na:      pbr == null || pbr === 0,
+      neutral: pbr != null && pbr >= 3,
     },
     {
       label: "ROE (자기자본이익률)",

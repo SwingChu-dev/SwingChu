@@ -31,7 +31,7 @@ interface ScreenResult {
   priceKRW:      number;
   changePercent: number;
   currentPer:    number | null;
-  pbr:           number;
+  pbr:           number | null;
   isUndervalued: boolean;
   score:         number;
   currency:      string;
@@ -63,13 +63,13 @@ export default function ExploreScreen() {
   const { enrichStock, isEnriching } = useEnrichment();
   const { usdKrw } = useStockPrice();
 
-  const fmtPrice = (item: ScreenResult): string => {
+  const fmtPrice = useCallback((item: ScreenResult): string => {
     if (item.market === "NASDAQ") {
       const usd = (item.priceKRW / usdKrw).toFixed(2);
       return `$${usd}  (₩${item.priceKRW.toLocaleString()})`;
     }
     return `₩${item.priceKRW.toLocaleString()}`;
-  };
+  }, [usdKrw]);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchScreen = useCallback(async (
@@ -121,14 +121,14 @@ export default function ExploreScreen() {
     setResults([]);
   };
 
-  const resolveId = (item: ScreenResult) => {
+  const resolveId = useCallback((item: ScreenResult) => {
     const predefined = STOCKS.find(
       (s) => s.ticker.toLowerCase() === item.ticker.toLowerCase()
     );
     return predefined ? predefined.id : `${item.ticker.toLowerCase()}_screen`;
-  };
+  }, []);
 
-  const toggleWatchlist = (item: ScreenResult) => {
+  const toggleWatchlist = useCallback((item: ScreenResult) => {
     const id = resolveId(item);
     if (isInWatchlist(id)) {
       removeStock(id);
@@ -149,7 +149,7 @@ export default function ExploreScreen() {
         enrichStock(id, item.ticker, item.market);
       }
     }
-  };
+  }, [resolveId, isInWatchlist, removeStock, addFromUniverse, enrichStock]);
 
   const renderItem = ({ item, index }: { item: ScreenResult; index: number }) => {
     const id          = resolveId(item);
@@ -215,7 +215,7 @@ export default function ExploreScreen() {
           <View style={styles.metricDivider} />
           <View style={styles.metricBox}>
             <Text style={styles.metricLabel}>PBR</Text>
-            <Text style={styles.metricValue}>{item.pbr.toFixed(2) + "x"}</Text>
+            <Text style={styles.metricValue}>{item.pbr != null ? item.pbr.toFixed(2) + "x" : "N/A"}</Text>
           </View>
           <View style={styles.metricDivider} />
           <View style={styles.metricBox}>

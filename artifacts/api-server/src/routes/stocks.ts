@@ -142,7 +142,7 @@ interface ScreenStock {
   sector:    string;
   marketCap: string;
   basePer:   number | null;
-  pbr:       number;
+  pbr:       number | null;
   basePrice: number;
 }
 
@@ -617,11 +617,11 @@ router.get("/stocks/screen", async (req, res) => {
 
       const crit = UV_CRITERIA[c.market];
       const perOk   = currentPer === null || currentPer < crit.maxPer;
-      const pbrOk   = c.pbr < crit.maxPbr;
+      const pbrOk   = c.pbr === null    || c.pbr < crit.maxPbr;
       const isUndervalued = perOk && pbrOk;
 
       const perScore = currentPer !== null ? currentPer / crit.maxPer : 0.5;
-      const pbrScore = c.pbr / crit.maxPbr;
+      const pbrScore = c.pbr !== null     ? c.pbr / crit.maxPbr       : 0.5;
       const score    = parseFloat(((perScore + pbrScore) / 2).toFixed(3));
 
       return {

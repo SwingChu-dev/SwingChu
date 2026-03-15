@@ -5,9 +5,9 @@ const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 export interface Technicals {
   ma5:        number | null;
   ma20:       number | null;
-  trendUp:    boolean | null;  // null = insufficient data
-  disparity5: number | null;   // (price/ma5 - 1) * 100
-  disparity20:number | null;   // (price/ma20 - 1) * 100
+  trendUp:    boolean | null;
+  disparity5: number | null;
+  disparity20:number | null;
   loading:    boolean;
 }
 
@@ -28,8 +28,11 @@ export function useTechnicals(ticker: string, market: string, livePrice: number)
     if (!ticker || !market) return;
     setTechnicals(prev => ({ ...prev, loading: true }));
 
+    const ctrl = new AbortController();
+
     globalThis.fetch(
-      `${API_BASE}/stocks/history?ticker=${encodeURIComponent(ticker)}&market=${encodeURIComponent(market)}&period=3mo`
+      `${API_BASE}/stocks/history?ticker=${encodeURIComponent(ticker)}&market=${encodeURIComponent(market)}&period=3mo`,
+      { signal: ctrl.signal },
     )
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(payload => {
@@ -44,7 +47,6 @@ export function useTechnicals(ticker: string, market: string, livePrice: number)
         const ma5  = calcSMA(closes, 5);
         const ma20 = calcSMA(closes, 20);
 
-        // MA20 추세: 최근 5일 MA20 평균 vs 5일 전 5일 MA20 평균
         const recentMa20s: number[] = [];
         const pastMa20s:   number[] = [];
         for (let i = 0; i < 5; i++) {
@@ -63,9 +65,12 @@ export function useTechnicals(ticker: string, market: string, livePrice: number)
 
         setTechnicals({ ma5, ma20, trendUp, disparity5, disparity20, loading: false });
       })
-      .catch(() => {
+      .catch(err => {
+        if (err?.name === "AbortError") return;
         setTechnicals({ ma5: null, ma20: null, trendUp: null, disparity5: null, disparity20: null, loading: false });
       });
+
+    return () => ctrl.abort();
   }, [ticker, market]);
 
   return technicals;
