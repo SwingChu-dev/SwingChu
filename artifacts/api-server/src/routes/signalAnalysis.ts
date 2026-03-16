@@ -2,16 +2,7 @@ import { Router } from "express";
 import NodeCache from "node-cache";
 import Anthropic from "@anthropic-ai/sdk";
 import YahooFinanceClass from "yahoo-finance2";
-import {
-  hasServerKis,
-  kisDomesticHistory,
-  kisDomesticQuote,
-  kisDomesticInvestorFlow,
-  kisOverseasHistory,
-  kisOverseasQuote,
-  getExcd,
-  type Bar,
-} from "./kis";
+import type { Bar } from "./kis";
 
 const yahooFinance = new (YahooFinanceClass as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
 
@@ -22,54 +13,41 @@ function toYahooTicker(ticker: string, market: string): string {
 }
 
 async function fetchHistory(ticker: string, market: string, days: number): Promise<Bar[]> {
-  const isKorean = market === "KOSPI" || market === "KOSDAQ";
-  // ① KIS 시도
-  let bars: Bar[] = [];
-  if (hasServerKis()) {
-    bars = isKorean
-      ? await kisDomesticHistory(ticker, days)
-      : await kisOverseasHistory(ticker, getExcd(market), days);
-  }
-  // ② KIS 실패 시 Yahoo Finance chart() 폴백
-  if (bars.length < 20) {
-    const yt = toYahooTicker(ticker, market);
-    const p1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    try {
-      const result: any = await (yahooFinance as any).chart(yt, {
-        period1:  p1,
-        interval: "1d",
-      });
-      const quotes: any[] = result?.quotes ?? result?.indicators?.quote?.[0] ?? [];
-      bars = quotes
-        .filter((d: any) => d.close != null && d.close > 0)
-        .map((d: any) => ({
-          date:   (d.date instanceof Date ? d.date : new Date((d.date ?? 0) * 1000)).toISOString().split("T")[0],
-          open:   d.open   ?? d.close,
-          high:   d.high   ?? d.close,
-          low:    d.low    ?? d.close,
-          close:  d.close,
-          volume: d.volume ?? 0,
-        }));
-    } catch {
-      // chart() 도 실패 시 historical() 시도
-      try {
-        const p1s = p1.toISOString().split("T")[0];
-        const p2s = new Date().toISOString().split("T")[0];
-        const raw: any[] = await (yahooFinance as any).historical(yt, { period1: p1s, period2: p2s }).catch(() => []);
-        bars = raw
-          .filter((d: any) => d.close != null && d.close > 0)
-          .map((d: any) => ({
-            date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
-            open:   d.open  ?? d.close,
-            high:   d.high  ?? d.close,
-            low:    d.low   ?? d.close,
-            close:  d.close,
-            volume: d.volume ?? 0,
-          }));
-      } catch {}
-    }
-  }
-  return bars;
+  const yt = toYahooTicker(ticker, market);
+  const p1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  // ① Yahoo Finance chart()
+  try {
+    const result: any = await (yahooFinance as any).chart(yt, { period1: p1, interval: "1d" });
+    const quotes: any[] = result?.quotes ?? [];
+    const bars = quotes
+      .filter((d: any) => d.close != null && d.close > 0)
+      .map((d: any) => ({
+        date:   (d.date instanceof Date ? d.date : new Date((d.date ?? 0) * 1000)).toISOString().split("T")[0],
+        open:   d.open   ?? d.close,
+        high:   d.high   ?? d.close,
+        low:    d.low    ?? d.close,
+        close:  d.close,
+        volume: d.volume ?? 0,
+      }));
+    if (bars.length >= 20) return bars;
+  } catch {}
+  // ② historical() 폴백
+  try {
+    const p1s = p1.toISOString().split("T")[0];
+    const p2s = new Date().toISOString().split("T")[0];
+    const raw: any[] = await (yahooFinance as any).historical(yt, { period1: p1s, period2: p2s }).catch(() => []);
+    return raw
+      .filter((d: any) => d.close != null && d.close > 0)
+      .map((d: any) => ({
+        date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
+        open:   d.open  ?? d.close,
+        high:   d.high  ?? d.close,
+        low:    d.low   ?? d.close,
+        close:  d.close,
+        volume: d.volume ?? 0,
+      }));
+  } catch {}
+  return [];
 }
 
 const router = Router();
@@ -414,40 +392,29 @@ router.get("/stocks/signals", async (req, res) => {
 
   for (const { ticker, market } of parsed) {
     try {
-      const isKorean = market === "KOSPI" || market === "KOSDAQ";
-
-      // ── 1. 히스토리 + 현재가 + 투자자 수급 병렬 로드 ──────────────────────
-      const [bars, kisQuote, investorFlow] = await Promise.all([
+      // ── 1. 히스토리 + 현재가 병렬 로드 (Yahoo Finance) ─────────────────────
+      const yt = toYahooTicker(ticker, market);
+      const [bars, yq] = await Promise.all([
         fetchHistory(ticker, market, 120),
-        isKorean
-          ? kisDomesticQuote(ticker)
-          : kisOverseasQuote(ticker, getExcd(market)),
-        isKorean
-          ? kisDomesticInvestorFlow(ticker)
-          : Promise.resolve(null),
+        (yahooFinance as any).quote(yt).catch(() => null),
       ]);
 
       if (bars.length < 20) continue;
 
-      // ── 1b. quote 폴백: KIS 실패 시 Yahoo Finance ──────────────────────────
-      let quote: { close: number; volume: number; changePercent: number; high52w: number; low52w: number } | null = kisQuote;
-      if (!quote) {
-        try {
-          const yt = toYahooTicker(ticker, market);
-          const yq: any = await (yahooFinance as any).quote(yt);
-          if (yq) {
-            const price = yq.regularMarketPrice ?? 0;
-            quote = {
-              close:         price,
-              volume:        yq.regularMarketVolume ?? 0,
-              changePercent: yq.regularMarketChangePercent ?? 0,
-              high52w:       yq.fiftyTwoWeekHigh ?? price * 1.3,
-              low52w:        yq.fiftyTwoWeekLow  ?? price * 0.7,
-            };
-          }
-        } catch {}
-      }
-      if (!quote) continue;
+      const yqData: any = yq;
+      if (!yqData?.regularMarketPrice) continue;
+      const price = yqData.regularMarketPrice ?? 0;
+      const quote = {
+        close:         price,
+        volume:        yqData.regularMarketVolume ?? 0,
+        changePercent: yqData.regularMarketChangePercent ?? 0,
+        high52w:       yqData.fiftyTwoWeekHigh ?? price * 1.3,
+        low52w:        yqData.fiftyTwoWeekLow  ?? price * 0.7,
+      };
+
+      // 투자자 수급: Yahoo Finance에서 미제공 → 0으로 설정 (AI 판정에 미미한 영향)
+      const institutionalNet = 0;
+      const foreignerNet     = 0;
 
       const closes  = bars.map(b => b.close);
       const volumes = bars.map(b => b.volume);
@@ -497,9 +464,6 @@ router.get("/stocks/signals", async (req, res) => {
         pct52Range,
       };
 
-      const institutionalNet = investorFlow?.institutionalNet ?? 0;
-      const foreignerNet     = investorFlow?.foreignerNet     ?? 0;
-
       // ── 3. Claude AI 신호 분석 ─────────────────────────────────────────────
       const { smartMoney, scalping } = await analyzeWithAI(
         ticker, market, ind, institutionalNet, foreignerNet
@@ -510,9 +474,6 @@ router.get("/stocks/signals", async (req, res) => {
         smartMoney, scalping,
         generatedAt: new Date().toISOString(),
       });
-
-      // KIS rate limit 준수
-      await new Promise(r => setTimeout(r, isKorean ? 60 : 150));
     } catch (err) {
       console.error(`[signals] ${ticker}:`, err);
     }

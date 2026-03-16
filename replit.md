@@ -63,17 +63,15 @@ Express 5 API server with Yahoo Finance integration for Korean stock trading app
   - `GET /stocks/history` — 1yr OHLC for backtesting (1h TTL)
   - `GET /stocks/search` — ticker search (5m TTL)
   - `GET /stocks/analyze` — **AI analysis**: 1yr drawdown-percentile split entries + analyst-target profit targets + full StockInfo fields (1h TTL)
-  - `GET /stocks/signals` — **AI 신호 분석** (Claude Haiku-4-5): RSI-14, MACD, 볼린저밴드, 거래량비율 + KIS 투자자 수급 → 세력감지/단타레이더 JSON (10분 TTL); `?items=TICKER:MARKET,...` 형식; KIS 히스토리 → Yahoo Finance chart() 폴백
-- **Data sources (이중화)**:
-  - **가격 데이터 (실시간 · 일봉)**: KIS Open API 우선 (서버 자격증명 환경변수 `KIS_APPKEY`, `KIS_APPSECRET`) → Yahoo Finance 폴백
-    - 국내주식: `kisDomesticQuote` / `kisDomesticMultiQuote` / `kisDomesticHistory` (TR_ID: FHKST01010100, FHKST03010100)
-    - 미국주식: `kisOverseasQuote` / `kisOverseasMultiQuote` / `kisOverseasHistory` (TR_ID: HHDFS00000300, HHDFS76240000)
-    - KIS 환율: USDKRW 실시간 (5분 TTL) → Yahoo Finance 폴백
-  - **재무 데이터** (PER, PBR, ROE 등): Yahoo Finance quoteSummary (분기 업데이트, 캐시 5분)
-  - **뉴스 · 검색**: Yahoo Finance (참고 데이터, 가격 데이터 아님)
-  - KIS 없을 경우 전체 Yahoo Finance 폴백으로 동작 유지
-- **KIS rate limit**: 국내 20 req/sec (60ms 간격), 해외 1 req/sec (150ms 간격)
-- USD/KRW rate cached 5m via KIS → Yahoo Finance 폴백
+  - `GET /stocks/signals` — **AI 신호 분석** (Claude Haiku-4-5): RSI-14, MACD, 볼린저밴드, 거래량비율 → 세력감지/단타레이더 JSON (10분 TTL); `?items=TICKER:MARKET,...` 형식
+- **Data sources (Yahoo Finance 단일화)**:
+  - **가격 데이터 (실시간 · 일봉)**: Yahoo Finance 전용
+    - 국내주식: `${ticker}.KS` / `${ticker}.KQ` 형식
+    - 미국주식: 티커 그대로 사용
+    - USD/KRW: `USDKRW=X` (5분 TTL, 기본값 1450)
+  - **재무 데이터** (PER, PBR, ROE 등): Yahoo Finance quoteSummary (5분 캐시)
+  - **뉴스 · 검색**: Yahoo Finance
+  - KIS API는 코드에서 완전 제거됨 (kis.ts 파일 자체는 Bar 타입 export로 유지)
 - `calcEntries()` uses rolling 20-day peak drawdown distribution (35/62/87th percentile) → real volatility-based split entry levels
 - `calcProfitTargets()` uses analyst target mean as anchor for pt3
 
