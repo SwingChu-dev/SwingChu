@@ -63,11 +63,16 @@ Express 5 API server with Yahoo Finance integration for Korean stock trading app
   - `GET /stocks/history` — 1yr OHLC for backtesting (1h TTL)
   - `GET /stocks/search` — ticker search (5m TTL)
   - `GET /stocks/analyze` — **AI analysis**: 1yr drawdown-percentile split entries + analyst-target profit targets + full StockInfo fields (1h TTL)
-- **Data sources**: Korean stocks (KOSPI/KOSDAQ) → FinanceDataReader (KRX직접); US stocks → Yahoo Finance
-  - `src/korean_fdr.py` — Python script wrapping `FinanceDataReader`; commands: `history`, `quote`, `multi_quote`
-  - `src/koreanFdr.ts` — Node.js subprocess client with TTL cache; exports `fdrQuote`, `fdrMultiQuote`, `fdrHistory`
-  - Financial ratios (PER, PBR, ROE, etc.) still from Yahoo Finance quoteSummary for all markets
-- USD/KRW rate cached 5m via Yahoo Finance (`USDKRW=X`)
+- **Data sources (이중화)**:
+  - **가격 데이터 (실시간 · 일봉)**: KIS Open API 우선 (서버 자격증명 환경변수 `KIS_APPKEY`, `KIS_APPSECRET`) → Yahoo Finance 폴백
+    - 국내주식: `kisDomesticQuote` / `kisDomesticMultiQuote` / `kisDomesticHistory` (TR_ID: FHKST01010100, FHKST03010100)
+    - 미국주식: `kisOverseasQuote` / `kisOverseasMultiQuote` / `kisOverseasHistory` (TR_ID: HHDFS00000300, HHDFS76240000)
+    - KIS 환율: USDKRW 실시간 (5분 TTL) → Yahoo Finance 폴백
+  - **재무 데이터** (PER, PBR, ROE 등): Yahoo Finance quoteSummary (분기 업데이트, 캐시 5분)
+  - **뉴스 · 검색**: Yahoo Finance (참고 데이터, 가격 데이터 아님)
+  - KIS 없을 경우 전체 Yahoo Finance 폴백으로 동작 유지
+- **KIS rate limit**: 국내 20 req/sec (60ms 간격), 해외 1 req/sec (150ms 간격)
+- USD/KRW rate cached 5m via KIS → Yahoo Finance 폴백
 - `calcEntries()` uses rolling 20-day peak drawdown distribution (35/62/87th percentile) → real volatility-based split entry levels
 - `calcProfitTargets()` uses analyst target mean as anchor for pt3
 
