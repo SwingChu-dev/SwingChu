@@ -63,6 +63,7 @@ Express 5 API server with Yahoo Finance integration for Korean stock trading app
   - `GET /stocks/history` — 1yr OHLC for backtesting (1h TTL)
   - `GET /stocks/search` — ticker search (5m TTL)
   - `GET /stocks/analyze` — **AI analysis**: 1yr drawdown-percentile split entries + analyst-target profit targets + full StockInfo fields (1h TTL)
+  - `GET /stocks/signals` — **AI 신호 분석** (Claude Haiku-4-5): RSI-14, MACD, 볼린저밴드, 거래량비율 + KIS 투자자 수급 → 세력감지/단타레이더 JSON (10분 TTL); `?items=TICKER:MARKET,...` 형식; KIS 히스토리 → Yahoo Finance chart() 폴백
 - **Data sources (이중화)**:
   - **가격 데이터 (실시간 · 일봉)**: KIS Open API 우선 (서버 자격증명 환경변수 `KIS_APPKEY`, `KIS_APPSECRET`) → Yahoo Finance 폴백
     - 국내주식: `kisDomesticQuote` / `kisDomesticMultiQuote` / `kisDomesticHistory` (TR_ID: FHKST01010100, FHKST03010100)
@@ -82,7 +83,8 @@ Expo React Native mobile app — Korean swing trading dashboard. Toss Securities
 
 - **Predefined stocks (12)**: NVDA, GOOGL, ORCL, IONQ, SNDK, EONR [NASDAQ], 005930, 000660, 012450, 005380, 034020 [KOSPI], 032820 [KOSDAQ]
 - **AsyncStorage keys**: `@watchlist_ids_v2`, `@custom_stocks_v2`, `@portfolio_v2`, `@price_alerts_v1`, `@seen_signal_ids`, `@enriched_v1`
-- **Provider chain**: WatchlistProvider → EnrichmentProvider → PriceBridge → AlertProvider → PortfolioProvider → SignalProvider → RootLayoutNav
+- **Provider chain**: WatchlistProvider → EnrichmentProvider → KisProvider → AISignalBridge(AISignalProvider) → PriceBridge(StockPriceProvider) → AlertProvider → PortfolioProvider → SignalProvider → RootLayoutNav
+- **AISignalContext** (`context/AISignalContext.tsx`): 워치리스트 종목 5개씩 청크 → `/api/stocks/signals` 호출 → 세력감지(AISmartMoneySignal) + 단타레이더(AIScalpSignal) 제공; 10분 TTL + AsyncStorage 캐시
 - **EnrichmentContext** (`context/EnrichmentContext.tsx`): bookmarked non-predefined stocks auto-trigger `enrichStock()` → `/api/stocks/analyze` → AsyncStorage `@enriched_v1` (24h TTL)
 - **Stock detail** (`app/stock/[id].tsx`): 9 tabs — 진입, 익절, 박스권, 전망, 재무, 리스크, 요일, 뉴스, 백테스트; data priority: enrichedData → detail API → stub
 - **Design**: `#0064FF` primary, `#F04452` rise, `#1B63E8` fall, `TOSS_ORANGE` warning

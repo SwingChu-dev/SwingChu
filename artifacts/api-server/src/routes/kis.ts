@@ -251,6 +251,39 @@ export async function kisOverseasHistory(ticker: string, excd: string, days: num
   } catch { return []; }
 }
 
+// ─── 국내주식 투자자별 매매동향 (기관/외국인 순매수) ─────────────────────────
+export interface InvestorFlow {
+  institutionalNet: number;   // 기관 순매수 (주, + 매수 - 매도)
+  foreignerNet: number;       // 외국인 순매수
+  institutionalBuy: number;
+  institutionalSell: number;
+  foreignerBuy: number;
+  foreignerSell: number;
+}
+
+export async function kisDomesticInvestorFlow(ticker: string): Promise<InvestorFlow | null> {
+  if (!hasServerKis()) return null;
+  try {
+    const token = await getServerToken();
+    const data  = await kisGet(
+      "/uapi/domestic-stock/v1/quotations/inquire-investor",
+      "FHKST01010900",
+      SERVER_APPKEY, SERVER_APPSECRET, token,
+      { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: ticker }
+    );
+    const o = data?.output;
+    if (!o) return null;
+    return {
+      institutionalNet:  parseInt(o.orgn_ntby_qty  || o.ttal_orgn_ntby_qty || "0", 10),
+      foreignerNet:      parseInt(o.frgn_ntby_qty  || "0", 10),
+      institutionalBuy:  parseInt(o.orgn_buy_qty   || "0", 10),
+      institutionalSell: parseInt(o.orgn_sell_qty  || "0", 10),
+      foreignerBuy:      parseInt(o.frgn_buy_qty   || "0", 10),
+      foreignerSell:     parseInt(o.frgn_sell_qty  || "0", 10),
+    };
+  } catch { return null; }
+}
+
 // ─── USD/KRW 환율 (해외주식 시세 활용) ────────────────────────────────────────
 let kisUsdKrwCache = 0;
 let kisUsdKrwTime  = 0;

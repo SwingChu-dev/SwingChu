@@ -21,6 +21,7 @@ import { PortfolioProvider } from "@/context/PortfolioContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { KisProvider } from "@/context/KisContext";
+import { AISignalProvider } from "@/context/AISignalContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -95,6 +96,12 @@ function PriceBridge({ children }: { children: React.ReactNode }) {
   const { watchlistStocks } = useWatchlist();
   const watchlist = watchlistStocks.map((s) => ({ ticker: s.ticker, market: s.market }));
   return <StockPriceProvider watchlist={watchlist}>{children}</StockPriceProvider>;
+}
+
+function AISignalBridge({ children }: { children: React.ReactNode }) {
+  const { watchlistStocks } = useWatchlist();
+  const watchlist = watchlistStocks.map(s => ({ ticker: s.ticker, market: s.market, id: s.id }));
+  return <AISignalProvider watchlist={watchlist}>{children}</AISignalProvider>;
 }
 
 function AlertChecker() {
@@ -190,15 +197,17 @@ export default function RootLayout() {
               <WatchlistProvider>
                 <EnrichmentProvider>
                   <KisProvider>
-                    <PriceBridge>
-                      <AlertProvider>
-                        <PortfolioProvider>
-                          <SignalProvider>
-                            <RootLayoutNav />
-                          </SignalProvider>
-                        </PortfolioProvider>
-                      </AlertProvider>
-                    </PriceBridge>
+                    <AISignalBridge>
+                      <PriceBridge>
+                        <AlertProvider>
+                          <PortfolioProvider>
+                            <SignalProvider>
+                              <RootLayoutNav />
+                            </SignalProvider>
+                          </PortfolioProvider>
+                        </AlertProvider>
+                      </PriceBridge>
+                    </AISignalBridge>
                   </KisProvider>
                 </EnrichmentProvider>
               </WatchlistProvider>

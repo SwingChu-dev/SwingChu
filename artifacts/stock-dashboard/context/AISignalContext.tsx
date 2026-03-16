@@ -1,0 +1,220 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_BASE    = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+const CACHE_KEY   = "@ai_signals_v1";
+const CACHE_TTL   = 10 * 60 * 1000;
+const FETCH_CHUNK = 5;
+
+// ─── 타입 정의 ────────────────────────────────────────────────────────────────
+
+export type SignalType = "세력진입" | "세력이탈" | "매집중" | "분산중" | "관망";
+export type SignalStrength = "강" | "중" | "약";
+export type ScalpType = "급등포착" | "고점위험" | "눌림목" | "관망";
+export type UrgencyType = "즉시" | "당일" | "이번주";
+export type RiskLevel = "위험" | "주의" | "안전";
+
+export interface TechnicalIndicators {
+  rsi14: number;
+  macd: number;
+  macdSignal: number;
+  macdHistogram: number;
+  bbUpper: number;
+  bbMid: number;
+  bbLower: number;
+  bbWidth: number;
+  ma5: number;
+  ma20: number;
+  volume: number;
+  volumeAvg20: number;
+  volumeRatio: number;
+  currentPrice: number;
+  changePercent: number;
+  high52w: number;
+  low52w: number;
+  distFrom52High: number;
+  pct52Range: number;
+}
+
+export interface AISmartMoneySignal {
+  ticker: string;
+  market: string;
+  type: SignalType;
+  strength: SignalStrength;
+  institutionalNet: number;
+  foreignerNet: number;
+  summary: string;
+  signals: string[];
+  indicators: TechnicalIndicators;
+  generatedAt: string;
+}
+
+export interface AIScalpSignal {
+  ticker: string;
+  market: string;
+  type: ScalpType;
+  urgency: UrgencyType;
+  riskLevel: RiskLevel;
+  surgeScore: number;
+  riskScore: number;
+  expectedMovePercent: number;
+  entryLowPct: number;
+  entryHighPct: number;
+  stopLossPct: number;
+  profitPcts: { label: string; percent: number }[];
+  summary: string;
+  caution?: string;
+  signals: string[];
+  indicators: TechnicalIndicators;
+  generatedAt: string;
+}
+
+interface AISignalContextType {
+  smartMoneySignals: Record<string, AISmartMoneySignal>;
+  scalpSignals:      Record<string, AIScalpSignal>;
+  loading:           boolean;
+  lastFetch:         number | null;
+  refresh:           () => void;
+}
+
+const AISignalContext = createContext<AISignalContextType | null>(null);
+
+// ─── Provider ────────────────────────────────────────────────────────────────
+
+interface Props {
+  children: ReactNode;
+  watchlist: { ticker: string; market: string; id: string }[];
+}
+
+export function AISignalProvider({ children, watchlist }: Props) {
+  const [smartMoneySignals, setSmartMoneySignals] = useState<Record<string, AISmartMoneySignal>>({});
+  const [scalpSignals,      setScalpSignals]       = useState<Record<string, AIScalpSignal>>({});
+  const [loading,   setLoading]   = useState(false);
+  const [lastFetch, setLastFetch] = useState<number | null>(null);
+
+  const fetchSignals = useCallback(async () => {
+    if (watchlist.length === 0) return;
+    if (lastFetch && Date.now() - lastFetch < CACHE_TTL) return;
+
+    setLoading(true);
+    try {
+      const newSmart: Record<string, AISmartMoneySignal> = {};
+      const newScalp: Record<string, AIScalpSignal>      = {};
+
+      // 청크별로 나눠서 요청 (한꺼번에 너무 많이 보내지 않도록)
+      for (let i = 0; i < watchlist.length; i += FETCH_CHUNK) {
+        const chunk = watchlist.slice(i, i + FETCH_CHUNK);
+        const items = chunk.map(s => `${s.ticker}:${s.market}`).join(",");
+
+        try {
+          const resp = await fetch(`${API_BASE}/stocks/signals?items=${items}`, {
+            signal: AbortSignal.timeout(60_000),
+          });
+          if (!resp.ok) continue;
+
+          const data: any[] = await resp.json();
+          for (const d of data) {
+            const ind: TechnicalIndicators = d.indicators;
+
+            newSmart[d.ticker] = {
+              ticker:           d.ticker,
+              market:           d.market,
+              type:             d.smartMoney.type,
+              strength:         d.smartMoney.strength,
+              institutionalNet: d.smartMoney.institutionalNet ?? 0,
+              foreignerNet:     d.smartMoney.foreignerNet     ?? 0,
+              summary:          d.smartMoney.summary,
+              signals:          d.smartMoney.signals,
+              indicators:       ind,
+              generatedAt:      d.generatedAt,
+            };
+
+            newScalp[d.ticker] = {
+              ticker:              d.ticker,
+              market:              d.market,
+              type:                d.scalping.type,
+              urgency:             d.scalping.urgency,
+              riskLevel:           d.scalping.riskLevel,
+              surgeScore:          d.scalping.surgeScore,
+              riskScore:           d.scalping.riskScore,
+              expectedMovePercent: d.scalping.expectedMovePercent,
+              entryLowPct:         d.scalping.entryLowPct,
+              entryHighPct:        d.scalping.entryHighPct,
+              stopLossPct:         d.scalping.stopLossPct,
+              profitPcts:          d.scalping.profitPcts,
+              summary:             d.scalping.summary,
+              caution:             d.scalping.caution,
+              signals:             d.scalping.signals,
+              indicators:          ind,
+              generatedAt:         d.generatedAt,
+            };
+          }
+        } catch {}
+
+        // 청크 간 간격 (서버 부하 분산)
+        if (i + FETCH_CHUNK < watchlist.length) {
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+
+      setSmartMoneySignals(prev => ({ ...prev, ...newSmart }));
+      setScalpSignals(prev      => ({ ...prev, ...newScalp }));
+      const now = Date.now();
+      setLastFetch(now);
+
+      // AsyncStorage 캐시 저장
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+        smart: newSmart, scalp: newScalp, ts: now,
+      }));
+    } catch {}
+    setLoading(false);
+  }, [watchlist, lastFetch]);
+
+  // 캐시 로드
+  useEffect(() => {
+    AsyncStorage.getItem(CACHE_KEY).then(raw => {
+      if (!raw) return;
+      try {
+        const { smart, scalp, ts } = JSON.parse(raw);
+        if (Date.now() - ts < CACHE_TTL * 3) {
+          setSmartMoneySignals(smart ?? {});
+          setScalpSignals(scalp ?? {});
+          setLastFetch(ts);
+        }
+      } catch {}
+    });
+  }, []);
+
+  // 마운트 후 + 10분 주기 자동 갱신
+  useEffect(() => {
+    fetchSignals();
+    const id = setInterval(fetchSignals, CACHE_TTL);
+    return () => clearInterval(id);
+  }, [fetchSignals]);
+
+  const refresh = useCallback(() => {
+    setLastFetch(null);
+    fetchSignals();
+  }, [fetchSignals]);
+
+  return (
+    <AISignalContext.Provider value={{
+      smartMoneySignals, scalpSignals, loading, lastFetch, refresh,
+    }}>
+      {children}
+    </AISignalContext.Provider>
+  );
+}
+
+export function useAISignals() {
+  const ctx = useContext(AISignalContext);
+  if (!ctx) throw new Error("useAISignals must be inside AISignalProvider");
+  return ctx;
+}
