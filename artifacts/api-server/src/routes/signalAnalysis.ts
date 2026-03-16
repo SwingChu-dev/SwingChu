@@ -2,7 +2,7 @@ import { Router } from "express";
 import NodeCache from "node-cache";
 import Anthropic from "@anthropic-ai/sdk";
 import YahooFinanceClass from "yahoo-finance2";
-import type { Bar } from "./kis";
+interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number }
 
 const yahooFinance = new (YahooFinanceClass as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
 

@@ -20,7 +20,6 @@ import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
 import { PortfolioProvider } from "@/context/PortfolioContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
-import { KisProvider } from "@/context/KisContext";
 import { AISignalProvider } from "@/context/AISignalContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -150,15 +149,6 @@ function RootLayoutNav() {
             headerShown: false,
           }}
         />
-        <Stack.Screen
-          name="kis-connect"
-          options={{
-            presentation: "formSheet",
-            sheetAllowedDetents: [0.6, 1],
-            sheetGrabberVisible: true,
-            headerShown: false,
-          }}
-        />
       </Stack>
     </>
   );
@@ -196,19 +186,17 @@ export default function RootLayout() {
             <KeyboardProvider>
               <WatchlistProvider>
                 <EnrichmentProvider>
-                  <KisProvider>
-                    <AISignalBridge>
-                      <PriceBridge>
-                        <AlertProvider>
-                          <PortfolioProvider>
-                            <SignalProvider>
-                              <RootLayoutNav />
-                            </SignalProvider>
-                          </PortfolioProvider>
-                        </AlertProvider>
-                      </PriceBridge>
-                    </AISignalBridge>
-                  </KisProvider>
+                  <AISignalBridge>
+                    <PriceBridge>
+                      <AlertProvider>
+                        <PortfolioProvider>
+                          <SignalProvider>
+                            <RootLayoutNav />
+                          </SignalProvider>
+                        </PortfolioProvider>
+                      </AlertProvider>
+                    </PriceBridge>
+                  </AISignalBridge>
                 </EnrichmentProvider>
               </WatchlistProvider>
             </KeyboardProvider>

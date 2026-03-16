@@ -1,6 +1,7 @@
 import { Router } from "express";
 import YahooFinanceClass from "yahoo-finance2";
-import type { Bar } from "./kis";
+
+export interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number }
 
 const router = Router();
 const yahooFinance = new (YahooFinanceClass as any)({

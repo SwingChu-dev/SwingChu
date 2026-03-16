@@ -81,7 +81,7 @@ Expo React Native mobile app — Korean swing trading dashboard. Toss Securities
 
 - **Predefined stocks (12)**: NVDA, GOOGL, ORCL, IONQ, SNDK, EONR [NASDAQ], 005930, 000660, 012450, 005380, 034020 [KOSPI], 032820 [KOSDAQ]
 - **AsyncStorage keys**: `@watchlist_ids_v2`, `@custom_stocks_v2`, `@portfolio_v2`, `@price_alerts_v1`, `@seen_signal_ids`, `@enriched_v1`
-- **Provider chain**: WatchlistProvider → EnrichmentProvider → KisProvider → AISignalBridge(AISignalProvider) → PriceBridge(StockPriceProvider) → AlertProvider → PortfolioProvider → SignalProvider → RootLayoutNav
+- **Provider chain**: WatchlistProvider → EnrichmentProvider → AISignalBridge(AISignalProvider) → PriceBridge(StockPriceProvider) → AlertProvider → PortfolioProvider → SignalProvider → RootLayoutNav
 - **AISignalContext** (`context/AISignalContext.tsx`): 워치리스트 종목 5개씩 청크 → `/api/stocks/signals` 호출 → 세력감지(AISmartMoneySignal) + 단타레이더(AIScalpSignal) 제공; 10분 TTL + AsyncStorage 캐시
 - **EnrichmentContext** (`context/EnrichmentContext.tsx`): bookmarked non-predefined stocks auto-trigger `enrichStock()` → `/api/stocks/analyze` → AsyncStorage `@enriched_v1` (24h TTL)
 - **Stock detail** (`app/stock/[id].tsx`): 9 tabs — 진입, 익절, 박스권, 전망, 재무, 리스크, 요일, 뉴스, 백테스트; data priority: enrichedData → detail API → stub

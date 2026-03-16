@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   useColorScheme,
-  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +15,6 @@ import Colors from "@/constants/colors";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useSignals } from "@/context/SignalContext";
 import { useStockPrice } from "@/context/StockPriceContext";
-import { useKis } from "@/context/KisContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
 import { calcBoxPosition } from "@/utils/boxPosition";
@@ -35,7 +33,6 @@ export default function HomeScreen() {
   const { watchlistStocks, removeStock } = useWatchlist();
   const { newCount, getSignalForStock } = useSignals();
   const { getQuote, refresh, quotes } = useStockPrice();
-  const { isConnected: kisConnected, lastSync: kisLastSync, syncStatus: kisSyncStatus, syncWatchlist } = useKis();
   const vix = useVix();
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
@@ -132,39 +129,6 @@ export default function HomeScreen() {
             <Text style={[styles.summaryLbl, { color: c.textSecondary }]}>VIX</Text>
           </View>
         </View>
-
-        {/* ─── KIS 연동 배너 ─── */}
-        {kisConnected && (
-          <TouchableOpacity
-            style={[styles.kisBanner, { backgroundColor: c.card }]}
-            onPress={() => router.push("/kis-connect" as any)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.kisLeft}>
-              <View style={styles.kisDot} />
-              <View>
-                <Text style={[styles.kisBannerTitle, { color: c.text }]}>KIS 관심종목 연동 중</Text>
-                <Text style={[styles.kisBannerSub, { color: c.textSecondary }]}>
-                  {kisLastSync
-                    ? `마지막 동기화 ${kisLastSync.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`
-                    : "동기화 필요"}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[styles.kisSyncBtn, kisSyncStatus === "syncing" && { opacity: 0.6 }]}
-              onPress={(e) => { e.stopPropagation(); syncWatchlist(); }}
-              disabled={kisSyncStatus === "syncing"}
-            >
-              {kisSyncStatus === "syncing" ? (
-                <ActivityIndicator size="small" color="#fff" style={{ width: 14, height: 14 }} />
-              ) : (
-                <Ionicons name="sync" size={14} color="#fff" />
-              )}
-              <Text style={styles.kisSyncBtnText}>동기화</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        )}
 
         {/* ─── Filter Chips ─── */}
         <ScrollView
@@ -292,32 +256,4 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   addBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-
-  kisBanner: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    justifyContent:    "space-between",
-    marginHorizontal:  16,
-    marginBottom:      10,
-    borderRadius:      14,
-    paddingHorizontal: 14,
-    paddingVertical:   11,
-  },
-  kisLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  kisDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: "#2DB55D",
-  },
-  kisBannerTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  kisBannerSub:   { fontSize: 11, marginTop: 1 },
-  kisSyncBtn: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    gap:               5,
-    backgroundColor:   "#0064FF",
-    paddingHorizontal: 12,
-    paddingVertical:   7,
-    borderRadius:      10,
-  },
-  kisSyncBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
 });
