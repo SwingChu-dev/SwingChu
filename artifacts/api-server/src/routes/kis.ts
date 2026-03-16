@@ -5,28 +5,55 @@ const router = Router();
 
 const KIS_BASE = "https://openapi.koreainvestment.com:9443";
 
-// ─── 토큰 캐시: appkey 기준 23시간 ────────────────────────────────────────────
-const tokenCache = new NodeCache({ stdTTL: 23 * 3600, checkperiod: 3600 });
+// ─── 토큰 캐시: in-flight Promise 재사용으로 rate-limit race condition 방지 ──────
+// KIS는 1분에 1회만 토큰을 발급해 줌 → 동시 다중 요청이 모두 신규 발급을 시도하면 403
+// in-flight map에 pending Promise를 보관해 같은 appkey 요청은 동일 Promise를 반환
+
+interface TokenEntry { token: string; expiresAt: number }
+const tokenStore  = new Map<string, TokenEntry>();
+const tokenFlight = new Map<string, Promise<string>>();
 
 async function getKisToken(appkey: string, appsecret: string): Promise<string> {
   const cacheKey = `token:${appkey}`;
-  const cached = tokenCache.get<string>(cacheKey);
-  if (cached) return cached;
 
-  const resp = await fetch(`${KIS_BASE}/oauth2/tokenP`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ grant_type: "client_credentials", appkey, appsecret }),
-  });
-
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`KIS 토큰 발급 실패 (${resp.status}): ${txt}`);
+  // ① 유효한 캐시 있으면 바로 반환 (만료 5분 전에 갱신)
+  const entry = tokenStore.get(cacheKey);
+  if (entry && Date.now() < entry.expiresAt - 5 * 60 * 1000) {
+    return entry.token;
   }
 
-  const data = (await resp.json()) as { access_token: string };
-  tokenCache.set(cacheKey, data.access_token, 23 * 3600);
-  return data.access_token;
+  // ② 이미 발급 중인 요청이 있으면 그 Promise를 재사용 (race condition 방지)
+  const inflight = tokenFlight.get(cacheKey);
+  if (inflight) return inflight;
+
+  // ③ 새 토큰 발급 시작 — Promise를 먼저 map에 저장
+  const fetchPromise = (async () => {
+    const resp = await fetch(`${KIS_BASE}/oauth2/tokenP`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grant_type: "client_credentials", appkey, appsecret }),
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`KIS 토큰 발급 실패 (${resp.status}): ${txt}`);
+    }
+
+    const data = (await resp.json()) as { access_token: string; token_type: string; expires_in?: number };
+    const token = data.access_token;
+    const ttlSec = data.expires_in ?? (23 * 3600);
+    tokenStore.set(cacheKey, { token, expiresAt: Date.now() + ttlSec * 1000 });
+    return token;
+  })();
+
+  tokenFlight.set(cacheKey, fetchPromise);
+  try {
+    const token = await fetchPromise;
+    return token;
+  } finally {
+    // 완료 후 in-flight에서 제거 (다음 갱신 요청은 새로 발급)
+    tokenFlight.delete(cacheKey);
+  }
 }
 
 async function kisGet(
@@ -163,7 +190,14 @@ export async function kisDomesticHistory(ticker: string, days: number): Promise<
       }
     );
 
+    // 에러 코드 확인
+    if (data?.rt_cd && data.rt_cd !== "0") {
+      console.error(`[KIS history] ${ticker} 에러: rt_cd=${data.rt_cd} msg=${data.msg1}`);
+      return [];
+    }
+
     const rows: any[] = data?.output2 ?? [];
+    console.log(`[KIS history] ${ticker}: output2 rows=${rows.length}, rt_cd=${data?.rt_cd}`);
     return rows
       .filter(r => r.stck_bsop_date && r.stck_clpr)
       .map(r => ({
@@ -176,7 +210,10 @@ export async function kisDomesticHistory(ticker: string, days: number): Promise<
       }))
       .filter(r => r.close > 0)
       .reverse();
-  } catch { return []; }
+  } catch(e) {
+    console.error(`[KIS history] ${ticker} catch:`, String(e));
+    return [];
+  }
 }
 
 // ─── 해외주식 현재가 (단건) ───────────────────────────────────────────────────
@@ -234,7 +271,12 @@ export async function kisOverseasHistory(ticker: string, excd: string, days: num
       SERVER_APPKEY, SERVER_APPSECRET, token,
       { AUTH: "", EXCD: excd, SYMB: ticker, GUBN: "0", BYMD: "", MODP: "0" }
     );
+    if (data?.rt_cd && data.rt_cd !== "0") {
+      console.error(`[KIS OV history] ${ticker} 에러: rt_cd=${data.rt_cd} msg=${data.msg1}`);
+      return [];
+    }
     const rows: any[] = data?.output2 ?? [];
+    console.log(`[KIS OV history] ${ticker}: output2 rows=${rows.length}, rt_cd=${data?.rt_cd}`);
     return rows
       .filter(r => r.xymd && r.clos)
       .map(r => ({
@@ -248,7 +290,10 @@ export async function kisOverseasHistory(ticker: string, excd: string, days: num
       .filter(r => r.close > 0)
       .slice(0, days)  // 최근 days개 한정
       .reverse();
-  } catch { return []; }
+  } catch(e) {
+    console.error(`[KIS OV history] ${ticker} catch:`, String(e));
+    return [];
+  }
 }
 
 // ─── 국내주식 투자자별 매매동향 (기관/외국인 순매수) ─────────────────────────
@@ -355,7 +400,7 @@ router.post("/kis/watchlist", async (req, res) => {
     return res.json({ groups: result, totalCount: result.reduce((a, g) => a + g.stocks.length, 0) });
   } catch (e: any) {
     if (e.message?.includes("토큰") || e.message?.includes("401")) {
-      tokenCache.del(`token:${appkey}`);
+      tokenStore.delete(`token:${appkey}`);
     }
     return res.status(500).json({ error: e.message ?? "KIS 연동 오류" });
   }
@@ -367,7 +412,7 @@ router.post("/kis/verify", async (req, res) => {
     return res.status(400).json({ error: "appkey와 appsecret이 필요합니다" });
   }
   try {
-    tokenCache.del(`token:${appkey}`);
+    tokenStore.delete(`token:${appkey}`);
     await getKisToken(appkey, appsecret);
     return res.json({ ok: true });
   } catch (e: any) {
