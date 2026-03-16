@@ -34,8 +34,8 @@ function DisclaimerScreen() {
     <View style={[disclaimerStyles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
       <View style={disclaimerStyles.logoWrap}>
         <Text style={disclaimerStyles.logoIcon}>📈</Text>
-        <Text style={disclaimerStyles.logoTitle}>스윙 트레이더</Text>
-        <Text style={disclaimerStyles.logoSub}>Smart Stock Dashboard</Text>
+        <Text style={disclaimerStyles.logoTitle}>스윙의 정석</Text>
+        <Text style={disclaimerStyles.logoSub}>스윙 트레이딩 전략 대시보드</Text>
       </View>
 
       <View style={disclaimerStyles.card}>

@@ -89,7 +89,7 @@ export default function MoreScreen() {
       >
         <Text style={[styles.headerTitle, { color: c.text }]}>더보기</Text>
         <Text style={[styles.headerSub, { color: c.textSecondary }]}>
-          스윙 트레이더 분석 도구
+          스윙의 정석 분석 도구
         </Text>
       </View>
 
