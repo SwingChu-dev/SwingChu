@@ -28,3 +28,9 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["glibcLocales"]
+
+[userenv]
+
+[userenv.shared]
+KIS_APPKEY = "PSrDDhTm4jI3S7GAOqbU3zKiQhkP3ztqsScC"
+KIS_APPSECRET = "37XQUyb7hyxhW6+iA2JkkdWtrZ7W2QaZRKBEA55hnJDiDLr9Uk54voBN3y0GyGdJCts0+d5w8zpsVrlsOsDn6eIP7WdLrNekdd+KWuhuc3GRnr9uPALuyPXvshppxOKZyASnrD7p9fN6GClsZLvLCFYELKaZucaqpcc45na2NvKqkQcRBxI="
