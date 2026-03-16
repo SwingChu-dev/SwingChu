@@ -12,7 +12,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
-import { useSignals } from "@/context/SignalContext";
 
 interface MenuItemProps {
   icon: React.ComponentProps<typeof Ionicons>["name"];
@@ -70,8 +69,6 @@ export default function MoreScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { newCount } = useSignals();
-
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
       {/* 헤더 */}
@@ -101,15 +98,6 @@ export default function MoreScreen() {
         {/* 분석 도구 */}
         <SectionHeader title="분석 도구" />
         <View style={styles.section}>
-          <MenuItem
-            icon="eye-outline"
-            iconColor="#8B5CF6"
-            title="세력감지"
-            description="스마트머니·기관 수급 이상 신호 포착"
-            badge={newCount > 0 ? newCount : undefined}
-            onPress={() => router.navigate("/(tabs)/signals")}
-          />
-          <View style={[styles.divider, { backgroundColor: c.separator }]} />
           <MenuItem
             icon="bar-chart-outline"
             iconColor="#0064FF"

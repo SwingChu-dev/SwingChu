@@ -106,15 +106,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="scalping"
+        name="signals"
         options={{
-          title: "단타레이더",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? "bolt.fill" : "bolt"} tintColor={color} size={24} />
-            ) : (
-              <Ionicons name={focused ? "flash" : "flash-outline"} size={22} color={color} />
-            ),
+          title: "세력감지",
+          tabBarIcon: ({ color, focused }) => (
+            <View>
+              {isIOS ? (
+                <SymbolView name={focused ? "eye.fill" : "eye"} tintColor={color} size={24} />
+              ) : (
+                <Ionicons name={focused ? "eye" : "eye-outline"} size={22} color={color} />
+              )}
+              <TabBadge count={newCount} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
@@ -141,36 +145,24 @@ export default function TabLayout() {
         name="more"
         options={{
           title: "더보기",
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              {isIOS ? (
-                <SymbolView
-                  name={focused ? "ellipsis.circle.fill" : "ellipsis.circle"}
-                  tintColor={color}
-                  size={24}
-                />
-              ) : (
-                <Ionicons
-                  name={focused ? "ellipsis-horizontal-circle" : "ellipsis-horizontal-circle-outline"}
-                  size={22}
-                  color={color}
-                />
-              )}
-              {/* 세력감지 미확인 신호 배지 */}
-              <TabBadge count={newCount} />
-            </View>
-          ),
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView
+                name={focused ? "ellipsis.circle.fill" : "ellipsis.circle"}
+                tintColor={color}
+                size={24}
+              />
+            ) : (
+              <Ionicons
+                name={focused ? "ellipsis-horizontal-circle" : "ellipsis-horizontal-circle-outline"}
+                size={22}
+                color={color}
+              />
+            ),
         }}
       />
 
       {/* ── 더보기에서 접근하는 숨겨진 탭 (탭바에 표시 안 됨) ── */}
-      <Tabs.Screen
-        name="signals"
-        options={{
-          title: "세력감지",
-          tabBarButton: () => null,
-        }}
-      />
       <Tabs.Screen
         name="analysis"
         options={{

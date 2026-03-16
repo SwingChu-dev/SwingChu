@@ -131,12 +131,8 @@ function calcSma(values: number[], period: number): number {
 
 // ─── 신호 분석 타입 ──────────────────────────────────────────────────────────
 
-export type SignalType = "세력진입" | "세력이탈" | "매집중" | "분산중" | "관망" |
-                         "급등포착" | "고점위험" | "눌림목";
+export type SignalType = "세력진입" | "세력이탈" | "매집중" | "분산중" | "관망";
 export type SignalStrength = "강" | "중" | "약";
-export type ScalpType = "급등포착" | "고점위험" | "눌림목" | "관망";
-export type UrgencyType = "즉시" | "당일" | "이번주";
-export type RiskLevel = "위험" | "주의" | "안전";
 
 export interface TechnicalIndicators {
   rsi14: number;
@@ -172,21 +168,6 @@ export interface StockSignal {
     summary: string;
     signals: string[];
   };
-  scalping: {
-    type: ScalpType;
-    urgency: UrgencyType;
-    riskLevel: RiskLevel;
-    surgeScore: number;
-    riskScore: number;
-    expectedMovePercent: number;
-    entryLowPct: number;
-    entryHighPct: number;
-    stopLossPct: number;
-    profitPcts: { label: string; percent: number }[];
-    summary: string;
-    caution?: string;
-    signals: string[];
-  };
   generatedAt: string;
 }
 
@@ -198,76 +179,44 @@ async function analyzeWithAI(
   ind: TechnicalIndicators,
   institutionalNet: number,
   foreignerNet: number,
-): Promise<{ smartMoney: StockSignal["smartMoney"]; scalping: StockSignal["scalping"] }> {
+): Promise<StockSignal["smartMoney"]> {
 
   const isKorean = market === "KOSPI" || market === "KOSDAQ";
   const priceStr = isKorean
     ? `${ind.currentPrice.toLocaleString()}원`
     : `$${ind.currentPrice.toFixed(2)} (₩${Math.round(ind.currentPrice * 1450).toLocaleString()})`;
 
-  const prompt = `당신은 한국 주식시장 전문 퀀트 애널리스트입니다. 아래 실시간 기술적 지표와 수급 데이터를 분석하여 JSON 형식으로 응답하세요.
+  const prompt = `당신은 한국 주식시장 전문 퀀트 애널리스트입니다. 아래 기술적 지표를 분석해 세력(스마트머니) 동향을 JSON으로 판단하세요.
 
-## 종목 정보
-- 티커: ${ticker} (${market})
-- 현재가: ${priceStr}
-- 전일 대비: ${ind.changePercent > 0 ? "+" : ""}${ind.changePercent.toFixed(2)}%
+## 종목: ${ticker} (${market}) | 현재가: ${priceStr} | 전일대비: ${ind.changePercent > 0 ? "+" : ""}${ind.changePercent.toFixed(2)}%
 
 ## 기술적 지표
-- RSI-14: ${ind.rsi14} (30 이하=과매도, 70 이상=과매수)
-- MACD: ${ind.macd} / Signal: ${ind.macdSignal} / Histogram: ${ind.macdHistogram}
-- 볼린저밴드: 상단 ${isKorean ? ind.bbUpper.toLocaleString() : ind.bbUpper.toFixed(2)} / 중단 ${isKorean ? ind.bbMid.toLocaleString() : ind.bbMid.toFixed(2)} / 하단 ${isKorean ? ind.bbLower.toLocaleString() : ind.bbLower.toFixed(2)}
-- BB폭(변동성): ${ind.bbWidth.toFixed(1)}%
-- MA5: ${isKorean ? ind.ma5.toLocaleString() : ind.ma5.toFixed(2)}, MA20: ${isKorean ? ind.ma20.toLocaleString() : ind.ma20.toFixed(2)}
-- 거래량: ${ind.volume.toLocaleString()} (20일 평균 대비 ${ind.volumeRatio.toFixed(2)}배)
-- 52주 고점 대비: ${ind.distFrom52High.toFixed(1)}%
-- 52주 범위 위치: ${Math.round(ind.pct52Range * 100)}%
+- RSI-14: ${ind.rsi14}  (30↓=과매도, 70↑=과매수)
+- MACD히스토그램: ${ind.macdHistogram} (양수=상승모멘텀, 음수=하락)
+- MA5: ${isKorean ? ind.ma5.toLocaleString() : ind.ma5.toFixed(2)} / MA20: ${isKorean ? ind.ma20.toLocaleString() : ind.ma20.toFixed(2)} (MA5>MA20=정배열)
+- 볼린저밴드폭: ${ind.bbWidth.toFixed(1)}%  BB상단: ${isKorean ? ind.bbUpper.toLocaleString() : ind.bbUpper.toFixed(2)}
+- 거래량: 20일평균 대비 ${ind.volumeRatio.toFixed(2)}배
+- 52주범위위치: ${Math.round(ind.pct52Range * 100)}%  (고점대비: ${ind.distFrom52High.toFixed(1)}%)
 
-## 수급 데이터 (당일)
-${isKorean
-  ? `- 기관 순매수: ${institutionalNet.toLocaleString()}주 (${institutionalNet > 0 ? "매수우위" : institutionalNet < 0 ? "매도우위" : "중립"})
-- 외국인 순매수: ${foreignerNet.toLocaleString()}주 (${foreignerNet > 0 ? "매수우위" : foreignerNet < 0 ? "매도우위" : "중립"})`
-  : `- 기관/외국인 데이터 없음 (미국주식, 기술적 분석만 사용)`}
-
-## 응답 형식 (반드시 JSON만 반환)
+## 응답 형식 (JSON만 반환)
 {
-  "smartMoney": {
-    "type": "세력진입|세력이탈|매집중|분산중|관망" 중 하나,
-    "strength": "강|중|약" 중 하나,
-    "summary": "2-3문장 한국어 분석 요약 (실제 수치 언급 포함)",
-    "signals": ["실제 지표 기반 감지 신호 3-5개 (구체적 수치 포함)"]
-  },
-  "scalping": {
-    "type": "급등포착|고점위험|눌림목|관망" 중 하나,
-    "urgency": "즉시|당일|이번주" 중 하나,
-    "riskLevel": "위험|주의|안전" 중 하나,
-    "surgeScore": 0-100 숫자 (급등 가능성),
-    "riskScore": 0-100 숫자 (위험도),
-    "expectedMovePercent": 예상 단기 이동 % (정수, 음수 가능),
-    "entryLowPct": 진입 하단 % (현재가 대비, 음수 또는 0),
-    "entryHighPct": 진입 상단 % (현재가 대비, 양수 또는 0),
-    "stopLossPct": 손절 % (양수, 3-10 범위),
-    "profitPcts": [{"label": "1차 익절", "percent": 숫자}, {"label": "2차 익절", "percent": 숫자}, {"label": "3차 익절", "percent": 숫자}],
-    "summary": "2문장 한국어 단타 전략 요약",
-    "caution": "주의 메시지 (해당시만, 없으면 null)",
-    "signals": ["단타 관점 신호 3-4개"]
-  }
+  "type": "세력진입|세력이탈|매집중|분산중|관망" 중 하나,
+  "strength": "강|중|약" 중 하나,
+  "summary": "2-3문장 한국어 분석 (수치 직접 언급)",
+  "signals": ["지표 기반 신호 3-5개 (구체적 수치 포함)"]
 }
 
-판단 기준 (기관/외국인 데이터가 0이어도 기술적 지표만으로 판단):
-- 세력진입: RSI 35~55 + 거래량 1.8배+ + MACD 히스토그램 양전환 (저점 상승 패턴)
-- 세력이탈: RSI 65+ + 거래량 1.8배+ + MACD 히스토그램 하향 + BB상단 근접
-- 매집중: MACD 상향 + 거래량 1.3배+ + 상승 + 52주범위 50% 이하
-- 분산중: 고점권(52주 70%+) 거래량 증가 + 음봉 + BB상단 이탈
-- 급등포착: 당일 +2%+ 또는 거래량 2배+ + MACD 히스토그램 양수
-- 고점위험: 52주 범위 75%+ + RSI 60+ + BB상단 근접
-- 눌림목: 52주 범위 35%이하 + RSI 45이하
-
-중요: 기관/외국인 데이터가 0이더라도 기술 지표로 충분히 신호 판단 가능. 가능하면 관망 대신 구체적 신호를 반환하세요. 관망은 어떤 지표도 뚜렷한 방향성을 보이지 않을 때만 사용.`;
+## 판단 기준 (기술 지표만으로 판단, 관망은 마지막 수단)
+- 세력진입: RSI 35~55 + 거래량 1.8배+ + MACD히스토 양전환 → 저점 매집 패턴
+- 세력이탈: RSI 65+ + 거래량 1.8배+ + MACD히스토 하향 + BB상단 근접 → 고점 분산
+- 매집중: MACD 상향 + 거래량 1.3배+ + 52주범위 50% 이하
+- 분산중: 52주범위 70%+ + 거래량 증가 + 하락 + BB상단 이탈
+- 관망: 위 어떤 패턴도 명확하지 않을 때만`;
 
   try {
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 1024,
+      max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -277,33 +226,12 @@ ${isKorean
     const parsed = JSON.parse(jsonMatch[0]);
 
     return {
-      smartMoney: {
-        type:            parsed.smartMoney?.type ?? "관망",
-        strength:        parsed.smartMoney?.strength ?? "약",
-        institutionalNet,
-        foreignerNet,
-        summary:         parsed.smartMoney?.summary ?? "",
-        signals:         parsed.smartMoney?.signals ?? [],
-      },
-      scalping: {
-        type:                parsed.scalping?.type ?? "관망",
-        urgency:             parsed.scalping?.urgency ?? "이번주",
-        riskLevel:           parsed.scalping?.riskLevel ?? "주의",
-        surgeScore:          parsed.scalping?.surgeScore ?? 30,
-        riskScore:           parsed.scalping?.riskScore ?? 30,
-        expectedMovePercent: parsed.scalping?.expectedMovePercent ?? 0,
-        entryLowPct:         parsed.scalping?.entryLowPct ?? 0,
-        entryHighPct:        parsed.scalping?.entryHighPct ?? 0,
-        stopLossPct:         parsed.scalping?.stopLossPct ?? 6,
-        profitPcts:          parsed.scalping?.profitPcts ?? [
-          { label: "1차 익절", percent: 3 },
-          { label: "2차 익절", percent: 8 },
-          { label: "3차 익절", percent: 15 },
-        ],
-        summary:  parsed.scalping?.summary ?? "",
-        caution:  parsed.scalping?.caution ?? undefined,
-        signals:  parsed.scalping?.signals ?? [],
-      },
+      type:            parsed.type     ?? "관망",
+      strength:        parsed.strength ?? "약",
+      institutionalNet,
+      foreignerNet,
+      summary:         parsed.summary  ?? "",
+      signals:         parsed.signals  ?? [],
     };
   } catch (e) {
     console.error("[AI signal] error:", e);
@@ -317,60 +245,32 @@ function fallbackSignal(
   ind: TechnicalIndicators,
   institutionalNet: number,
   foreignerNet: number,
-): ReturnType<typeof analyzeWithAI> extends Promise<infer T> ? T : never {
+): StockSignal["smartMoney"] {
   const { rsi14, volumeRatio, changePercent, pct52Range, macdHistogram } = ind;
 
-  let smType: SignalType;
-  let smStrength: SignalStrength;
-  if (changePercent > 3 && volumeRatio >= 2 && pct52Range < 0.5 && institutionalNet > 0) {
-    smType = "세력진입"; smStrength = "강";
-  } else if (changePercent < -3 && volumeRatio >= 2 && pct52Range > 0.6) {
-    smType = "세력이탈"; smStrength = "강";
-  } else if (changePercent > 1 && volumeRatio >= 1.5 && macdHistogram > 0) {
-    smType = "매집중"; smStrength = volumeRatio >= 2.5 ? "강" : "중";
-  } else if (changePercent < -1 && volumeRatio >= 1.5) {
-    smType = "분산중"; smStrength = "중";
+  let type: SignalType;
+  let strength: SignalStrength;
+  if (rsi14 >= 35 && rsi14 <= 55 && volumeRatio >= 1.8 && macdHistogram > 0) {
+    type = "세력진입"; strength = "강";
+  } else if (rsi14 >= 65 && volumeRatio >= 1.8 && macdHistogram < 0) {
+    type = "세력이탈"; strength = "강";
+  } else if (macdHistogram > 0 && volumeRatio >= 1.3 && pct52Range < 0.5) {
+    type = "매집중"; strength = volumeRatio >= 2 ? "강" : "중";
+  } else if (pct52Range >= 0.7 && changePercent < 0 && volumeRatio >= 1.3) {
+    type = "분산중"; strength = "중";
   } else {
-    smType = "관망"; smStrength = "약";
+    type = "관망"; strength = "약";
   }
 
-  let scalpType: ScalpType;
-  if (pct52Range >= 0.78 && volumeRatio >= 1.5) scalpType = "고점위험";
-  else if (changePercent >= 3 && volumeRatio >= 1.8) scalpType = "급등포착";
-  else if (pct52Range <= 0.28 && rsi14 <= 45) scalpType = "눌림목";
-  else scalpType = "관망";
-
-  const riskLevel: RiskLevel = rsi14 >= 70 ? "위험" : rsi14 >= 55 ? "주의" : "안전";
-  const urgency: UrgencyType = scalpType === "급등포착" ? "즉시" : scalpType === "고점위험" ? "당일" : "이번주";
-
   return {
-    smartMoney: {
-      type: smType, strength: smStrength,
-      institutionalNet, foreignerNet,
-      summary: `RSI ${rsi14}, 거래량 ${volumeRatio.toFixed(1)}배 기반 규칙 분석.`,
-      signals: [
-        `RSI-14: ${rsi14}`,
-        `거래량: ${volumeRatio.toFixed(1)}배`,
-        `당일 변동: ${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%`,
-      ],
-    },
-    scalping: {
-      type: scalpType, urgency, riskLevel,
-      surgeScore: Math.min(90, Math.round(40 + volumeRatio * 8 + Math.abs(changePercent) * 3)),
-      riskScore: Math.min(90, Math.round(30 + rsi14 * 0.5)),
-      expectedMovePercent: scalpType === "급등포착" ? Math.round(volumeRatio * 3) : scalpType === "눌림목" ? 8 : -5,
-      entryLowPct: scalpType === "눌림목" ? -3 : scalpType === "급등포착" ? -1 : 0,
-      entryHighPct: scalpType === "급등포착" ? 1 : 0,
-      stopLossPct: riskLevel === "위험" ? 5 : 7,
-      profitPcts: [
-        { label: "1차 익절", percent: 3 },
-        { label: "2차 익절", percent: 8 },
-        { label: "3차 익절", percent: 15 },
-      ],
-      summary: `${scalpType} 패턴 감지. RSI ${rsi14}, 거래량 ${volumeRatio.toFixed(1)}배 이동평균 대비.`,
-      caution: rsi14 >= 70 ? "RSI 과매수 구간 — 급등 추격 매수 위험" : undefined,
-      signals: [`RSI ${rsi14}`, `거래량 ${volumeRatio.toFixed(1)}배`, `당일 ${changePercent > 0 ? "+" : ""}${changePercent.toFixed(1)}%`],
-    },
+    type, strength, institutionalNet, foreignerNet,
+    summary: `RSI ${rsi14}, 거래량 ${volumeRatio.toFixed(1)}배 기반 규칙 분석.`,
+    signals: [
+      `RSI-14: ${rsi14}`,
+      `거래량: 평균 대비 ${volumeRatio.toFixed(1)}배`,
+      `MACD 히스토그램: ${macdHistogram > 0 ? "+" : ""}${macdHistogram.toFixed(2)}`,
+      `52주 범위 위치: ${Math.round(pct52Range * 100)}%`,
+    ],
   };
 }
 
@@ -467,13 +367,13 @@ router.get("/stocks/signals", async (req, res) => {
       };
 
       // ── 3. Claude AI 신호 분석 ─────────────────────────────────────────────
-      const { smartMoney, scalping } = await analyzeWithAI(
+      const smartMoney = await analyzeWithAI(
         ticker, market, ind, institutionalNet, foreignerNet
       );
 
       results.push({
         ticker, market, indicators: ind,
-        smartMoney, scalping,
+        smartMoney,
         generatedAt: new Date().toISOString(),
       });
     } catch (err) {
