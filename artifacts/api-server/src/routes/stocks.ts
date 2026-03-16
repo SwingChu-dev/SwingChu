@@ -41,7 +41,6 @@ const TTL = {
   SCREEN:  10 * 60 * 1000,     // 10분 — 저평가 스크리닝
   NEWS:    15 * 60 * 1000,     // 15분 — 뉴스 감성
   HISTORY: 60 * 60 * 1000,     // 1시간 — 과거 OHLC (일봉)
-  SEARCH:  5  * 60 * 1000,     // 5분  — 검색 결과
 };
 
 const quotesCache  = new TtlCache<any[]>();
@@ -49,29 +48,12 @@ const detailCache  = new TtlCache<any>();
 const screenCache  = new TtlCache<any[]>();
 const newsCache    = new TtlCache<any>();
 const historyCache = new TtlCache<any>();
-const searchCache  = new TtlCache<any[]>();
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 function toYahooTicker(ticker: string, market: string): string {
   if (market === "KOSPI")  return `${ticker}.KS`;
   if (market === "KOSDAQ") return `${ticker}.KQ`;
   return ticker;
-}
-
-function classifyMarket(symbol: string, exchange: string): string {
-  if (symbol.endsWith(".KS")) return "KOSPI";
-  if (symbol.endsWith(".KQ")) return "KOSDAQ";
-  const nasdaqExchanges = ["NMS", "NGM", "NCM"];
-  if (nasdaqExchanges.includes(exchange)) return "NASDAQ";
-  const nyseExchanges = ["NYQ", "PCX", "ASE", "BATS", "NYSEArca"];
-  if (nyseExchanges.includes(exchange)) return "NYSE";
-  return exchange;
-}
-
-function cleanTicker(symbol: string): string {
-  if (symbol.endsWith(".KS") || symbol.endsWith(".KQ")) return symbol.slice(0, -3);
-  return symbol;
 }
 
 // ─── Yahoo Finance 기반 한국 주식 헬퍼 (.KS/.KQ 심볼) ───────────────────────
@@ -547,48 +529,6 @@ router.get("/stocks/quotes", async (req, res) => {
     quotesCache.set(cacheKey, results, TTL.QUOTES);
     return res.json(results);
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
-  }
-});
-
-router.get("/stocks/search", async (req, res) => {
-  const q = (req.query.q as string) ?? "";
-  const mkt = (req.query.market as string) ?? "ALL";
-  if (q.length < 1) return res.json([]);
-
-  const cacheKey = `${q.toLowerCase()}:${mkt}`;
-  const cached = searchCache.get(cacheKey);
-  if (cached) return res.json(cached);
-
-  try {
-    const result = await yahooFinance.search(q, {
-      quotesCount: 40,
-      newsCount: 0,
-    });
-
-    let quotes = (result.quotes as any[])
-      .filter((r) => r.quoteType === "EQUITY" && r.symbol)
-      .map((r) => {
-        const market = classifyMarket(r.symbol, r.exchange ?? "");
-        return {
-          ticker:      cleanTicker(r.symbol),
-          yahooTicker: r.symbol,
-          name:        r.shortname ?? r.longname ?? r.symbol,
-          market,
-          exchange:    r.exchDisp ?? r.exchange ?? "",
-        };
-      });
-
-    if (mkt !== "ALL") {
-      quotes = quotes.filter((q) => q.market === mkt);
-    }
-
-    searchCache.set(cacheKey, quotes, TTL.SEARCH);
-    return res.json(quotes);
-  } catch (e: any) {
-    if (e?.message?.includes("Invalid Search Query") || e?.message?.includes("BadRequest")) {
-      return res.json([]);
-    }
     return res.status(500).json({ error: String(e) });
   }
 });

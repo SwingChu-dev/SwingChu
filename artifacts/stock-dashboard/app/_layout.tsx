@@ -17,7 +17,6 @@ import Colors from "@/constants/colors";
 import { WatchlistProvider, useWatchlist } from "@/context/WatchlistContext";
 import { SignalProvider } from "@/context/SignalContext";
 import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
-import { PortfolioProvider } from "@/context/PortfolioContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
@@ -189,11 +188,9 @@ export default function RootLayout() {
                   <AISignalBridge>
                     <PriceBridge>
                       <AlertProvider>
-                        <PortfolioProvider>
-                          <SignalProvider>
-                            <RootLayoutNav />
-                          </SignalProvider>
-                        </PortfolioProvider>
+                        <SignalProvider>
+                          <RootLayoutNav />
+                        </SignalProvider>
                       </AlertProvider>
                     </PriceBridge>
                   </AISignalBridge>
