@@ -204,8 +204,8 @@ const indBadge = StyleSheet.create({
 
 // ─── 신호 카드 ────────────────────────────────────────────────────────────────
 
-function SignalCard({ sig, stockId, isDark, c }: {
-  sig: AISmartMoneySignal; stockId: string; isDark: boolean; c: any
+function SignalCard({ sig, stockId, stockName, isDark, c }: {
+  sig: AISmartMoneySignal; stockId: string; stockName: string; isDark: boolean; c: any
 }) {
   const [expanded, setExpanded] = useState(false);
   const meta     = SIGNAL_META[sig.type];
@@ -259,8 +259,8 @@ function SignalCard({ sig, stockId, isDark, c }: {
 
       {/* ── 종목명 ── */}
       <View style={styles.sigNameRow}>
-        <Text style={[styles.sigStockName, { color: c.text }]}>{sig.ticker}</Text>
-        <Text style={[styles.sigTicker, { color: c.textSecondary }]}>{sig.market}</Text>
+        <Text style={[styles.sigStockName, { color: c.text }]}>{stockName}</Text>
+        <Text style={[styles.sigTicker, { color: c.textSecondary }]}>{sig.ticker}  ·  {sig.market}</Text>
       </View>
 
       {/* ── AI 요약 ── */}
@@ -339,7 +339,7 @@ export default function SignalsScreen() {
   const { smartMoneySignals, loading, lastFetch, refresh } = useAISignals();
   const { watchlistStocks } = useWatchlist();
 
-  const signals = useMemo(() => {
+  const allSignals = useMemo(() => {
     return watchlistStocks
       .map(stock => {
         const sig = smartMoneySignals[stock.ticker];
@@ -347,15 +347,15 @@ export default function SignalsScreen() {
         return { sig, stock };
       })
       .filter((x): x is { sig: AISmartMoneySignal; stock: typeof watchlistStocks[0] } => x !== null)
-      .filter(({ sig }) => sig.type !== "관망")
       .sort((a, b) => {
-        const order: Record<string, number> = { 세력진입: 0, 세력이탈: 1, 매집중: 2, 분산중: 3 };
-        return (order[a.sig.type] ?? 4) - (order[b.sig.type] ?? 4);
+        const order: Record<string, number> = { 세력진입: 0, 매집중: 1, 세력이탈: 2, 분산중: 3, 관망: 4 };
+        return (order[a.sig.type] ?? 5) - (order[b.sig.type] ?? 5);
       });
   }, [smartMoneySignals, watchlistStocks]);
 
-  const entrySignals = signals.filter(({ sig }) => sig.type === "세력진입" || sig.type === "매집중");
-  const exitSignals  = signals.filter(({ sig }) => sig.type === "세력이탈" || sig.type === "분산중");
+  const entrySignals = allSignals.filter(({ sig }) => sig.type === "세력진입" || sig.type === "매집중");
+  const exitSignals  = allSignals.filter(({ sig }) => sig.type === "세력이탈" || sig.type === "분산중");
+  const watchSignals = allSignals.filter(({ sig }) => sig.type === "관망");
 
   const lastUpdate = lastFetch
     ? new Date(lastFetch).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
@@ -374,7 +374,7 @@ export default function SignalsScreen() {
             </View>
           </View>
           <Text style={[styles.headerSub, { color: c.textSecondary }]}>
-            KIS 수급 + 기술지표 + AI 분석
+            수급 · 기술지표 · AI 분석
             {lastUpdate ? `  ·  ${lastUpdate} 기준` : ""}
           </Text>
         </View>
@@ -397,11 +397,11 @@ export default function SignalsScreen() {
         </View>
 
         {/* 로딩 */}
-        {loading && signals.length === 0 && (
+        {loading && allSignals.length === 0 && (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color="#7C3AED" />
             <Text style={[styles.loadingText, { color: c.textSecondary }]}>
-              KIS + AI 신호 분석 중...
+              AI 신호 분석 중...
             </Text>
             <Text style={[styles.loadingSubText, { color: c.textTertiary }]}>
               Claude가 실시간 지표를 분석하고 있습니다
@@ -420,7 +420,7 @@ export default function SignalsScreen() {
               </View>
             </View>
             {entrySignals.map(({ sig, stock }) => (
-              <SignalCard key={stock.ticker} sig={sig} stockId={stock.id} isDark={isDark} c={c} />
+              <SignalCard key={stock.ticker} sig={sig} stockId={stock.id} stockName={stock.name} isDark={isDark} c={c} />
             ))}
           </View>
         )}
@@ -436,13 +436,29 @@ export default function SignalsScreen() {
               </View>
             </View>
             {exitSignals.map(({ sig, stock }) => (
-              <SignalCard key={stock.ticker} sig={sig} stockId={stock.id} isDark={isDark} c={c} />
+              <SignalCard key={stock.ticker} sig={sig} stockId={stock.id} stockName={stock.name} isDark={isDark} c={c} />
+            ))}
+          </View>
+        )}
+
+        {/* 관망 신호 */}
+        {watchSignals.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionDot, { backgroundColor: "#8E8E93" }]} />
+              <Text style={[styles.sectionTitle, { color: c.text }]}>관망 종목</Text>
+              <View style={[styles.countBadge, { backgroundColor: "#8E8E9318" }]}>
+                <Text style={[styles.countBadgeText, { color: "#8E8E93" }]}>{watchSignals.length}</Text>
+              </View>
+            </View>
+            {watchSignals.map(({ sig, stock }) => (
+              <SignalCard key={stock.ticker} sig={sig} stockId={stock.id} stockName={stock.name} isDark={isDark} c={c} />
             ))}
           </View>
         )}
 
         {/* 신호 없음 */}
-        {!loading && signals.length === 0 && (
+        {!loading && allSignals.length === 0 && (
           <View style={styles.emptyWrap}>
             <Ionicons name="eye-off-outline" size={48} color={c.textTertiary} />
             <Text style={[styles.emptyTitle, { color: c.text }]}>감지된 신호 없음</Text>

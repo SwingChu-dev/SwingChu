@@ -158,8 +158,8 @@ const scale = StyleSheet.create({
 
 // ─── 카드 ─────────────────────────────────────────────────────────────────────
 
-function ScalpCard({ sig, stockId, isDark, c }: {
-  sig: ResolvedSignal; stockId: string; isDark: boolean; c: any
+function ScalpCard({ sig, stockId, stockName, isDark, c }: {
+  sig: ResolvedSignal; stockId: string; stockName: string; isDark: boolean; c: any
 }) {
   const [expanded, setExpanded] = useState(false);
   const meta        = TYPE_META[sig.type];
@@ -208,7 +208,7 @@ function ScalpCard({ sig, stockId, isDark, c }: {
       {/* ── 종목 + 현재가 + 점수 ── */}
       <View style={styles.nameScoreRow}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.stockName, { color: c.text }]}>{sig.ticker}</Text>
+          <Text style={[styles.stockName, { color: c.text }]}>{stockName}</Text>
           <View style={styles.priceRow}>
             <Text style={[styles.currentPriceText, { color: c.text }]}>
               ₩{sig.currentPriceKRW.toLocaleString()}
@@ -438,7 +438,7 @@ export default function ScalpingScreen() {
             </View>
           </View>
           <Text style={[styles.headerSub, { color: c.textSecondary }]}>
-            RSI·MACD·BB + KIS 수급 + AI 분석
+            RSI·MACD·BB + AI 분석
             {lastUpdate ? `  ·  ${lastUpdate} 기준` : ""}
           </Text>
         </View>
@@ -525,6 +525,7 @@ export default function ScalpingScreen() {
               key={sig.ticker}
               sig={sig}
               stockId={stock?.id ?? sig.ticker}
+              stockName={stock?.name ?? sig.ticker}
               isDark={isDark}
               c={c}
             />
