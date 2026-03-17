@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 export function useVix(intervalMs = 300_000) {
   const [vix, setVix] = useState<number | null>(null);

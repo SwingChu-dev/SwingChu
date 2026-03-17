@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { StockInfo } from "@/constants/stockData";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 interface DayData {
   date: string;

@@ -25,7 +25,7 @@ import {
 const ENRICH_KEY = "@enriched_v1";
 const FRESH_TTL  = 24 * 60 * 60 * 1000; // 24시간
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 export interface EnrichedAnalysis {
   stockId:             string;

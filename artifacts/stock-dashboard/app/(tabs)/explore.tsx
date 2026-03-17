@@ -16,7 +16,7 @@ import { useStockPrice } from "@/context/StockPriceContext";
 import { UniverseStock } from "@/constants/stockUniverse";
 import { STOCKS } from "@/constants/stockData";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 type Market   = "ALL" | "NASDAQ" | "KOSPI" | "KOSDAQ";
 type ViewMode = "undervalued" | "all";

@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE    = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 const CACHE_KEY   = "@ai_signals_v2";
 const CACHE_TTL   = 10 * 60 * 1000;
 const FETCH_CHUNK = 5;

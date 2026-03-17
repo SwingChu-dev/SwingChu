@@ -39,7 +39,7 @@ const MARKET_COLORS: Record<string, string> = {
   KOSDAQ: "#F59E0B",
 };
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 export default function StockDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

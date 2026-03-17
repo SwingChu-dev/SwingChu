@@ -30,7 +30,7 @@ const EVAL_COLORS: Record<string, string> = {
   "강한 저평가": "#3B82F6",
 };
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 async function fetchDetail(ticker: string, market: string): Promise<StockDetail | null> {
   try {

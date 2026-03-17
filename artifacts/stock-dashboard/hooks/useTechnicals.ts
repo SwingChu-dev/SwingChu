@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 export interface Technicals {
   ma5:        number | null;

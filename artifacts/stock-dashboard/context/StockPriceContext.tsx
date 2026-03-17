@@ -11,7 +11,7 @@ import { AppState, AppStateStatus } from "react-native";
 
 const REFRESH_INTERVAL_MS = 30_000;
 const USD_KRW_FALLBACK    = 1450;
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 export interface LiveQuote {
   ticker:        string;

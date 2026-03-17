@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
+import { API_BASE } from "@/utils/apiBase";
 
 interface NewsItem {
   title: string;
