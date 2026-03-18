@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -336,7 +337,11 @@ export default function SignalsScreen() {
   const isDark = useColorScheme() === "dark";
   const c      = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
-  const { smartMoneySignals, loading, lastFetch, refresh } = useAISignals();
+  const { smartMoneySignals, loading, lastFetch, refresh, markAllSeen } = useAISignals();
+
+  useFocusEffect(useCallback(() => {
+    markAllSeen();
+  }, [markAllSeen]));
   const { watchlistStocks } = useWatchlist();
 
   const allSignals = useMemo(() => {

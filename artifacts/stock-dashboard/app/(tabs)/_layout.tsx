@@ -6,7 +6,7 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useSignals } from "@/context/SignalContext";
+import { useAISignals } from "@/context/AISignalContext";
 import { Text } from "react-native";
 
 function TabBadge({ count }: { count: number }) {
@@ -45,7 +45,7 @@ export default function TabLayout() {
   const safeAreaInsets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const { newCount } = useSignals();
+  const { newCount } = useAISignals();
 
   return (
     <Tabs

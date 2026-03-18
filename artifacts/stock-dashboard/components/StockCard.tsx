@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StockInfo, USD_KRW_RATE } from "@/constants/stockData";
-import { SIGNAL_META, SmartMoneySignal } from "@/constants/smartMoney";
 import { LiveQuote } from "@/context/StockPriceContext";
 import { calcBoxPosition } from "@/utils/boxPosition";
 
@@ -23,7 +22,7 @@ function formatPrice(p: number): string {
 interface StockCardProps {
   stock:    StockInfo;
   quote:    LiveQuote | null;
-  signal:   SmartMoneySignal | null;
+  signal?:  null;
   colors:   any;
   isDark:   boolean;
   onPress:  () => void;
@@ -39,7 +38,6 @@ const USE_NATIVE = Platform.OS !== "web";
 function StockCardInner({
   stock,
   quote,
-  signal,
   colors: c,
   isDark,
   onPress,
@@ -73,7 +71,6 @@ function StockCardInner({
 
   const boxPos   = calcBoxPosition(stock.boxRange, quote);
   const boxColor = boxPos === "저점권" ? c.positiveGreen : boxPos === "고점권" ? c.positive : c.warning;
-  const signalMeta = signal ? SIGNAL_META[signal.type] : null;
 
   return (
     <View style={styles.wrapper}>
@@ -108,7 +105,6 @@ function StockCardInner({
               <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
                 {stock.name}
               </Text>
-              {signal?.isNew && <View style={styles.newDot} />}
             </View>
             <Text style={[styles.ticker, { color: c.textSecondary }]}>
               {stock.ticker}  ·  {stock.market}
@@ -116,22 +112,9 @@ function StockCardInner({
           </View>
 
           <View style={styles.mid}>
-            {signalMeta && signal ? (
-              <View style={[
-                styles.signalBadge,
-                { backgroundColor: isDark
-                    ? (signal.type === "세력이탈" || signal.type === "분산중" ? "#1B2744" : "#3A1218")
-                    : signalMeta.bg
-                }
-              ]}>
-                <Ionicons name={signalMeta.icon as any} size={11} color={signalMeta.color} />
-                <Text style={[styles.signalText, { color: signalMeta.color }]}>{signal.type}</Text>
-              </View>
-            ) : (
-              <View style={[styles.boxBadge, { backgroundColor: boxColor + "20" }]}>
-                <Text style={[styles.boxText, { color: boxColor }]}>{boxPos}</Text>
-              </View>
-            )}
+            <View style={[styles.boxBadge, { backgroundColor: boxColor + "20" }]}>
+              <Text style={[styles.boxText, { color: boxColor }]}>{boxPos}</Text>
+            </View>
           </View>
 
           <View style={styles.right}>
@@ -168,8 +151,7 @@ const StockCard = memo(StockCardInner, (prev, next) => {
     prev.stock.id    === next.stock.id   &&
     prev.isDark      === next.isDark     &&
     prev.colors      === next.colors     &&
-    prev.quote       === next.quote      &&
-    prev.signal      === next.signal
+    prev.quote       === next.quote
   );
 });
 
@@ -203,18 +185,8 @@ const styles = StyleSheet.create({
   left: { flex: 1, gap: 4, marginRight: 8 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   name: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  newDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#F04452" },
   ticker: { fontSize: 12, fontFamily: "Inter_400Regular" },
   mid: { alignItems: "center", marginRight: 12 },
-  signalBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  signalText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   boxBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   boxText: { fontSize: 10, fontFamily: "Inter_500Medium" },
   right: { alignItems: "flex-end", gap: 3 },

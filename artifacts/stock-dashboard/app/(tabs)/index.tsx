@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useWatchlist } from "@/context/WatchlistContext";
-import { useSignals } from "@/context/SignalContext";
+import { useAISignals } from "@/context/AISignalContext";
 import { useStockPrice } from "@/context/StockPriceContext";
 import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const [editMode, setEditMode] = useState(false);
 
   const { watchlistStocks, removeStock } = useWatchlist();
-  const { newCount, getSignalForStock } = useSignals();
+  const { newCount } = useAISignals();
   const { getQuote, refresh, quotes } = useStockPrice();
   const vix = useVix();
 
@@ -158,7 +158,7 @@ export default function HomeScreen() {
               stock={stock}
               // Pass computed props so React.memo can skip re-renders correctly
               quote={getQuote(stock.ticker, stock.market)}
-              signal={getSignalForStock(stock.id) ?? null}
+              signal={null}
               colors={c}
               isDark={isDark}
               editMode={editMode}

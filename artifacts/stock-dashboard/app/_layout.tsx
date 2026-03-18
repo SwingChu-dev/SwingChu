@@ -15,7 +15,6 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { useColorScheme, View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import Colors from "@/constants/colors";
 import { WatchlistProvider, useWatchlist } from "@/context/WatchlistContext";
-import { SignalProvider } from "@/context/SignalContext";
 import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
@@ -188,9 +187,7 @@ export default function RootLayout() {
                   <AISignalBridge>
                     <PriceBridge>
                       <AlertProvider>
-                        <SignalProvider>
-                          <RootLayoutNav />
-                        </SignalProvider>
+                        <RootLayoutNav />
                       </AlertProvider>
                     </PriceBridge>
                   </AISignalBridge>

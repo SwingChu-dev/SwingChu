@@ -4,12 +4,15 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { API_BASE } from "@/utils/apiBase";
-const CACHE_KEY   = "@ai_signals_v2";
+
+const CACHE_KEY   = "@ai_signals_v3";
+const SEEN_KEY    = "@ai_signals_seen_v3";
 const CACHE_TTL   = 10 * 60 * 1000;
 const FETCH_CHUNK = 5;
 
@@ -57,7 +60,9 @@ interface AISignalContextType {
   smartMoneySignals: Record<string, AISmartMoneySignal>;
   loading:           boolean;
   lastFetch:         number | null;
+  newCount:          number;
   refresh:           () => void;
+  markAllSeen:       () => void;
 }
 
 const AISignalContext = createContext<AISignalContextType | null>(null);
@@ -73,10 +78,34 @@ export function AISignalProvider({ children, watchlist }: Props) {
   const [smartMoneySignals, setSmartMoneySignals] = useState<Record<string, AISmartMoneySignal>>({});
   const [loading,   setLoading]   = useState(false);
   const [lastFetch, setLastFetch] = useState<number | null>(null);
+  const [seenKeys,  setSeenKeys]  = useState<Set<string>>(new Set());
+
+  // force-refresh 플래그: stale closure 문제 우회
+  const forceRef = useRef(false);
+
+  // 캐시/seen 초기 로드
+  useEffect(() => {
+    AsyncStorage.getItem(CACHE_KEY).then(raw => {
+      if (!raw) return;
+      try {
+        const { smart, ts } = JSON.parse(raw);
+        if (Date.now() - ts < CACHE_TTL * 3) {
+          setSmartMoneySignals(smart ?? {});
+          setLastFetch(ts);
+        }
+      } catch {}
+    });
+    AsyncStorage.getItem(SEEN_KEY).then(raw => {
+      if (!raw) return;
+      try { setSeenKeys(new Set(JSON.parse(raw))); } catch {}
+    });
+  }, []);
 
   const fetchSignals = useCallback(async () => {
     if (watchlist.length === 0) return;
-    if (lastFetch && Date.now() - lastFetch < CACHE_TTL) return;
+    // forceRef 플래그가 없으면 TTL 체크
+    if (!forceRef.current && lastFetch && Date.now() - lastFetch < CACHE_TTL) return;
+    forceRef.current = false;
 
     setLoading(true);
     try {
@@ -94,6 +123,7 @@ export function AISignalProvider({ children, watchlist }: Props) {
 
           const data: any[] = await resp.json();
           for (const d of data) {
+            if (!d.smartMoney?.type) continue;
             newSmart[d.ticker] = {
               ticker:           d.ticker,
               market:           d.market,
@@ -101,8 +131,8 @@ export function AISignalProvider({ children, watchlist }: Props) {
               strength:         d.smartMoney.strength,
               institutionalNet: d.smartMoney.institutionalNet ?? 0,
               foreignerNet:     d.smartMoney.foreignerNet     ?? 0,
-              summary:          d.smartMoney.summary,
-              signals:          d.smartMoney.signals,
+              summary:          d.smartMoney.summary          ?? "",
+              signals:          d.smartMoney.signals          ?? [],
               indicators:       d.indicators,
               generatedAt:      d.generatedAt,
             };
@@ -118,25 +148,10 @@ export function AISignalProvider({ children, watchlist }: Props) {
       const now = Date.now();
       setLastFetch(now);
 
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
-        smart: newSmart, ts: now,
-      }));
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ smart: newSmart, ts: now }));
     } catch {}
     setLoading(false);
   }, [watchlist, lastFetch]);
-
-  useEffect(() => {
-    AsyncStorage.getItem(CACHE_KEY).then(raw => {
-      if (!raw) return;
-      try {
-        const { smart, ts } = JSON.parse(raw);
-        if (Date.now() - ts < CACHE_TTL * 3) {
-          setSmartMoneySignals(smart ?? {});
-          setLastFetch(ts);
-        }
-      } catch {}
-    });
-  }, []);
 
   useEffect(() => {
     fetchSignals();
@@ -144,14 +159,28 @@ export function AISignalProvider({ children, watchlist }: Props) {
     return () => clearInterval(id);
   }, [fetchSignals]);
 
+  // 새 신호 카운트: 매수/매도 신호 중 아직 안 본 것
+  const newCount = Object.values(smartMoneySignals).filter(s => {
+    const isActionable = s.type !== "관망";
+    const key = `${s.ticker}:${s.generatedAt}`;
+    return isActionable && !seenKeys.has(key);
+  }).length;
+
+  const markAllSeen = useCallback(() => {
+    const keys = Object.values(smartMoneySignals).map(s => `${s.ticker}:${s.generatedAt}`);
+    const next = new Set(keys);
+    setSeenKeys(next);
+    AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...next]));
+  }, [smartMoneySignals]);
+
   const refresh = useCallback(() => {
+    forceRef.current = true;
     setLastFetch(null);
-    fetchSignals();
-  }, [fetchSignals]);
+  }, []);
 
   return (
     <AISignalContext.Provider value={{
-      smartMoneySignals, loading, lastFetch, refresh,
+      smartMoneySignals, loading, lastFetch, newCount, refresh, markAllSeen,
     }}>
       {children}
     </AISignalContext.Provider>
