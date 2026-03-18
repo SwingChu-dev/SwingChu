@@ -337,7 +337,7 @@ export default function SignalsScreen() {
   const isDark = useColorScheme() === "dark";
   const c      = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
-  const { smartMoneySignals, loading, lastFetch, refresh, markAllSeen } = useAISignals();
+  const { smartMoneySignals, loading, loadingTicker, lastFetch, error, refresh, markAllSeen } = useAISignals();
 
   useFocusEffect(useCallback(() => {
     markAllSeen();
@@ -401,15 +401,36 @@ export default function SignalsScreen() {
           <CycleGuide isDark={isDark} c={c} />
         </View>
 
+        {/* 에러 */}
+        {error && !loading && (
+          <View style={[styles.errorWrap, { backgroundColor: isDark ? "#2C1F1F" : "#FEF0F1" }]}>
+            <Ionicons name="warning-outline" size={20} color="#F04452" />
+            <Text style={[styles.errorText, { color: "#F04452" }]}>{error}</Text>
+            <TouchableOpacity onPress={refresh} style={[styles.errorRetry, { backgroundColor: "#F0445218" }]}>
+              <Text style={{ color: "#F04452", fontFamily: "Inter_600SemiBold", fontSize: 13 }}>다시 시도</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* 로딩 */}
         {loading && allSignals.length === 0 && (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color="#7C3AED" />
             <Text style={[styles.loadingText, { color: c.textSecondary }]}>
-              AI 신호 분석 중...
+              AI 신호 분석 중{loadingTicker ? ` — ${loadingTicker}` : "..."}
             </Text>
             <Text style={[styles.loadingSubText, { color: c.textTertiary }]}>
-              Claude가 실시간 지표를 분석하고 있습니다
+              Claude가 기술지표를 분석하고 있습니다{"\n"}종목당 약 5~15초 소요
+            </Text>
+          </View>
+        )}
+
+        {/* 부분 로딩 중 */}
+        {loading && allSignals.length > 0 && loadingTicker && (
+          <View style={[styles.partialLoadWrap, { backgroundColor: isDark ? "#1A1D2E" : "#F0F4FF" }]}>
+            <ActivityIndicator size="small" color="#7C3AED" />
+            <Text style={[styles.partialLoadText, { color: "#7C3AED" }]}>
+              {loadingTicker} 분석 중...
             </Text>
           </View>
         )}
@@ -494,8 +515,15 @@ const styles = StyleSheet.create({
   refreshBtn: { padding: 6 },
 
   loadingWrap: { alignItems: "center", paddingVertical: 60, gap: 12 },
-  loadingText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  loadingSubText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  loadingText: { fontSize: 16, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  loadingSubText: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 18 },
+
+  errorWrap: { marginHorizontal: 16, marginBottom: 12, borderRadius: 12, padding: 16, gap: 8, alignItems: "center" },
+  errorText: { fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "center", lineHeight: 18 },
+  errorRetry: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, marginTop: 4 },
+
+  partialLoadWrap: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 10 },
+  partialLoadText: { fontSize: 12, fontFamily: "Inter_500Medium" },
 
   section: { marginBottom: 8 },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 20, paddingVertical: 10 },
