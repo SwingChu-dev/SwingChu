@@ -10,9 +10,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STOCKS, StockInfo, Market } from "@/constants/stockData";
 import { UniverseStock } from "@/constants/stockUniverse";
 
-const STORAGE_KEY = "@watchlist_ids_v2";
-const CUSTOM_KEY = "@custom_stocks_v2";
-const DEFAULT_IDS = STOCKS.map((s) => s.id);
+const STORAGE_KEY    = "@watchlist_ids_v3";
+const CUSTOM_KEY     = "@custom_stocks_v3";
+const STORAGE_KEY_V2 = "@watchlist_ids_v2";
+const CUSTOM_KEY_V2  = "@custom_stocks_v2";
+const DEFAULT_IDS    = STOCKS.map((s) => s.id);
 
 function createStubFromUniverse(us: UniverseStock): StockInfo {
   const cp = us.currentPrice;
@@ -85,28 +87,49 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const [customStocks,  setCustomStocks]  = useState<Record<string, StockInfo>>({});
 
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, CUSTOM_KEY]).then(([[, rawIds], [, rawCustom]]) => {
-      if (rawIds) {
-        try {
-          const saved = JSON.parse(rawIds) as string[];
-          if (saved.length > 0) {
-            // 새로 추가된 DEFAULT_IDS가 있으면 기존 목록 끝에 병합
-            const newDefaults = DEFAULT_IDS.filter((id) => !saved.includes(id));
-            const merged = newDefaults.length > 0 ? [...saved, ...newDefaults] : saved;
-            setWatchlistIds(merged);
-            if (newDefaults.length > 0) {
-              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    AsyncStorage.multiGet([STORAGE_KEY, CUSTOM_KEY, STORAGE_KEY_V2, CUSTOM_KEY_V2]).then(
+      ([[, rawIds], [, rawCustom], [, rawIdsV2], [, rawCustomV2]]) => {
+        let loadedIds: string[] | null  = null;
+        let loadedCustom: Record<string, StockInfo> | null = null;
+
+        // v3 우선 로드
+        if (rawIds) {
+          try {
+            const parsed = JSON.parse(rawIds);
+            if (Array.isArray(parsed)) loadedIds = parsed;
+          } catch {}
+        }
+        if (rawCustom) {
+          try {
+            const parsed = JSON.parse(rawCustom);
+            if (parsed && typeof parsed === "object") loadedCustom = parsed;
+          } catch {}
+        }
+
+        // v3 없으면 v2에서 마이그레이션 (병합 로직 제거하고 그대로 로드)
+        if (!loadedIds && rawIdsV2) {
+          try {
+            const parsed = JSON.parse(rawIdsV2);
+            if (Array.isArray(parsed)) {
+              loadedIds = parsed;
+              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
             }
-          }
-        } catch {}
+          } catch {}
+        }
+        if (!loadedCustom && rawCustomV2) {
+          try {
+            const parsed = JSON.parse(rawCustomV2);
+            if (parsed && typeof parsed === "object") {
+              loadedCustom = parsed;
+              AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(parsed));
+            }
+          } catch {}
+        }
+
+        if (loadedIds) setWatchlistIds(loadedIds);
+        if (loadedCustom) setCustomStocks(loadedCustom);
       }
-      if (rawCustom) {
-        try {
-          const parsed = JSON.parse(rawCustom) as Record<string, StockInfo>;
-          setCustomStocks(parsed);
-        } catch {}
-      }
-    });
+    );
   }, []);
 
   const saveIds = useCallback((ids: string[]) => {
