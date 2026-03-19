@@ -3,40 +3,9 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useAISignals } from "@/context/AISignalContext";
-import { Text } from "react-native";
-
-function TabBadge({ count }: { count: number }) {
-  if (count === 0) return null;
-  return (
-    <View style={badge.wrap}>
-      <Text style={badge.text}>{count > 9 ? "9+" : count}</Text>
-    </View>
-  );
-}
-
-const badge = StyleSheet.create({
-  wrap: {
-    position: "absolute",
-    top: -4,
-    right: -8,
-    backgroundColor: "#F04452",
-    borderRadius: 8,
-    minWidth: 15,
-    height: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 3,
-  },
-  text: {
-    color: "#fff",
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-  },
-});
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -45,7 +14,6 @@ export default function TabLayout() {
   const safeAreaInsets = useSafeAreaInsets();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const { newCount } = useAISignals();
 
   return (
     <Tabs
@@ -106,22 +74,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="signals"
-        options={{
-          title: "세력감지",
-          tabBarIcon: ({ color, focused }) => (
-            <View>
-              {isIOS ? (
-                <SymbolView name={focused ? "eye.fill" : "eye"} tintColor={color} size={24} />
-              ) : (
-                <Ionicons name={focused ? "eye" : "eye-outline"} size={22} color={color} />
-              )}
-              <TabBadge count={newCount} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="more"
         options={{
           title: "더보기",
@@ -142,21 +94,9 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ── 더보기에서 접근하는 숨겨진 탭 (탭바에 표시 안 됨) ── */}
-      <Tabs.Screen
-        name="analysis"
-        options={{
-          title: "분석",
-          tabBarButton: () => null,
-        }}
-      />
-      <Tabs.Screen
-        name="strategy"
-        options={{
-          title: "전략",
-          tabBarButton: () => null,
-        }}
-      />
+      <Tabs.Screen name="signals"  options={{ href: null }} />
+      <Tabs.Screen name="analysis" options={{ href: null }} />
+      <Tabs.Screen name="strategy" options={{ href: null }} />
     </Tabs>
   );
 }
