@@ -22,26 +22,35 @@ import { useVix } from "@/hooks/useVix";
 
 type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "고점권" | "세력진입";
 
-// 구간 결정: AI 지표 우선, 없으면 boxRange 기반
+// 구간 결정: AI 지표(MA5/20/60 + RSI + BB) 우선, 없으면 boxRange 기반
 function resolveZone(
   sig: AISmartMoneySignal | undefined,
   stock: any,
   quote: any
 ): "저점권" | "중간권" | "고점권" {
   if (sig?.indicators) {
-    const ind = sig.indicators;
-    const bbRange = ind.bbUpper - ind.bbLower;
-    const bbPos   = bbRange > 0 ? (ind.currentPrice - ind.bbLower) / bbRange : 0.5;
+    const { rsi14, ma5, ma20, ma60, bbUpper, bbLower, currentPrice } = sig.indicators;
+
+    const bbRange    = bbUpper - bbLower;
+    const bbPos      = bbRange > 0 ? (currentPrice - bbLower) / bbRange : 0.5;
+    const isFullBull = ma5 > ma20 && ma20 > ma60;
+    const isFullBear = ma5 < ma20 && ma20 < ma60;
+
     const lowScore =
-      (ind.rsi14 <= 35 ? 2 : ind.rsi14 <= 42 ? 1 : 0) +
-      (ind.pct52Range <= 0.20 ? 2 : ind.pct52Range <= 0.35 ? 1 : 0) +
-      (bbPos <= 0.25 ? 1 : 0);
+      (isFullBear ? 2 : ma5 < ma20 ? 1 : 0) +
+      (currentPrice < ma20 ? 1 : 0) +
+      (currentPrice < ma60 ? 1 : 0) +
+      (rsi14 <= 35 ? 2 : rsi14 <= 45 ? 1 : 0) +
+      (bbPos <= 0.20 ? 1 : 0);
+
     const highScore =
-      (ind.rsi14 >= 70 ? 2 : ind.rsi14 >= 63 ? 1 : 0) +
-      (ind.pct52Range >= 0.80 ? 2 : ind.pct52Range >= 0.68 ? 1 : 0) +
-      (bbPos >= 0.75 ? 1 : 0);
-    if (lowScore  >= 2) return "저점권";
-    if (highScore >= 2) return "고점권";
+      (isFullBull ? 2 : ma5 > ma20 ? 1 : 0) +
+      (currentPrice > ma20 && currentPrice > ma60 ? 1 : 0) +
+      (rsi14 >= 70 ? 2 : rsi14 >= 63 ? 1 : 0) +
+      (bbPos >= 0.80 ? 1 : 0);
+
+    if (lowScore  >= 3) return "저점권";
+    if (highScore >= 3) return "고점권";
     return "중간권";
   }
   return calcBoxPosition(stock.boxRange, quote);

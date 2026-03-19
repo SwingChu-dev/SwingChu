@@ -145,6 +145,7 @@ export interface TechnicalIndicators {
   bbWidth: number;
   ma5: number;
   ma20: number;
+  ma60: number;
   volume: number;
   volumeAvg20: number;
   volumeRatio: number;
@@ -192,11 +193,13 @@ async function analyzeWithAI(
 
 ## 기술적 지표
 - RSI-14: ${ind.rsi14}  (30↓=과매도, 70↑=과매수)
-- MACD히스토그램: ${ind.macdHistogram} (양수=상승모멘텀, 음수=하락)
-- MA5: ${isKorean ? ind.ma5.toLocaleString() : ind.ma5.toFixed(2)} / MA20: ${isKorean ? ind.ma20.toLocaleString() : ind.ma20.toFixed(2)} (MA5>MA20=정배열)
-- 볼린저밴드폭: ${ind.bbWidth.toFixed(1)}%  BB상단: ${isKorean ? ind.bbUpper.toLocaleString() : ind.bbUpper.toFixed(2)}
+- MACD히스토그램: ${ind.macdHistogram.toFixed(3)} (양수=상승모멘텀, 음수=하락)
+- MA5: ${isKorean ? ind.ma5.toLocaleString() : ind.ma5.toFixed(2)} / MA20: ${isKorean ? ind.ma20.toLocaleString() : ind.ma20.toFixed(2)} / MA60: ${isKorean ? ind.ma60.toLocaleString() : ind.ma60.toFixed(2)}
+- MA배열: ${ind.ma5 > ind.ma20 && ind.ma20 > ind.ma60 ? "완전정배열(강세)" : ind.ma5 < ind.ma20 && ind.ma20 < ind.ma60 ? "완전역배열(약세)" : ind.ma5 > ind.ma20 ? "단기정배열" : "단기역배열"}
+- 현재가 위치: MA5 ${ind.currentPrice >= ind.ma5 ? "위" : "아래"} / MA20 ${ind.currentPrice >= ind.ma20 ? "위" : "아래"} / MA60 ${ind.currentPrice >= ind.ma60 ? "위" : "아래"}
+- 볼린저밴드폭: ${ind.bbWidth.toFixed(1)}%  BB하단: ${isKorean ? ind.bbLower.toLocaleString() : ind.bbLower.toFixed(2)} / BB상단: ${isKorean ? ind.bbUpper.toLocaleString() : ind.bbUpper.toFixed(2)}
 - 거래량: 20일평균 대비 ${ind.volumeRatio.toFixed(2)}배
-- 52주범위위치: ${Math.round(ind.pct52Range * 100)}%  (고점대비: ${ind.distFrom52High.toFixed(1)}%)
+- 52주범위위치: ${Math.round(ind.pct52Range * 100)}% (고점대비: ${ind.distFrom52High.toFixed(1)}%)
 
 ## 응답 형식 (JSON만 반환)
 {
@@ -206,12 +209,12 @@ async function analyzeWithAI(
   "signals": ["지표 기반 신호 3-5개 (구체적 수치 포함)"]
 }
 
-## 판단 기준 (기술 지표만으로 판단, 관망은 마지막 수단)
-- 세력진입: RSI 35~55 + 거래량 1.8배+ + MACD히스토 양전환 → 저점 매집 패턴
-- 세력이탈: RSI 65+ + 거래량 1.8배+ + MACD히스토 하향 + BB상단 근접 → 고점 분산
-- 매집중: MACD 상향 + 거래량 1.3배+ + 52주범위 50% 이하
-- 분산중: 52주범위 70%+ + 거래량 증가 + 하락 + BB상단 이탈
-- 관망: 위 어떤 패턴도 명확하지 않을 때만`;
+## 판단 기준 (MA5/20/60 정배열 우선 판단, 관망은 마지막 수단)
+- 세력진입: RSI 35~55 + 거래량 1.8배+ + MACD히스토 양전환 + 현재가 MA60 지지 반등 → 저점 매집
+- 세력이탈: RSI 65+ + 거래량 1.8배+ + 완전정배열 과열 + BB상단 이탈 → 고점 분산
+- 매집중: MA5 > MA20 반전 시작 + MACD 양전환 + 거래량 1.3배+ + 현재가 MA20 아래~근처
+- 분산중: 완전정배열→역배열 전환 중 + 거래량 증가 + 하락 + BB상단 이탈
+- 관망: MA 배열 혼재, 거래량 평범, 방향성 불명확`;
 
   try {
     const msg = await anthropic.messages.create({
@@ -246,30 +249,45 @@ function fallbackSignal(
   institutionalNet: number,
   foreignerNet: number,
 ): StockSignal["smartMoney"] {
-  const { rsi14, volumeRatio, changePercent, pct52Range, macdHistogram } = ind;
+  const { rsi14, volumeRatio, changePercent, macdHistogram, ma5, ma20, ma60, currentPrice } = ind;
+
+  const isFullBull  = ma5 > ma20 && ma20 > ma60;  // 완전 정배열
+  const isFullBear  = ma5 < ma20 && ma20 < ma60;  // 완전 역배열
+  const priceAboveMA60 = currentPrice >= ma60;
+  const priceNearMA60  = Math.abs(currentPrice - ma60) / ma60 < 0.03; // MA60 ±3%
 
   let type: SignalType;
   let strength: SignalStrength;
-  if (rsi14 >= 35 && rsi14 <= 55 && volumeRatio >= 1.8 && macdHistogram > 0) {
-    type = "세력진입"; strength = "강";
-  } else if (rsi14 >= 65 && volumeRatio >= 1.8 && macdHistogram < 0) {
-    type = "세력이탈"; strength = "강";
-  } else if (macdHistogram > 0 && volumeRatio >= 1.3 && pct52Range < 0.5) {
+
+  // 세력진입: MA60 지지 + RSI 중립 + 거래량 급증 + MACD 상향전환
+  if (rsi14 >= 33 && rsi14 <= 57 && volumeRatio >= 1.8 && macdHistogram > 0
+      && (priceNearMA60 || (!isFullBull && priceAboveMA60))) {
+    type = "세력진입"; strength = volumeRatio >= 2.5 ? "강" : "중";
+  // 세력이탈: 완전정배열 과열 + RSI 과매수 + 거래량 급증 + MACD 꺾임
+  } else if (isFullBull && rsi14 >= 65 && volumeRatio >= 1.8 && macdHistogram < 0) {
+    type = "세력이탈"; strength = rsi14 >= 70 ? "강" : "중";
+  // 매집중: MA5가 MA20 상향 돌파 시작 + MACD 양전환 + 거래량 증가
+  } else if (ma5 > ma20 && macdHistogram > 0 && volumeRatio >= 1.3 && !isFullBull) {
     type = "매집중"; strength = volumeRatio >= 2 ? "강" : "중";
-  } else if (pct52Range >= 0.7 && changePercent < 0 && volumeRatio >= 1.3) {
+  // 분산중: 완전정배열→역배열 전환 + 하락 + 거래량 증가
+  } else if (isFullBull && changePercent < -0.5 && volumeRatio >= 1.3) {
+    type = "분산중"; strength = "중";
+  } else if (isFullBear && changePercent < -0.5 && volumeRatio >= 1.5) {
     type = "분산중"; strength = "중";
   } else {
     type = "관망"; strength = "약";
   }
 
+  const alignment = isFullBull ? "완전정배열" : isFullBear ? "완전역배열" : ma5 > ma20 ? "단기정배열" : "단기역배열";
   return {
     type, strength, institutionalNet, foreignerNet,
-    summary: `RSI ${rsi14}, 거래량 ${volumeRatio.toFixed(1)}배 기반 규칙 분석.`,
+    summary: `RSI ${rsi14}, MA ${alignment}, 거래량 ${volumeRatio.toFixed(1)}배 기반 규칙 분석.`,
     signals: [
       `RSI-14: ${rsi14}`,
+      `MA배열: ${alignment} (5선 ${ma5 > ma60 ? ">" : "<"} 60선)`,
       `거래량: 평균 대비 ${volumeRatio.toFixed(1)}배`,
-      `MACD 히스토그램: ${macdHistogram > 0 ? "+" : ""}${macdHistogram.toFixed(2)}`,
-      `52주 범위 위치: ${Math.round(pct52Range * 100)}%`,
+      `MACD 히스토그램: ${macdHistogram > 0 ? "+" : ""}${macdHistogram.toFixed(3)}`,
+      `현재가 vs MA60: ${priceNearMA60 ? "MA60 근접(±3%)" : priceAboveMA60 ? "MA60 위" : "MA60 아래"}`,
     ],
   };
 }
@@ -332,6 +350,7 @@ router.get("/stocks/signals", async (req, res) => {
       const volumeRatio = volumeAvg > 0 ? Math.round((currentVol / volumeAvg) * 100) / 100 : 1;
       const ma5  = calcSma(allCloses, 5);
       const ma20 = calcSma(allCloses, 20);
+      const ma60 = calcSma(allCloses, 60);
 
       const high52w = Math.max(currentClose, ...closes.map(c => c));
       const low52w  = Math.min(currentClose, ...closes.map(c => c));
@@ -355,6 +374,7 @@ router.get("/stocks/signals", async (req, res) => {
         bbWidth:       bb.bw,
         ma5,
         ma20,
+        ma60,
         volume:        currentVol,
         volumeAvg20:   volumeAvg,
         volumeRatio,

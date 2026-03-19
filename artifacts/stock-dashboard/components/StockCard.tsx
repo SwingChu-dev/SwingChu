@@ -19,29 +19,36 @@ function formatPrice(p: number): string {
   return p.toLocaleString();
 }
 
-// AI 지표 기반 정밀 구간 산출
-// RSI + 52주 범위 위치 + BB 위치 + 거래량을 종합 판단
+// MA5/20/60 + RSI + BB 종합 구간 판단
+// 단기~중기 이동평균 배열 우선, RSI·BB로 보정
 function zoneFromIndicators(ind: AISmartMoneySignal["indicators"]): "저점권" | "중간권" | "고점권" {
-  const { rsi14, pct52Range, bbMid, bbUpper, bbLower, currentPrice } = ind;
+  const { rsi14, ma5, ma20, ma60, bbUpper, bbLower, currentPrice } = ind;
 
-  // BB 위치 (0~1: 하단~상단)
   const bbRange = bbUpper - bbLower;
   const bbPos   = bbRange > 0 ? (currentPrice - bbLower) / bbRange : 0.5;
 
-  // 저점권: RSI ≤ 40 + 52주 하위 35% + BB 하단
+  const isFullBull = ma5 > ma20 && ma20 > ma60; // 완전 정배열
+  const isFullBear = ma5 < ma20 && ma20 < ma60; // 완전 역배열
+
+  // ── 저점권 스코어 ────────────────────────────────────────────
+  // MA 역배열 / 현재가 각 선 아래 / RSI 과매도
   const lowScore =
-    (rsi14 <= 35 ? 2 : rsi14 <= 42 ? 1 : 0) +
-    (pct52Range <= 0.20 ? 2 : pct52Range <= 0.35 ? 1 : 0) +
-    (bbPos <= 0.25 ? 1 : 0);
+    (isFullBear ? 2 : ma5 < ma20 ? 1 : 0) +           // MA 배열
+    (currentPrice < ma20 ? 1 : 0) +                    // 단기 이평 아래
+    (currentPrice < ma60 ? 1 : 0) +                    // 중기 이평 아래
+    (rsi14 <= 35 ? 2 : rsi14 <= 45 ? 1 : 0) +         // RSI 과매도
+    (bbPos <= 0.20 ? 1 : 0);                           // BB 하단
 
-  // 고점권: RSI ≥ 65 + 52주 상위 70% + BB 상단
+  // ── 고점권 스코어 ────────────────────────────────────────────
+  // MA 완전 정배열 + RSI 과매수 + BB 상단
   const highScore =
-    (rsi14 >= 70 ? 2 : rsi14 >= 63 ? 1 : 0) +
-    (pct52Range >= 0.80 ? 2 : pct52Range >= 0.68 ? 1 : 0) +
-    (bbPos >= 0.75 ? 1 : 0);
+    (isFullBull ? 2 : ma5 > ma20 ? 1 : 0) +           // MA 배열
+    (currentPrice > ma20 && currentPrice > ma60 ? 1 : 0) + // 이평 위
+    (rsi14 >= 70 ? 2 : rsi14 >= 63 ? 1 : 0) +         // RSI 과매수
+    (bbPos >= 0.80 ? 1 : 0);                           // BB 상단
 
-  if (lowScore  >= 2) return "저점권";
-  if (highScore >= 2) return "고점권";
+  if (lowScore  >= 3) return "저점권";
+  if (highScore >= 3) return "고점권";
   return "중간권";
 }
 

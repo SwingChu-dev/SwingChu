@@ -11,8 +11,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { API_BASE } from "@/utils/apiBase";
 
-const CACHE_KEY  = "@ai_signals_v4";
-const SEEN_KEY   = "@ai_signals_seen_v4";
+const CACHE_KEY  = "@ai_signals_v5";
+const SEEN_KEY   = "@ai_signals_seen_v5";
 const CACHE_TTL  = 10 * 60 * 1000;
 
 export type SignalType     = "세력진입" | "세력이탈" | "매집중" | "분산중" | "관망";
@@ -29,6 +29,7 @@ export interface TechnicalIndicators {
   bbWidth: number;
   ma5: number;
   ma20: number;
+  ma60: number;
   volume: number;
   volumeAvg20: number;
   volumeRatio: number;
