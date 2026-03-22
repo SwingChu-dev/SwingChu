@@ -13,9 +13,11 @@ export interface PriceAlert {
   ticker: string;
   market: string;
   name: string;
-  type: "above" | "below" | "rsi_overbought" | "rsi_oversold";
+  type: "above" | "below" | "rsi_overbought" | "rsi_oversold" | "profit_take";
   targetPrice?: number;
   targetRsi?: number;
+  buyPrice?: number;       // profit_take 용: 매수 기준가
+  targetProfitPct?: number; // profit_take 용: 목표 수익률 (%)
   triggered: boolean;
   triggeredAt?: string;
   createdAt: string;
@@ -108,6 +110,9 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
             shouldTrigger = true;
           } else if (alert.type === "rsi_oversold" && info.rsi && info.rsi <= (alert.targetRsi ?? 30)) {
             shouldTrigger = true;
+          } else if (alert.type === "profit_take" && alert.buyPrice && alert.targetProfitPct) {
+            const profitPct = ((info.priceKRW - alert.buyPrice) / alert.buyPrice) * 100;
+            if (profitPct >= alert.targetProfitPct) shouldTrigger = true;
           }
 
           if (shouldTrigger) {

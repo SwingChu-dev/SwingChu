@@ -115,6 +115,18 @@ export default function MoreScreen() {
           />
         </View>
 
+        {/* 글로벌 리스크 */}
+        <SectionHeader title="글로벌 리스크" />
+        <View style={styles.section}>
+          <MenuItem
+            icon="globe-outline"
+            iconColor="#FF6B00"
+            title="지경학적 리스크"
+            description="유가·금·달러 기반 복합 위험도 + IMEC 수혜/소외 분류"
+            onPress={() => router.push("/geopolitical-risk" as any)}
+          />
+        </View>
+
         {/* 앱 정보 */}
         <SectionHeader title="앱 정보" />
         <View style={styles.section}>

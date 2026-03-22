@@ -147,6 +147,10 @@ function RootLayoutNav() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="geopolitical-risk"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
       </Stack>
     </>
   );

@@ -22,33 +22,45 @@ export default function AlertBanner() {
   if (!triggeredAlert) return null;
 
   const { alert, currentPrice } = triggeredAlert;
-  const isUp = alert.type === "above" || alert.type === "rsi_overbought";
+  const isProfitTake = alert.type === "profit_take";
+  const isUp = alert.type === "above" || alert.type === "rsi_overbought" || isProfitTake;
 
-  const typeLabel = {
-    above: "목표가 도달",
-    below: "하한가 도달",
+  const typeLabel: Record<string, string> = {
+    above:          "목표가 도달",
+    below:          "하한가 도달",
     rsi_overbought: "RSI 과매수",
-    rsi_oversold: "RSI 과매도",
-  }[alert.type];
+    rsi_oversold:   "RSI 과매도",
+    profit_take:    "수익 목표 달성 🏆",
+  };
+
+  const bannerBg = isProfitTake ? "#854D0E" : "#1C1C2E";
+  const iconBg   = isProfitTake ? "#F59E0B" : isUp ? "#F04452" : "#1B63E8";
 
   return (
     <Animated.View
       style={[
         styles.banner,
-        { transform: [{ translateY: slideAnim }], top: 0 },
+        { transform: [{ translateY: slideAnim }], top: 0, backgroundColor: bannerBg },
       ]}
     >
-      <View style={[styles.iconWrap, { backgroundColor: isUp ? "#F04452" : "#1B63E8" }]}>
-        <Ionicons name={isUp ? "arrow-up" : "arrow-down"} size={16} color="#fff" />
+      <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+        <Ionicons name={isProfitTake ? "trophy" : isUp ? "arrow-up" : "arrow-down"} size={16} color="#fff" />
       </View>
       <View style={styles.body}>
         <Text style={styles.title}>
-          🔔 {typeLabel} — {alert.name}
+          {isProfitTake ? "🥇 " : "🔔 "}{typeLabel[alert.type] ?? "알림"} — {alert.name}
         </Text>
-        <Text style={styles.sub}>
-          현재가 ₩{currentPrice.toLocaleString()}
-          {alert.targetPrice ? `  |  목표 ₩${alert.targetPrice.toLocaleString()}` : ""}
-        </Text>
+        {isProfitTake ? (
+          <Text style={styles.sub}>
+            현재가 ₩{currentPrice.toLocaleString()}  |  수익 {alert.targetProfitPct}% 달성{"\n"}
+            💡 수익금 일부를 금 현물로 전환하세요
+          </Text>
+        ) : (
+          <Text style={styles.sub}>
+            현재가 ₩{currentPrice.toLocaleString()}
+            {alert.targetPrice ? `  |  목표 ₩${alert.targetPrice.toLocaleString()}` : ""}
+          </Text>
+        )}
       </View>
       <TouchableOpacity onPress={dismissTriggered} style={styles.close}>
         <Ionicons name="close" size={18} color="#fff" />
