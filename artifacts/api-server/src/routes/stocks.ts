@@ -1,5 +1,12 @@
 import { Router } from "express";
 import YahooFinanceClass from "yahoo-finance2";
+import {
+  isAvailable as kisAvailable,
+  fetchKisKrBatch,
+  fetchKisUsBatch,
+  type KisKrQuote,
+  type KisUsQuote,
+} from "../lib/kisProvider";
 
 export interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number }
 
@@ -441,37 +448,113 @@ router.get("/stocks/quotes", async (req, res) => {
   const krTickers = parsed.filter(p => p.market === "KOSPI" || p.market === "KOSDAQ");
   const usTickers = parsed.filter(p => p.market !== "KOSPI" && p.market !== "KOSDAQ");
 
-  // ── 국내주식: Yahoo Finance ────────────────────────────────────────────
+  const useKis = kisAvailable();
+
+  // ── 국내주식: KIS 우선 → Yahoo Finance 폴백 ──────────────────────────
   let krMap: Record<string, KrQuote> = {};
   if (krTickers.length > 0) {
-    const yMap = await yahooKrMultiQuote(krTickers.map(p => ({ ticker: p.ticker, market: p.market })));
-    Object.assign(krMap, yMap);
+    if (useKis) {
+      const kisResult = await fetchKisKrBatch(krTickers.map(p => p.ticker));
+      for (const [ticker, q] of Object.entries(kisResult)) {
+        krMap[ticker] = {
+          close:         q.price,
+          open:          q.open,
+          high:          q.high,
+          low:           q.low,
+          volume:        q.volume,
+          change:        q.change,
+          changePercent: q.changePercent,
+          prevClose:     q.prevClose,
+          high52w:       q.high52w,
+          low52w:        q.low52w,
+          date:          new Date().toISOString().split("T")[0],
+        };
+      }
+      // 실패 종목은 Yahoo Finance 폴백
+      const missing = krTickers.filter(p => !krMap[p.ticker]);
+      if (missing.length > 0) {
+        const yMap = await yahooKrMultiQuote(missing.map(p => ({ ticker: p.ticker, market: p.market })));
+        Object.assign(krMap, yMap);
+      }
+    } else {
+      const yMap = await yahooKrMultiQuote(krTickers.map(p => ({ ticker: p.ticker, market: p.market })));
+      Object.assign(krMap, yMap);
+    }
   }
 
-  // ── 미국주식: Yahoo Finance ───────────────────────────────────────────
+  // ── 미국주식: KIS 우선 → Yahoo Finance 폴백 ──────────────────────────
   let usMap: Record<string, any> = {};
   if (usTickers.length > 0) {
-    await Promise.allSettled(usTickers.map(async p => {
-      try {
-        const q = await yahooFinance.quote(p.yahooTicker);
-        if (q?.regularMarketPrice) usMap[p.ticker] = {
-          close: q.regularMarketPrice ?? 0,
-          open:  q.regularMarketOpen ?? 0,
-          high:  q.regularMarketDayHigh ?? 0,
-          low:   q.regularMarketDayLow ?? 0,
-          volume: q.regularMarketVolume ?? 0,
-          change: q.regularMarketChange ?? 0,
-          changePercent: q.regularMarketChangePercent ?? 0,
-          prevClose: q.regularMarketPreviousClose ?? 0,
-          high52w: q.fiftyTwoWeekHigh ?? 0,
-          low52w:  q.fiftyTwoWeekLow ?? 0,
-          _name: q.shortName ?? q.longName ?? p.ticker,
-          _currency: q.currency ?? "USD",
-          _avgVol: q.averageDailyVolume10Day ?? 0,
-          _fiftyAvg: q.fiftyDayAverage ?? 0,
+    if (useKis) {
+      const kisResult = await fetchKisUsBatch(usTickers.map(p => p.ticker));
+      for (const [ticker, q] of Object.entries(kisResult)) {
+        usMap[ticker] = {
+          close:         q.price,
+          open:          q.open,
+          high:          q.high,
+          low:           q.low,
+          volume:        q.volume,
+          change:        q.change,
+          changePercent: q.changePercent,
+          prevClose:     q.prevClose,
+          high52w:       q.high52w,
+          low52w:        q.low52w,
+          _name:         ticker,
+          _currency:     "USD",
+          _avgVol:       q.volume,
+          _fiftyAvg:     0,
+          _source:       "KIS",
         };
-      } catch {}
-    }));
+      }
+      // KIS 실패 → Yahoo Finance 폴백
+      const missing = usTickers.filter(p => !usMap[p.ticker]);
+      if (missing.length > 0) {
+        await Promise.allSettled(missing.map(async p => {
+          try {
+            const q = await yahooFinance.quote(p.yahooTicker);
+            if (q?.regularMarketPrice) usMap[p.ticker] = {
+              close: q.regularMarketPrice ?? 0,
+              open:  q.regularMarketOpen ?? 0,
+              high:  q.regularMarketDayHigh ?? 0,
+              low:   q.regularMarketDayLow ?? 0,
+              volume: q.regularMarketVolume ?? 0,
+              change: q.regularMarketChange ?? 0,
+              changePercent: q.regularMarketChangePercent ?? 0,
+              prevClose: q.regularMarketPreviousClose ?? 0,
+              high52w: q.fiftyTwoWeekHigh ?? 0,
+              low52w:  q.fiftyTwoWeekLow ?? 0,
+              _name: q.shortName ?? q.longName ?? p.ticker,
+              _currency: q.currency ?? "USD",
+              _avgVol: q.averageDailyVolume10Day ?? 0,
+              _fiftyAvg: q.fiftyDayAverage ?? 0,
+              _source: "Yahoo",
+            };
+          } catch {}
+        }));
+      }
+    } else {
+      await Promise.allSettled(usTickers.map(async p => {
+        try {
+          const q = await yahooFinance.quote(p.yahooTicker);
+          if (q?.regularMarketPrice) usMap[p.ticker] = {
+            close: q.regularMarketPrice ?? 0,
+            open:  q.regularMarketOpen ?? 0,
+            high:  q.regularMarketDayHigh ?? 0,
+            low:   q.regularMarketDayLow ?? 0,
+            volume: q.regularMarketVolume ?? 0,
+            change: q.regularMarketChange ?? 0,
+            changePercent: q.regularMarketChangePercent ?? 0,
+            prevClose: q.regularMarketPreviousClose ?? 0,
+            high52w: q.fiftyTwoWeekHigh ?? 0,
+            low52w:  q.fiftyTwoWeekLow ?? 0,
+            _name: q.shortName ?? q.longName ?? p.ticker,
+            _currency: q.currency ?? "USD",
+            _avgVol: q.averageDailyVolume10Day ?? 0,
+            _fiftyAvg: q.fiftyDayAverage ?? 0,
+          };
+        } catch {}
+      }));
+    }
   }
 
   try {
