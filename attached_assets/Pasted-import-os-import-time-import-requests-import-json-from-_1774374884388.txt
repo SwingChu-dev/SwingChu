@@ -1,0 +1,68 @@
+import os
+import time
+import requests
+import json
+from termcolor import colored # pip install termcolor 필요
+
+# --- 1. 설정 (Replit Secrets) ---
+APP_KEY = os.environ['APP_KEY']
+APP_SECRET = os.environ['APP_SECRET']
+URL_BASE = "https://openapi.koreainvestment.com:9443"
+
+def get_token():
+    url = f"{URL_BASE}/oauth2/tokenP"
+    res = requests.post(url, data=json.dumps({"grant_type": "client_credentials", "appkey": APP_KEY, "appsecret": APP_SECRET}))
+    return res.json()['access_token']
+
+TOKEN = get_token()
+
+# 데이터 저장용 (미니 차트용)
+price_history = {ticker: [] for ticker in ['EONR', 'NVDA', 'XLE', 'SOXX', 'URA']}
+
+def get_realtime_us(symbol):
+    url = f"{URL_BASE}/uapi/overseas-stock/v1/quotations/price"
+    headers = {"Content-Type":"application/json", "authorization":f"Bearer {TOKEN}", "appkey":APP_KEY, "appsecret":APP_SECRET, "tr_id":"HHDFS00000300"}
+    params = {"AUTH": "", "EXCD": "NAS", "SYMB": symbol}
+    try:
+        res = requests.get(url, headers=headers, params=params).json()
+        return float(res['output']['last']), float(res['output']['diff'])
+    except: return None, None
+
+def draw_chart(history):
+    """간이 텍스트 차트 생성"""
+    if len(history) < 2: return ""
+    chars = " ▂▃▄▅▆▇█"
+    min_p, max_p = min(history), max(history)
+    if max_p == min_p: return "───"
+    return "".join(chars[int((p - min_p) / (max_p - min_p) * 7)] for p in history[-10:])
+
+# --- 2. 메인 루프 ---
+print(colored("🚀 AI & 인프라 섹터 실시간 레이더 가동", "cyan", attrs=["bold"]))
+
+try:
+    while True:
+        os.system('clear')
+        print(f"⏰ 체크 시각: {time.strftime('%H:%M:%S')} | 기준: 한투 API 실시간")
+        print("=" * 60)
+        print(f"{'종목':<10} | {'현재가':<10} | {'변동':<8} | {'최근 흐름 (10회)'}")
+        print("-" * 60)
+
+        for ticker in price_history.keys():
+            price, diff = get_realtime_us(ticker)
+            if price is None: continue
+            
+            price_history[ticker].append(price)
+            chart = draw_chart(price_history[ticker])
+            
+            # 색상 결정 (상승 빨강, 하락 파랑)
+            color = "red" if diff > 0 else "blue" if diff < 0 else "white"
+            diff_str = f"{'+' if diff > 0 else ''}{diff}"
+            
+            print(f"{ticker:<10} | {colored(f'${price:>8.2f}', color)} | {colored(f'{diff_str:>8}', color)} | {chart}")
+
+        print("-" * 60)
+        print(colored("💡 에너지(XLE/URA)와 반도체(SOXX)의 '디커플링'을 주시하세요.", "yellow"))
+        time.sleep(15) # API 부하 방지 및 적정 갱신 주기
+
+except KeyboardInterrupt:
+    print("\n시스템 종료.")

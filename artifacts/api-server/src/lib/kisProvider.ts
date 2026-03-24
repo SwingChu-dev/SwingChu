@@ -24,9 +24,6 @@ export function isAvailable(): boolean {
   return !!(process.env.APP_KEY && process.env.APP_SECRET);
 }
 
-export function isBalanceAvailable(): boolean {
-  return isAvailable() && !!(process.env.CANO);
-}
 
 async function getToken(): Promise<string | null> {
   if (!isAvailable()) return null;
@@ -184,78 +181,6 @@ export async function fetchKisKrBatch(
     if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 150));
   }
   return result;
-}
-
-// ── 국내 주식 잔고 조회 ──────────────────────────────────────────────────
-export interface KisBalanceItem {
-  ticker:       string;  // 종목코드
-  name:         string;  // 종목명
-  qty:          number;  // 보유수량
-  avgPrice:     number;  // 매입평균가
-  currentPrice: number;  // 현재가
-  evalAmt:      number;  // 평가금액
-  purchaseAmt:  number;  // 매입금액
-  plAmt:        number;  // 평가손익금액
-  plRate:       number;  // 평가손익률 (%)
-}
-
-export interface KisBalanceSummary {
-  holdings:     KisBalanceItem[];
-  totalEvalAmt: number;  // 총 평가금액
-  totalPurchAmt:number;  // 총 매입금액
-  totalPlAmt:   number;  // 총 평가손익
-  totalPlRate:  number;  // 총 수익률
-}
-
-export async function fetchKisBalance(): Promise<KisBalanceSummary | null> {
-  if (!isBalanceAvailable()) return null;
-  const cano        = process.env.CANO!;
-  const acntPrdtCd  = process.env.ACNT_PRDT_CD ?? "01";
-
-  const json = await kisGet(
-    "/uapi/domestic-stock/v1/trading/inquire-balance",
-    "TTTC8434R",
-    {
-      CANO:              cano,
-      ACNT_PRDT_CD:      acntPrdtCd,
-      AFHR_FLPR_YN:      "N",
-      OUTC_ISCD:         "",
-      ROUT_ISCD:         "",
-      SNI_CNTG_ISCD_YN:  "N",
-      UNPR_DVSN_AMNT_YN: "N",
-      WCRC_FRCR_DVSN_CD: "01",
-      INQR_DVSN_3:       "01",
-      CTX_AREA_FK100:    "",
-      CTX_AREA_NK100:    "",
-    }
-  );
-  if (!json) return null;
-
-  const output1: any[] = json.output1 ?? [];
-  const output2: any   = json.output2  ?? {};
-
-  const holdings: KisBalanceItem[] = output1
-    .filter((o: any) => parseInt(o.hldg_qty ?? "0", 10) > 0)
-    .map((o: any) => ({
-      ticker:        o.pdno        ?? "",
-      name:          o.prdt_name   ?? "",
-      qty:           parseInt(o.hldg_qty       ?? "0", 10),
-      avgPrice:      parseFloat(o.pchs_avg_pric ?? "0"),
-      currentPrice:  parseInt(o.prpr           ?? "0", 10),
-      evalAmt:       parseInt(o.evlu_amt        ?? "0", 10),
-      purchaseAmt:   parseInt(o.pchs_amt        ?? "0", 10),
-      plAmt:         parseInt(o.evlu_pfls_amt   ?? "0", 10),
-      plRate:        parseFloat(o.evlu_pfls_rt  ?? "0"),
-    }));
-
-  const totalEvalAmt  = parseInt(output2.tot_evlu_amt        ?? "0", 10);
-  const totalPurchAmt = parseInt(output2.pchs_amt_smtl_amt   ?? "0", 10);
-  const totalPlAmt    = parseInt(output2.evlu_pfls_smtl_amt  ?? "0", 10);
-  const totalPlRate   = totalPurchAmt > 0
-    ? Math.round((totalPlAmt / totalPurchAmt) * 10000) / 100
-    : 0;
-
-  return { holdings, totalEvalAmt, totalPurchAmt, totalPlAmt, totalPlRate };
 }
 
 // ── 해외 복수 종목 병렬 조회 ─────────────────────────────────────────────
