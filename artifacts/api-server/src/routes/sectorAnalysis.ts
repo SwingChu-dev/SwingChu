@@ -67,6 +67,53 @@ async function fetchHistory(ticker: string, days: number): Promise<{ date: strin
   }
 }
 
+// ── GET /sector/flow  (최근 5일 섹터 자금 흐름) ─────────────────────────────
+const FLOW_ETFS = ["XLE", "SOXX", "URA", "CPER"];
+
+router.get("/sector/flow", async (req, res) => {
+  const cacheKey = "sector_flow_v1";
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const results = await Promise.all(
+    FLOW_ETFS.map(async t => {
+      try {
+        const p1 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const data: any = await (yahooFinance as any).chart(t, { period1: p1, interval: "1d" });
+        const quotes: any[] = (data?.quotes ?? []).filter((d: any) => d.close != null);
+        if (quotes.length < 3) return { ticker: t, trend: 0, pct: 0 };
+        const closes = quotes.map((d: any) => d.close);
+        const totalPct = closes.slice(1).reduce((acc: number, c: number, i: number) =>
+          acc + (c - closes[i]) / closes[i], 0);
+        return { ticker: t, trend: totalPct >= 0 ? 1 : -1, pct: Math.round(totalPct * 10000) / 100 };
+      } catch {
+        return { ticker: t, trend: 0, pct: 0 };
+      }
+    })
+  );
+
+  const resultMap: Record<string, { trend: number; pct: number }> = {};
+  for (const r of results) resultMap[r.ticker] = { trend: r.trend, pct: r.pct };
+
+  // 이상 감지: 에너지 상승 + 반도체 하락 = 자금 이동 신호
+  const xle  = resultMap["XLE"]?.trend  ?? 0;
+  const soxx = resultMap["SOXX"]?.trend ?? 0;
+  const ura  = resultMap["URA"]?.trend  ?? 0;
+
+  let anomaly: string | null = null;
+  if (xle > 0 && soxx < 0) {
+    anomaly = "⚠️ 반도체 자금이 에너지/인프라로 이동 중 — 기술주 비중 조정 고려";
+  } else if (ura > 0 && soxx < 0) {
+    anomaly = "⚠️ 원자력 강세, 반도체 약세 — AI 인프라 수혜주 선별 필요";
+  } else if (soxx > 0 && xle < 0) {
+    anomaly = "✅ 반도체 강세, 에너지 약세 — 기술주 모멘텀 유효";
+  }
+
+  const payload = { sectors: resultMap, anomaly, updatedAt: new Date().toISOString() };
+  cache.set(cacheKey, payload, 5 * 60); // 5분 캐시
+  return res.json(payload);
+});
+
 // GET /sector/analysis?tickers=EONR,NVDA
 router.get("/sector/analysis", async (req, res) => {
   const extraRaw  = (req.query.tickers as string) ?? "";

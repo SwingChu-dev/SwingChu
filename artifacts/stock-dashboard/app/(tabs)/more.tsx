@@ -119,6 +119,13 @@ export default function MoreScreen() {
         <SectionHeader title="글로벌 리스크" />
         <View style={styles.section}>
           <MenuItem
+            icon="pulse-outline"
+            iconColor="#F04452"
+            title="기계적 매매신호"
+            description="매수/매도 목표가 설정 + 섹터 자금 흐름 이상 감지"
+            onPress={() => router.push("/trade-signals" as any)}
+          />
+          <MenuItem
             icon="stats-chart-outline"
             iconColor="#0064FF"
             title="섹터 수익률 분석"
