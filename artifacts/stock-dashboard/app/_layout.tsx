@@ -159,6 +159,10 @@ function RootLayoutNav() {
           name="trade-signals"
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
+        <Stack.Screen
+          name="portfolio"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
       </Stack>
     </>
   );

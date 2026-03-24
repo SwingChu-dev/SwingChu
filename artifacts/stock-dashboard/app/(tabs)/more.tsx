@@ -115,6 +115,18 @@ export default function MoreScreen() {
           />
         </View>
 
+        {/* 내 계좌 */}
+        <SectionHeader title="내 계좌 (한국투자증권)" />
+        <View style={styles.section}>
+          <MenuItem
+            icon="wallet-outline"
+            iconColor="#2DB55D"
+            title="국장 포트폴리오"
+            description="실시간 잔고 · 보유종목 수익률 · 비중 현황"
+            onPress={() => router.push("/portfolio" as any)}
+          />
+        </View>
+
         {/* 글로벌 리스크 */}
         <SectionHeader title="글로벌 리스크" />
         <View style={styles.section}>
