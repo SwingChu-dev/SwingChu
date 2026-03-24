@@ -119,6 +119,13 @@ export default function MoreScreen() {
         <SectionHeader title="글로벌 리스크" />
         <View style={styles.section}>
           <MenuItem
+            icon="stats-chart-outline"
+            iconColor="#0064FF"
+            title="섹터 수익률 분석"
+            description="에너지·반도체·원자력·구리 ETF와 내 종목 동조화 비교"
+            onPress={() => router.push("/sector-analysis" as any)}
+          />
+          <MenuItem
             icon="globe-outline"
             iconColor="#FF6B00"
             title="지경학적 리스크"
