@@ -166,36 +166,36 @@ export async function fetchKisUsQuote(ticker: string): Promise<KisUsQuote | null
   };
 }
 
-// ── 국내 복수 종목 병렬 조회 (동시 최대 3개, 속도 제한) ─────────────────────
+// ── 국내 복수 종목 병렬 조회 (동시 최대 5개, 100ms 속도 제한) ──────────────
 export async function fetchKisKrBatch(
   tickers: string[]
 ): Promise<Record<string, KisKrQuote>> {
   const result: Record<string, KisKrQuote> = {};
-  const BATCH = 3;
+  const BATCH = 5;
   for (let i = 0; i < tickers.length; i += BATCH) {
     const chunk = tickers.slice(i, i + BATCH);
     await Promise.allSettled(chunk.map(async t => {
       const q = await fetchKisKrQuote(t);
       if (q) result[t] = q;
     }));
-    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 150));
+    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 100));
   }
   return result;
 }
 
-// ── 해외 복수 종목 병렬 조회 ─────────────────────────────────────────────
+// ── 해외 복수 종목 병렬 조회 (동시 최대 5개, 100ms 속도 제한) ──────────────
 export async function fetchKisUsBatch(
   tickers: string[]
 ): Promise<Record<string, KisUsQuote>> {
   const result: Record<string, KisUsQuote> = {};
-  const BATCH = 3;
+  const BATCH = 5;
   for (let i = 0; i < tickers.length; i += BATCH) {
     const chunk = tickers.slice(i, i + BATCH);
     await Promise.allSettled(chunk.map(async t => {
       const q = await fetchKisUsQuote(t);
       if (q) result[t] = q;
     }));
-    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 150));
+    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 100));
   }
   return result;
 }

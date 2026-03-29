@@ -183,19 +183,16 @@ export default function RealtimeRadarScreen() {
           if (q._source === "KIS") usedKis = true;
         }
       }
-      setPrices(prev => {
-        // 히스토리 업데이트
-        setHistory(h => {
-          const updated = { ...h };
-          for (const [t, d] of Object.entries(next)) {
-            if (!d.ok) continue;
-            const arr = [...(updated[t] ?? []), d.price];
-            updated[t] = arr.slice(-MAX_HISTORY);
-          }
-          return updated;
-        });
-        return { ...prev, ...next };
+      setHistory(h => {
+        const updated = { ...h };
+        for (const [t, d] of Object.entries(next)) {
+          if (!d.ok) continue;
+          const arr = [...(updated[t] ?? []), d.price];
+          updated[t] = arr.slice(-MAX_HISTORY);
+        }
+        return updated;
       });
+      setPrices(prev => ({ ...prev, ...next }));
       setKisActive(usedKis);
       setLastTime(new Date().toLocaleTimeString("ko-KR"));
       setCountdown(REFRESH_SEC);

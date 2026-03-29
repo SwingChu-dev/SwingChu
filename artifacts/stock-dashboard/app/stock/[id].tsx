@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -102,23 +102,28 @@ export default function StockDetailScreen() {
   const liveQuote = getQuote(baseStock.ticker, baseStock.market);
 
   // enrichedData가 있으면 predefined/stub 모두 AI 분석 결과 우선 적용
-  const stock: StockInfo = enrichedData
-    ? buildStockInfo(baseStock, enrichedData)
-    : isStub
-      ? detail
-        ? buildEnrichedStock(baseStock, detail, liveQuote)
+  const stock: StockInfo = useMemo(() =>
+    enrichedData
+      ? buildStockInfo(baseStock, enrichedData)
+      : isStub
+        ? detail
+          ? buildEnrichedStock(baseStock, detail, liveQuote)
+          : baseStock
         : baseStock
-      : baseStock;
+  , [enrichedData, isStub, detail, liveQuote, baseStock]);
 
-  const marketColor    = MARKET_COLORS[stock.market] || "#888";
-  const firstForecast  = stock.forecasts[0];
-  const displayPrice   = liveKRW(stock.ticker, stock.market, stock.currentPrice);
-  const rawChangePct   = liveChangePct(stock.ticker, stock.market);
-  const isLive         = rawChangePct !== null;
+  const marketColor   = MARKET_COLORS[stock.market] || "#888";
+  const firstForecast = stock.forecasts[0];
+  const displayPrice  = liveKRW(stock.ticker, stock.market, stock.currentPrice);
+  const rawChangePct  = liveChangePct(stock.ticker, stock.market);
+  const isLive        = rawChangePct !== null;
   const displayChangePct = isLive ? rawChangePct : firstForecast?.changePercent ?? 0;
   const isPositiveShort  = displayChangePct >= 0;
 
-  const dynBoxPos = calcBoxPosition(stock.boxRange, liveQuote);
+  const dynBoxPos = useMemo(
+    () => calcBoxPosition(stock.boxRange, liveQuote),
+    [stock.boxRange, liveQuote]
+  );
   const boxPosColor =
     dynBoxPos === "저점권" ? c.positive :
     dynBoxPos === "고점권" ? c.negative : c.warning;

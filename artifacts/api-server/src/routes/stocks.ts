@@ -12,7 +12,7 @@ export interface Bar { date: string; open: number; high: number; low: number; cl
 
 const router = Router();
 const yahooFinance = new (YahooFinanceClass as any)({
-  suppressNotices: ["yahooSurvey"],
+  suppressNotices: ["yahooSurvey", "ripHistorical"],
 });
 
 // ─── TTL 캐시 (API 호출 제한 방지) ─────────────────────────────────────────
@@ -43,11 +43,12 @@ class TtlCache<T> {
 }
 
 const TTL = {
-  QUOTES:  30 * 1000,          // 30초 — 실시간 시세
-  DETAIL:  5  * 60 * 1000,     // 5분  — 종목 상세 (재무)
-  SCREEN:  10 * 60 * 1000,     // 10분 — 저평가 스크리닝
-  NEWS:    15 * 60 * 1000,     // 15분 — 뉴스 감성
+  QUOTES:  30 * 1000,          // 30초  — 실시간 시세
+  DETAIL:  5  * 60 * 1000,     // 5분   — 종목 상세 (재무)
+  SCREEN:  10 * 60 * 1000,     // 10분  — 저평가 스크리닝
+  NEWS:    15 * 60 * 1000,     // 15분  — 뉴스 감성
   HISTORY: 60 * 60 * 1000,     // 1시간 — 과거 OHLC (일봉)
+  ANALYZE: 30 * 60 * 1000,     // 30분  — AI/재무 종합 분석
 };
 
 const quotesCache  = new TtlCache<any[]>();
@@ -108,18 +109,18 @@ async function yahooKrHistory(
   ticker: string, market: string, days: number
 ): Promise<{ date: string; open: number; high: number; low: number; close: number; volume: number }[]> {
   const yt = toYahooTicker(ticker, market);
-  const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const period2 = new Date().toISOString().split("T")[0];
+  const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   try {
-    const raw = await (yahooFinance as any).historical(yt, { period1, period2 }).catch(() => []);
-    return (raw as any[])
-      .filter((d: any) => d.close != null)
+    const result: any = await (yahooFinance as any).chart(yt, { period1, interval: "1d" });
+    const quotes: any[] = result?.quotes ?? [];
+    return quotes
+      .filter((d: any) => d.close != null && d.close > 0)
       .map((d: any) => ({
-        date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
-        open:   Math.round(d.open   ?? 0),
-        high:   Math.round(d.high   ?? 0),
-        low:    Math.round(d.low    ?? 0),
-        close:  Math.round(d.close  ?? 0),
+        date:   (d.date instanceof Date ? d.date : new Date((d.date ?? 0) * 1000)).toISOString().split("T")[0],
+        open:   Math.round(d.open   ?? d.close),
+        high:   Math.round(d.high   ?? d.close),
+        low:    Math.round(d.low    ?? d.close),
+        close:  Math.round(d.close),
         volume: d.volume ?? 0,
       }));
   } catch { return []; }
@@ -877,22 +878,19 @@ router.get("/stocks/history", async (req, res) => {
       // 국내주식 — Yahoo Finance
       data = await yahooKrHistory(ticker, market, days);
     } else {
-      // 미국주식 — Yahoo Finance
+      // 미국주식 — Yahoo Finance chart()
       const liveRate = await getLiveUsdKrw();
       const period1 = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      const period2 = new Date();
-      const raw = await yahooFinance.historical(yahooTicker, {
-        period1: period1.toISOString().split("T")[0],
-        period2: period2.toISOString().split("T")[0],
-      }).catch(() => []);
-      data = (raw as any[])
-        .filter((d: any) => d.close != null)
+      const result: any = await (yahooFinance as any).chart(yahooTicker, { period1, interval: "1d" }).catch(() => ({ quotes: [] }));
+      const raw: any[] = result?.quotes ?? [];
+      data = raw
+        .filter((d: any) => d.close != null && d.close > 0)
         .map((d: any) => ({
-          date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
-          open:   Math.round(d.open  * liveRate),
-          high:   Math.round(d.high  * liveRate),
-          low:    Math.round(d.low   * liveRate),
-          close:  Math.round(d.close * liveRate),
+          date:   (d.date instanceof Date ? d.date : new Date((d.date ?? 0) * 1000)).toISOString().split("T")[0],
+          open:   Math.round((d.open  ?? d.close) * liveRate),
+          high:   Math.round((d.high  ?? d.close) * liveRate),
+          low:    Math.round((d.low   ?? d.close) * liveRate),
+          close:  Math.round(d.close               * liveRate),
           volume: d.volume ?? 0,
         }));
     }
@@ -962,8 +960,7 @@ router.get("/stocks/analyze", async (req, res) => {
   const liveRate = await getLiveUsdKrw();
 
   try {
-    const period1 = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const period2 = new Date().toISOString().split("T")[0];
+    const period1 = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
     // Yahoo Finance 재무/가격/히스토리 병렬 로드
     const [summary, rawHistoryYahoo, krRows, krQ] = await Promise.all([
@@ -971,7 +968,9 @@ router.get("/stocks/analyze", async (req, res) => {
         modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price", "summaryProfile"] as any,
       }).catch(() => null),
       !isKorean
-        ? yahooFinance.historical(yahooTicker, { period1, period2 }).catch(() => [])
+        ? (yahooFinance as any).chart(yahooTicker, { period1, interval: "1d" })
+            .then((r: any) => r?.quotes ?? [])
+            .catch(() => [] as any[])
         : Promise.resolve([] as any[]),
       isKorean ? yahooKrHistory(ticker, market, 365) : Promise.resolve([] as Bar[]),
       isKorean ? yahooKrQuote(ticker, market) : Promise.resolve(null),
@@ -1184,7 +1183,7 @@ router.get("/stocks/analyze", async (req, res) => {
       entryRecommendation: entryRec,
     };
 
-    analyzeCache.set(cacheKey, result, TTL.HISTORY);
+    analyzeCache.set(cacheKey, result, TTL.ANALYZE);
     return res.json(result);
   } catch (e) {
     return res.status(500).json({ error: String(e) });

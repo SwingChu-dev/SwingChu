@@ -29,23 +29,7 @@ async function fetchHistory(ticker: string, market: string, days: number): Promi
         close:  d.close,
         volume: d.volume ?? 0,
       }));
-    if (bars.length >= 20) return bars;
-  } catch {}
-  // ② historical() 폴백
-  try {
-    const p1s = p1.toISOString().split("T")[0];
-    const p2s = new Date().toISOString().split("T")[0];
-    const raw: any[] = await (yahooFinance as any).historical(yt, { period1: p1s, period2: p2s }).catch(() => []);
-    return raw
-      .filter((d: any) => d.close != null && d.close > 0)
-      .map((d: any) => ({
-        date:   (d.date instanceof Date ? d.date : new Date(d.date)).toISOString().split("T")[0],
-        open:   d.open  ?? d.close,
-        high:   d.high  ?? d.close,
-        low:    d.low   ?? d.close,
-        close:  d.close,
-        volume: d.volume ?? 0,
-      }));
+    if (bars.length > 0) return bars;
   } catch {}
   return [];
 }
