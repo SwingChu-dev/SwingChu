@@ -12,11 +12,14 @@ import { API_BASE } from "@/utils/apiBase";
 
 // ── 감시 종목 설정 ────────────────────────────────────────────────────────
 const RADAR_TICKERS = [
-  { ticker: "EONR",  market: "NASDAQ", name: "이온R",     group: "my",    desc: "에너지저장" },
-  { ticker: "NVDA",  market: "NASDAQ", name: "엔비디아",   group: "semi",  desc: "AI반도체" },
-  { ticker: "XLE",   market: "NASDAQ", name: "에너지 ETF", group: "energy",desc: "에너지" },
-  { ticker: "SOXX",  market: "NASDAQ", name: "반도체 ETF", group: "semi",  desc: "반도체" },
-  { ticker: "URA",   market: "NASDAQ", name: "원자력 ETF", group: "energy",desc: "원자력" },
+  { ticker: "EONR",  market: "NASDAQ", name: "이온R",       group: "my",    desc: "에너지저장" },
+  { ticker: "NVDA",  market: "NASDAQ", name: "엔비디아",     group: "semi",  desc: "AI반도체" },
+  { ticker: "SOXX",  market: "NASDAQ", name: "반도체 ETF",   group: "semi",  desc: "반도체" },
+  { ticker: "XLE",   market: "NYSE",   name: "에너지 ETF",   group: "energy",desc: "에너지" },
+  { ticker: "URA",   market: "NYSE",   name: "원자력 ETF",   group: "energy",desc: "원자력" },
+  { ticker: "XEL",   market: "NASDAQ", name: "엑셀에너지",   group: "energy",desc: "전력유틸리티" },
+  { ticker: "BWXT",  market: "NYSE",   name: "BWX테크",     group: "energy",desc: "원자력기술" },
+  { ticker: "GEV",   market: "NYSE",   name: "GE버노바",    group: "energy",desc: "에너지전환" },
 ];
 
 const GROUP_COLOR: Record<string, string> = {
@@ -98,6 +101,49 @@ function analyzeDivergence(
   return { level: "neutral", msg: "— 섹터 간 흐름 정상 (동행 중)" };
 }
 
+// ── Trump 리스크 타입 ──────────────────────────────────────────────────────
+interface TrumpHeadline { title: string; source: string; pubDate: string; }
+interface TrumpRisk {
+  score: number;
+  maxScore: number;
+  level: "calm" | "low" | "medium" | "high" | "extreme";
+  label: string;
+  headlines: TrumpHeadline[];
+  fetchedAt: string;
+  headlineCount: number;
+}
+
+const TRUMP_LEVEL_COLOR: Record<string, string> = {
+  calm:    "#2DB55D",
+  low:     "#22C55E",
+  medium:  "#F59E0B",
+  high:    "#F04452",
+  extreme: "#7C3AED",
+};
+const TRUMP_LEVEL_KR: Record<string, string> = {
+  calm:    "안전",
+  low:     "주의",
+  medium:  "경계",
+  high:    "위험",
+  extreme: "극위험",
+};
+
+// ── Trump 게이지 바 ───────────────────────────────────────────────────────
+function TrumpGauge({ score, max, level }: { score: number; max: number; level: string }) {
+  const pct = Math.round((score / max) * 100);
+  const col = TRUMP_LEVEL_COLOR[level] ?? "#94A3B8";
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      <View style={[styles.gaugeTrack]}>
+        <View style={[styles.gaugeFill, { width: `${pct}%` as any, backgroundColor: col }]} />
+      </View>
+      <View style={[styles.levelBadge, { backgroundColor: col + "20" }]}>
+        <Text style={[styles.levelTxt, { color: col }]}>{TRUMP_LEVEL_KR[level]} {score.toFixed(0)}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ── 메인 화면 ─────────────────────────────────────────────────────────────
 interface PriceData {
   price:         number;
@@ -111,12 +157,14 @@ export default function RealtimeRadarScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  const [prices,    setPrices]    = useState<Record<string, PriceData>>({});
-  const [history,   setHistory]   = useState<Record<string, number[]>>({});
-  const [countdown, setCountdown] = useState(REFRESH_SEC);
-  const [loading,   setLoading]   = useState(false);
-  const [lastTime,  setLastTime]  = useState<string>("");
-  const [kisActive, setKisActive] = useState(false);
+  const [prices,     setPrices]     = useState<Record<string, PriceData>>({});
+  const [history,    setHistory]    = useState<Record<string, number[]>>({});
+  const [countdown,  setCountdown]  = useState(REFRESH_SEC);
+  const [loading,    setLoading]    = useState(false);
+  const [lastTime,   setLastTime]   = useState<string>("");
+  const [kisActive,  setKisActive]  = useState(false);
+  const [trump,      setTrump]      = useState<TrumpRisk | null>(null);
+  const [trumpLoad,  setTrumpLoad]  = useState(false);
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -155,19 +203,33 @@ export default function RealtimeRadarScreen() {
     finally { setLoading(false); }
   }, []);
 
+  const fetchTrumpRisk = useCallback(async () => {
+    setTrumpLoad(true);
+    try {
+      const res = await fetch(`${API_BASE}/stocks/trump-risk`);
+      const json: TrumpRisk = await res.json();
+      setTrump(json);
+    } catch {}
+    finally { setTrumpLoad(false); }
+  }, []);
+
   useEffect(() => {
     fetchPrices();
+    fetchTrumpRisk();
 
     // 15초 자동 갱신
     fetchRef.current = setInterval(fetchPrices, REFRESH_SEC * 1000);
+    // 5분마다 Trump 리스크 갱신
+    const trumpTimer = setInterval(fetchTrumpRisk, 5 * 60 * 1000);
     // 1초 카운트다운
     timerRef.current = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000);
 
     return () => {
       clearInterval(fetchRef.current!);
       clearInterval(timerRef.current!);
+      clearInterval(trumpTimer);
     };
-  }, [fetchPrices]);
+  }, [fetchPrices, fetchTrumpRisk]);
 
   // 첫 번째 / 이전 가격 (히스토리 첫값과 현재값으로 디커플링 분석)
   const firstPrices: Record<string, number> = {};
@@ -308,6 +370,52 @@ export default function RealtimeRadarScreen() {
           </View>
         )}
 
+        {/* ── 트럼프 타코수치 ── */}
+        <View style={[styles.card, { backgroundColor: c.card }]}>
+          <View style={[styles.groupHeader, { marginBottom: 10 }]}>
+            <Text style={{ fontSize: 16 }}>🦅</Text>
+            <Text style={[styles.groupLabel, { color: c.textSecondary }]}>트럼프 타코수치 (관세·무역 리스크)</Text>
+            <TouchableOpacity onPress={fetchTrumpRisk} style={{ marginLeft: "auto" }}>
+              {trumpLoad
+                ? <ActivityIndicator size="small" color={c.tint} />
+                : <Ionicons name="refresh-outline" size={14} color={c.textTertiary} />}
+            </TouchableOpacity>
+          </View>
+
+          {trump ? (
+            <>
+              <TrumpGauge score={trump.score} max={trump.maxScore} level={trump.level} />
+              <Text style={[styles.trumpLabel, { color: TRUMP_LEVEL_COLOR[trump.level] ?? c.textSecondary }]}>
+                {trump.label}
+              </Text>
+              <Text style={[styles.trumpSub, { color: c.textTertiary }]}>
+                최근 뉴스 {trump.headlineCount}건 분석 · 5분 갱신
+              </Text>
+
+              {trump.headlines.length > 0 && (
+                <View style={[styles.headlineWrap, { backgroundColor: isDark ? "#0F172A" : "#F8FAFC" }]}>
+                  {trump.headlines.slice(0, 4).map((h, i) => (
+                    <View key={i} style={[styles.headlineRow, i < Math.min(trump.headlines.length, 4) - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: isDark ? "#1E293B" : "#E2E8F0" }]}>
+                      <Text style={[styles.headlineTxt, { color: c.text }]} numberOfLines={2}>{h.title}</Text>
+                      {h.source ? <Text style={[styles.headlineSrc, { color: c.textTertiary }]}>{h.source}</Text> : null}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : trumpLoad ? (
+            <View style={{ height: 60, justifyContent: "center", alignItems: "center" }}>
+              <ActivityIndicator color={c.tint} />
+            </View>
+          ) : (
+            <Text style={[styles.trumpSub, { color: c.textTertiary }]}>뉴스 데이터 로드 실패. 새로고침 해주세요.</Text>
+          )}
+
+          <Text style={[styles.trumpNote, { color: c.textTertiary }]}>
+            * Google News RSS 기반 · SNS(X/Twitter) 연동은 유료 API 필요
+          </Text>
+        </View>
+
         {/* ── 안내 ── */}
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.groupLabel, { color: c.textSecondary, marginBottom: 8 }]}>모니터링 기준</Text>
@@ -391,4 +499,18 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 10, marginTop: 8,
   },
   kisHintTxt: { flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16 },
+
+  gaugeTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: "#E2E8F0", overflow: "hidden" },
+  gaugeFill:  { height: "100%", borderRadius: 4 },
+  levelBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 },
+  levelTxt:   { fontSize: 12, fontFamily: "Inter_700Bold" },
+
+  trumpLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+  trumpSub:   { fontSize: 11, fontFamily: "Inter_400Regular", marginBottom: 8 },
+  trumpNote:  { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 10, opacity: 0.6 },
+
+  headlineWrap:{ borderRadius: 10, padding: 10, marginTop: 8, gap: 0 },
+  headlineRow: { paddingVertical: 8 },
+  headlineTxt: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  headlineSrc: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2, opacity: 0.6 },
 });
