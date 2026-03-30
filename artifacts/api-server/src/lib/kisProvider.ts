@@ -1,6 +1,6 @@
 /**
  * 한국투자증권 Open API 제공자
- * APP_KEY / APP_SECRET 환경변수가 설정된 경우에만 활성화됩니다.
+ * KIS_APPKEY / KIS_APPSECRET 환경변수가 설정된 경우에만 활성화됩니다.
  * 미설정 시 isAvailable() → false, 모든 fetch 함수는 null 반환 → Yahoo Finance 폴백.
  */
 
@@ -9,6 +9,7 @@ const KIS_URL = "https://openapi.koreainvestment.com:9443";
 // ── 종목별 거래소 코드 매핑 (NYSE 상장 종목 명시, 나머지 NASDAQ) ───────────
 const NYSE_TICKERS = new Set([
   "XOM","CVX","BAC","WMT","JPM","JNJ","PG","KO","PFE","XLE","WFC","BRK","GS",
+  "GEV","BWXT",
 ]);
 
 function exchangeCode(ticker: string): string {
@@ -21,7 +22,7 @@ let _token: string | null = null;
 let _tokenExpiry = 0;
 
 export function isAvailable(): boolean {
-  return !!(process.env.APP_KEY && process.env.APP_SECRET);
+  return !!(process.env.KIS_APPKEY && process.env.KIS_APPSECRET);
 }
 
 
@@ -35,8 +36,8 @@ async function getToken(): Promise<string | null> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         grant_type: "client_credentials",
-        appkey:     process.env.APP_KEY,
-        appsecret:  process.env.APP_SECRET,
+        appkey:     process.env.KIS_APPKEY,
+        appsecret:  process.env.KIS_APPSECRET,
       }),
     });
     const json = await res.json() as any;
@@ -68,8 +69,8 @@ async function kisGet(path: string, trId: string, params: Record<string, string>
       headers: {
         "Content-Type":  "application/json",
         "authorization": `Bearer ${token}`,
-        "appkey":        process.env.APP_KEY!,
-        "appsecret":     process.env.APP_SECRET!,
+        "appkey":        process.env.KIS_APPKEY!,
+        "appsecret":     process.env.KIS_APPSECRET!,
         "tr_id":         trId,
       },
     });
