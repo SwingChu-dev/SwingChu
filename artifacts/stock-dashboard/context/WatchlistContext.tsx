@@ -7,69 +7,16 @@ import React, {
   ReactNode,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { STOCKS, StockInfo, Market } from "@/constants/stockData";
-import { UniverseStock } from "@/constants/stockUniverse";
+import { STOCKS, StockInfo } from "@/constants/stockData";
 
-const STORAGE_KEY    = "@watchlist_ids_v4";
-const CUSTOM_KEY     = "@custom_stocks_v4";
-const STORAGE_KEY_V3 = "@watchlist_ids_v3";
-const STORAGE_KEY_V2 = "@watchlist_ids_v2";
-const CUSTOM_KEY_V2  = "@custom_stocks_v2";
-const DEFAULT_IDS    = STOCKS.map((s) => s.id);
-const VALID_IDS      = new Set(DEFAULT_IDS);
+const STORAGE_KEY = "@watchlist_ids_v4";
+const DEFAULT_IDS = STOCKS.map((s) => s.id);
+const VALID_IDS   = new Set(DEFAULT_IDS);
 
-function createStubFromUniverse(us: UniverseStock): StockInfo {
-  const cp = us.currentPrice;
-  return {
-    id: us.id,
-    name: us.name,
-    ticker: us.ticker,
-    market: us.market as Market,
-    region: (us.market === "KOSPI" || us.market === "KOSDAQ") ? "국내장" : "미국장",
-    grade: "중형주",
-    themes: [us.sector],
-    currentPrice: cp,
-    currency: "KRW",
-    description: `${us.name}(${us.ticker}) — ${us.sector} · 시총 ${us.marketCap}. 탐색 탭에서 추가한 종목입니다.`,
-    splitEntries: [
-      { ratio: 30, dropPercent: 5,  targetPrice: Math.round(cp * 0.95) },
-      { ratio: 30, dropPercent: 10, targetPrice: Math.round(cp * 0.90) },
-      { ratio: 40, dropPercent: 15, targetPrice: Math.round(cp * 0.85) },
-    ],
-    profitTargets: [
-      { percent: 3,  price: Math.round(cp * 1.03) },
-      { percent: 8,  price: Math.round(cp * 1.08) },
-      { percent: 15, price: Math.round(cp * 1.15) },
-    ],
-    boxRange: {
-      support:          Math.round(cp * 0.80),
-      resistance:       Math.round(cp * 1.20),
-      currentPosition:  "중간권",
-    },
-    forecasts: [
-      { period: "1일 후",    price: Math.round(cp * 1.003),  changePercent: 0.3 },
-      { period: "1주 후",    price: Math.round(cp * 1.012),  changePercent: 1.2 },
-      { period: "1개월 후",  price: Math.round(cp * 1.035),  changePercent: 3.5 },
-      { period: "3개월 후",  price: Math.round(cp * 1.08),   changePercent: 8.0 },
-      { period: "6개월 후",  price: Math.round(cp * 1.15),   changePercent: 15.0 },
-      { period: "12개월 후", price: Math.round(cp * 1.25),   changePercent: 25.0 },
-      { period: "1800일",    price: Math.round(cp * 2.2),    changePercent: 120.0 },
-    ],
-    financials: {
-      per: 0, pbr: 0, roe: 0, debtRatio: 0, revenueGrowth: 0,
-      evaluation: "적정",
-      summary: "탐색 탭에서 추가된 종목으로 상세 재무 데이터가 제한됩니다. 직접 분석을 권장합니다.",
-    },
-    dayFeatures: [],
-    risk: {
-      geopolitical:    "사용자 추가 종목 — 직접 리스크 분석 필요.",
-      technicalBounce: "기술적 데이터가 제한됩니다.",
-      strategy:        "직접 분석이 필요합니다.",
-    },
-    witchDayStrategy:    "사용자 추가 종목으로 상세 전략이 제한됩니다.",
-    entryRecommendation: "직접 분석이 필요합니다.",
-  };
-}
+const LEGACY_KEYS = [
+  "@watchlist_ids_v3", "@watchlist_ids_v2",
+  "@custom_stocks_v4", "@custom_stocks_v3", "@custom_stocks_v2",
+];
 
 interface WatchlistContextType {
   watchlistIds:    string[];
@@ -77,7 +24,6 @@ interface WatchlistContextType {
   allKnownStocks:  StockInfo[];
   addStock:        (id: string) => void;
   removeStock:     (id: string) => void;
-  addFromUniverse: (us: UniverseStock) => void;
   isInWatchlist:   (id: string) => boolean;
   reorder:         (newIds: string[]) => void;
 }
@@ -85,49 +31,39 @@ interface WatchlistContextType {
 const WatchlistContext = createContext<WatchlistContextType | null>(null);
 
 export function WatchlistProvider({ children }: { children: ReactNode }) {
-  const [watchlistIds,  setWatchlistIds]  = useState<string[]>(DEFAULT_IDS);
-  const [customStocks,  setCustomStocks]  = useState<Record<string, StockInfo>>({});
+  const [watchlistIds, setWatchlistIds] = useState<string[]>(DEFAULT_IDS);
 
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, STORAGE_KEY_V3, STORAGE_KEY_V2]).then(
-      ([[, rawIds], [, rawIdsV3], [, rawIdsV2]]) => {
+    AsyncStorage.multiGet([STORAGE_KEY, ...LEGACY_KEYS]).then(
+      ([[, rawIds], [, rawV3], [, rawV2]]) => {
         let loadedIds: string[] | null = null;
 
-        // v4 우선
         if (rawIds) {
           try {
-            const parsed = JSON.parse(rawIds);
-            if (Array.isArray(parsed)) loadedIds = parsed;
+            const p = JSON.parse(rawIds);
+            if (Array.isArray(p)) loadedIds = p;
           } catch {}
         }
-        // v4 없으면 v3
-        if (!loadedIds && rawIdsV3) {
+        if (!loadedIds && rawV3) {
           try {
-            const parsed = JSON.parse(rawIdsV3);
-            if (Array.isArray(parsed)) loadedIds = parsed;
+            const p = JSON.parse(rawV3);
+            if (Array.isArray(p)) loadedIds = p;
           } catch {}
         }
-        // v3 없으면 v2
-        if (!loadedIds && rawIdsV2) {
+        if (!loadedIds && rawV2) {
           try {
-            const parsed = JSON.parse(rawIdsV2);
-            if (Array.isArray(parsed)) loadedIds = parsed;
+            const p = JSON.parse(rawV2);
+            if (Array.isArray(p)) loadedIds = p;
           } catch {}
         }
 
         if (loadedIds) {
-          // STOCKS에 없는 종목(삭제된 종목·수동추가 종목) 자동 제거
           const cleaned = loadedIds.filter((id) => VALID_IDS.has(id));
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
           setWatchlistIds(cleaned);
         }
 
-        // 구버전 custom stocks 키 정리
-        AsyncStorage.multiRemove([
-          "@custom_stocks_v3", "@custom_stocks_v2",
-          "@custom_stocks_v1", "@watchlist_ids_v3",
-          "@watchlist_ids_v2",
-        ]);
+        AsyncStorage.multiRemove(LEGACY_KEYS);
       }
     );
   }, []);
@@ -137,12 +73,8 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
   }, []);
 
-  const saveCustom = useCallback((custom: Record<string, StockInfo>) => {
-    setCustomStocks(custom);
-    AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(custom));
-  }, []);
-
   const addStock = useCallback((id: string) => {
+    if (!VALID_IDS.has(id)) return;
     setWatchlistIds((prev) => {
       if (prev.includes(id)) return prev;
       const next = [...prev, id];
@@ -159,25 +91,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const addFromUniverse = useCallback((us: UniverseStock) => {
-    const predefined = STOCKS.find((s) => s.ticker === us.ticker);
-    const targetId   = predefined ? predefined.id : us.id;
-    if (!predefined) {
-      setCustomStocks((prev) => {
-        if (prev[targetId]) return prev;
-        const next = { ...prev, [targetId]: createStubFromUniverse({ ...us, id: targetId }) };
-        AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(next));
-        return next;
-      });
-    }
-    setWatchlistIds((prev) => {
-      if (prev.includes(targetId)) return prev;
-      const next = [...prev, targetId];
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
   const isInWatchlist = useCallback(
     (id: string) => watchlistIds.includes(id),
     [watchlistIds]
@@ -185,18 +98,21 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
   const reorder = useCallback((newIds: string[]) => saveIds(newIds), [saveIds]);
 
-  const allKnownStocks: StockInfo[] = [
-    ...STOCKS,
-    ...Object.values(customStocks),
-  ];
-
   const watchlistStocks = watchlistIds
-    .map((id) => allKnownStocks.find((s) => s.id === id))
+    .map((id) => STOCKS.find((s) => s.id === id))
     .filter((s): s is StockInfo => s !== undefined);
 
   return (
     <WatchlistContext.Provider
-      value={{ watchlistIds, watchlistStocks, allKnownStocks, addStock, removeStock, addFromUniverse, isInWatchlist, reorder }}
+      value={{
+        watchlistIds,
+        watchlistStocks,
+        allKnownStocks: STOCKS,
+        addStock,
+        removeStock,
+        isInWatchlist,
+        reorder,
+      }}
     >
       {children}
     </WatchlistContext.Provider>
