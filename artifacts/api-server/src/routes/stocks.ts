@@ -912,6 +912,20 @@ function pctile(sorted: number[], p: number): number {
   return sorted[idx];
 }
 
+// ── RSI-14 단순 계산 (14개 변화량 기준 SMA 방식) ───────────────────────────
+function calcRsi14Simple(closes: number[]): number {
+  if (closes.length < 15) return 50;
+  let gains = 0, losses = 0;
+  for (let i = closes.length - 14; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  const avg = gains / 14;
+  const avl = losses / 14;
+  if (avl === 0) return 100;
+  return +(100 - 100 / (1 + avg / avl)).toFixed(1);
+}
+
 function calcEntries(data: {high:number;close:number}[], beta: number | null): [number,number,number] {
   const dds: number[] = [];
   for (let i = 20; i < data.length; i++) {
@@ -1025,6 +1039,26 @@ router.get("/stocks/analyze", async (req, res) => {
             low:   d.low   * liveRate,
             close: d.close * liveRate,
           }));
+
+    // ── 기술적 지표 계산 (RSI14, MA괴리율, MA배열, 거래량배율) ─────────────────
+    const closes = histData.map(d => d.close);
+    const rsi14Tech  = closes.length >= 15 ? calcRsi14Simple(closes) : null;
+    const ma5Tech    = closes.length >= 5  ? +(closes.slice(-5 ).reduce((a,b)=>a+b,0)/5 ).toFixed(0) : null;
+    const ma20Tech   = closes.length >= 20 ? +(closes.slice(-20).reduce((a,b)=>a+b,0)/20).toFixed(0) : null;
+    const ma60Tech   = closes.length >= 60 ? +(closes.slice(-60).reduce((a,b)=>a+b,0)/60).toFixed(0) : null;
+    const ma20Dev    = ma20Tech && priceKRW > 0 ? +((priceKRW - +ma20Tech) / +ma20Tech * 100).toFixed(1) : null;
+    const ma60Dev    = ma60Tech && priceKRW > 0 ? +((priceKRW - +ma60Tech) / +ma60Tech * 100).toFixed(1) : null;
+    const maAlignment: "정배열" | "역배열" | "혼재" | null =
+      ma5Tech && ma20Tech && ma60Tech
+        ? (+ma5Tech > +ma20Tech && +ma20Tech > +ma60Tech ? "정배열"
+          : +ma5Tech < +ma20Tech && +ma20Tech < +ma60Tech ? "역배열"
+          : "혼재")
+        : null;
+    const volCur = (pr as any)?.regularMarketVolume ?? 0;
+    const volAvg = (pr as any)?.averageDailyVolume10Day ?? (pr as any)?.averageVolume10days ?? (pr as any)?.averageVolume ?? 0;
+    const volumeSpike = volAvg > 0 ? +(volCur / volAvg).toFixed(2) : null;
+    const rsiSignal: "과매도" | "적정" | "과매수" | null =
+      rsi14Tech == null ? null : rsi14Tech >= 70 ? "과매수" : rsi14Tech <= 30 ? "과매도" : "적정";
 
     const [e1, e2, e3] = calcEntries(histData, beta);
     const splitEntries = [
@@ -1176,6 +1210,16 @@ router.get("/stocks/analyze", async (req, res) => {
         per: per ?? 0, pbr: pbr ?? 0, roe: roe ?? 0,
         debtRatio: debtRatio ?? 0, revenueGrowth: revenueGrowth ?? 0,
         evaluation, summary: finSummary,
+      },
+      technicalSummary: {
+        rsi14:        rsi14Tech,
+        rsiSignal,
+        ma20:         ma20Tech ? +ma20Tech : null,
+        ma60:         ma60Tech ? +ma60Tech : null,
+        ma20Dev,
+        ma60Dev,
+        maAlignment,
+        volumeSpike,
       },
       dayFeatures,
       risk: { geopolitical: mktRisk, technicalBounce: betaStr, strategy: strategyStr },

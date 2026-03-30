@@ -157,16 +157,41 @@ function StockCardInner({
             </Text>
           </View>
 
-          {/* ── 가운데: 구간 배지 ── */}
+          {/* ── 가운데: 구간 배지 + 기술 지표 ── */}
           <View style={styles.mid}>
             <View style={[styles.boxBadge, { backgroundColor: boxColor + "20" }]}>
               <Text style={[styles.boxText, { color: boxColor }]}>{boxPos}</Text>
             </View>
-            {signal?.indicators && (
-              <Text style={[styles.rsiText, { color: c.textTertiary }]}>
-                RSI {signal.indicators.rsi14}
-              </Text>
-            )}
+            {signal?.indicators && (() => {
+              const { rsi14, volumeRatio, ma20, currentPrice } = signal.indicators;
+              const rsiColor =
+                rsi14 >= 70 ? "#F04452" :
+                rsi14 <= 30 ? "#1B63E8" : c.textTertiary;
+              const rsiLabel =
+                rsi14 >= 70 ? `RSI ${rsi14}▲` :
+                rsi14 <= 30 ? `RSI ${rsi14}▼` : `RSI ${rsi14}`;
+              const ma20Dev = ma20 > 0
+                ? +((currentPrice - ma20) / ma20 * 100).toFixed(1)
+                : null;
+              const showVol = volumeRatio >= 1.8;
+              return (
+                <View style={styles.indicatorRow}>
+                  <Text style={[styles.rsiText, { color: rsiColor }]}>{rsiLabel}</Text>
+                  {showVol && (
+                    <View style={[styles.volBadge, { backgroundColor: "#FF6B0018" }]}>
+                      <Text style={styles.volText}>Vol {volumeRatio.toFixed(1)}x</Text>
+                    </View>
+                  )}
+                  {ma20Dev !== null && (
+                    <Text style={[styles.maDevText, {
+                      color: ma20Dev >= 0 ? c.positive : c.negative,
+                    }]}>
+                      MA {ma20Dev >= 0 ? "+" : ""}{ma20Dev}%
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
           </View>
 
           {/* ── 오른쪽: 가격 + 등락 ── */}
@@ -235,10 +260,14 @@ const styles = StyleSheet.create({
   },
   entryMarkText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#F04452" },
   ticker:  { fontSize: 12, fontFamily: "Inter_400Regular" },
-  mid:     { alignItems: "center", marginRight: 12, gap: 3 },
-  boxBadge:{ paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  boxText: { fontSize: 10, fontFamily: "Inter_500Medium" },
-  rsiText: { fontSize: 9, fontFamily: "Inter_400Regular" },
+  mid:          { alignItems: "center", marginRight: 12, gap: 3 },
+  boxBadge:     { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  boxText:      { fontSize: 10, fontFamily: "Inter_500Medium" },
+  indicatorRow: { alignItems: "center", gap: 2 },
+  rsiText:      { fontSize: 9, fontFamily: "Inter_500Medium" },
+  volBadge:     { paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  volText:      { fontSize: 8, fontFamily: "Inter_700Bold", color: "#FF6B00" },
+  maDevText:    { fontSize: 8, fontFamily: "Inter_400Regular" },
   right:   { alignItems: "flex-end", gap: 3 },
   priceRow:{ flexDirection: "row", alignItems: "center", gap: 5 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" },

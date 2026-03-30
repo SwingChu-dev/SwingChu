@@ -22,6 +22,7 @@ import BoxRangeSection from "@/components/detail/BoxRangeSection";
 import ForecastSection from "@/components/detail/ForecastSection";
 import FinancialsSection from "@/components/detail/FinancialsSection";
 import RiskSection from "@/components/detail/RiskSection";
+import TechnicalSection, { TechnicalSummary } from "@/components/detail/TechnicalSection";
 import DayFeaturesSection from "@/components/detail/DayFeaturesSection";
 import NewsSection from "@/components/detail/NewsSection";
 import BacktestSection from "@/components/detail/BacktestSection";
@@ -29,9 +30,9 @@ import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
 
-type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "리스크" | "요일" | "뉴스" | "백테스트";
+type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "기술" | "리스크" | "요일" | "뉴스" | "백테스트";
 
-const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "리스크", "요일", "뉴스", "백테스트"];
+const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "기술", "리스크", "요일", "뉴스", "백테스트"];
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#3B82F6",
@@ -123,6 +124,11 @@ export default function StockDetailScreen() {
   const dynBoxPos = useMemo(
     () => calcBoxPosition(stock.boxRange, liveQuote),
     [stock.boxRange, liveQuote]
+  );
+
+  const technicalSummary: TechnicalSummary | null = useMemo(
+    () => (enrichedData as any)?.technicalSummary ?? null,
+    [enrichedData]
   );
   const boxPosColor =
     dynBoxPos === "저점권" ? c.positive :
@@ -362,6 +368,29 @@ export default function StockDetailScreen() {
           {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
           {activeTab === "전망"   && <ForecastSection     stock={stock} />}
           {activeTab === "재무"   && <FinancialsSection   stock={stock} />}
+          {activeTab === "기술"   && (
+            technicalSummary
+              ? <TechnicalSection data={technicalSummary} />
+              : (
+                <View style={styles.techUnavailWrap}>
+                  <Ionicons name="pulse-outline" size={32} color={c.textTertiary} />
+                  <Text style={[styles.techUnavailTitle, { color: c.text }]}>기술 지표 분석 대기 중</Text>
+                  <Text style={[styles.techUnavailText, { color: c.textSecondary }]}>
+                    AI 분석을 실행하면 RSI14 · 이동평균 괴리율 · 거래량 급증{"\n"}지표가 자동 계산됩니다.
+                  </Text>
+                  {showAiPrompt && (
+                    <TouchableOpacity
+                      style={[styles.techAnalyzeBtn, { backgroundColor: c.tint }]}
+                      onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="sparkles" size={13} color="#fff" />
+                      <Text style={styles.techAnalyzeBtnText}>AI 분석 실행</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )
+          )}
           {activeTab === "리스크" && <RiskSection         stock={stock} />}
           {activeTab === "요일"   && <DayFeaturesSection  stock={stock} />}
           {activeTab === "뉴스"   && (
@@ -477,4 +506,15 @@ const styles = StyleSheet.create({
   themeTag:  { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   themeText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   bottomPad: { height: 100 },
+  techUnavailWrap: {
+    alignItems: "center", justifyContent: "center",
+    paddingVertical: 48, paddingHorizontal: 32, gap: 12,
+  },
+  techUnavailTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  techUnavailText:  { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  techAnalyzeBtn:   {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20,
+  },
+  techAnalyzeBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
