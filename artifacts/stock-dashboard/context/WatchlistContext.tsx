@@ -10,11 +10,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STOCKS, StockInfo, Market } from "@/constants/stockData";
 import { UniverseStock } from "@/constants/stockUniverse";
 
-const STORAGE_KEY    = "@watchlist_ids_v3";
-const CUSTOM_KEY     = "@custom_stocks_v3";
+const STORAGE_KEY    = "@watchlist_ids_v4";
+const CUSTOM_KEY     = "@custom_stocks_v4";
+const STORAGE_KEY_V3 = "@watchlist_ids_v3";
 const STORAGE_KEY_V2 = "@watchlist_ids_v2";
 const CUSTOM_KEY_V2  = "@custom_stocks_v2";
 const DEFAULT_IDS    = STOCKS.map((s) => s.id);
+const VALID_IDS      = new Set(DEFAULT_IDS);
 
 function createStubFromUniverse(us: UniverseStock): StockInfo {
   const cp = us.currentPrice;
@@ -87,47 +89,45 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const [customStocks,  setCustomStocks]  = useState<Record<string, StockInfo>>({});
 
   useEffect(() => {
-    AsyncStorage.multiGet([STORAGE_KEY, CUSTOM_KEY, STORAGE_KEY_V2, CUSTOM_KEY_V2]).then(
-      ([[, rawIds], [, rawCustom], [, rawIdsV2], [, rawCustomV2]]) => {
-        let loadedIds: string[] | null  = null;
-        let loadedCustom: Record<string, StockInfo> | null = null;
+    AsyncStorage.multiGet([STORAGE_KEY, STORAGE_KEY_V3, STORAGE_KEY_V2]).then(
+      ([[, rawIds], [, rawIdsV3], [, rawIdsV2]]) => {
+        let loadedIds: string[] | null = null;
 
-        // v3 우선 로드
+        // v4 우선
         if (rawIds) {
           try {
             const parsed = JSON.parse(rawIds);
             if (Array.isArray(parsed)) loadedIds = parsed;
           } catch {}
         }
-        if (rawCustom) {
+        // v4 없으면 v3
+        if (!loadedIds && rawIdsV3) {
           try {
-            const parsed = JSON.parse(rawCustom);
-            if (parsed && typeof parsed === "object") loadedCustom = parsed;
+            const parsed = JSON.parse(rawIdsV3);
+            if (Array.isArray(parsed)) loadedIds = parsed;
           } catch {}
         }
-
-        // v3 없으면 v2에서 마이그레이션 (병합 로직 제거하고 그대로 로드)
+        // v3 없으면 v2
         if (!loadedIds && rawIdsV2) {
           try {
             const parsed = JSON.parse(rawIdsV2);
-            if (Array.isArray(parsed)) {
-              loadedIds = parsed;
-              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-            }
-          } catch {}
-        }
-        if (!loadedCustom && rawCustomV2) {
-          try {
-            const parsed = JSON.parse(rawCustomV2);
-            if (parsed && typeof parsed === "object") {
-              loadedCustom = parsed;
-              AsyncStorage.setItem(CUSTOM_KEY, JSON.stringify(parsed));
-            }
+            if (Array.isArray(parsed)) loadedIds = parsed;
           } catch {}
         }
 
-        if (loadedIds) setWatchlistIds(loadedIds);
-        if (loadedCustom) setCustomStocks(loadedCustom);
+        if (loadedIds) {
+          // STOCKS에 없는 종목(삭제된 종목·수동추가 종목) 자동 제거
+          const cleaned = loadedIds.filter((id) => VALID_IDS.has(id));
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+          setWatchlistIds(cleaned);
+        }
+
+        // 구버전 custom stocks 키 정리
+        AsyncStorage.multiRemove([
+          "@custom_stocks_v3", "@custom_stocks_v2",
+          "@custom_stocks_v1", "@watchlist_ids_v3",
+          "@watchlist_ids_v2",
+        ]);
       }
     );
   }, []);
