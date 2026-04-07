@@ -12,6 +12,72 @@ import { StockInfo, USD_KRW_RATE } from "@/constants/stockData";
 import { LiveQuote } from "@/context/StockPriceContext";
 import { AISmartMoneySignal } from "@/context/AISignalContext";
 import { calcBoxPosition } from "@/utils/boxPosition";
+import { ISRAEL_DATA, IsraelLevel } from "@/constants/israelData";
+
+// ── 스캘핑 박스 컴포넌트 ─────────────────────────────────────
+const ISRAEL_DOT: Record<IsraelLevel, string> = {
+  높음: "#F04452", 중간: "#F59E0B", 낮음: "#3B82F6", 없음: "transparent",
+};
+
+function ScalpingBar({ quote, colors: c }: { quote: LiveQuote; colors: any }) {
+  const { price, high, low, prevClose } = quote;
+  const range = high - low;
+  if (!range || range <= 0) return null;
+
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  const pos   = clamp((price - low) / range);
+
+  // 피벗 포인트 (당일 고/저 + 전일 종가 기준)
+  const pp  = (high + low + prevClose) / 3;
+  const r1  = 2 * pp - low;
+  const s1  = 2 * pp - high;
+  const ppPos = clamp((pp - low) / range);
+
+  const zone =
+    pos <= 0.25 ? { label: "저가권 ↑", color: "#22C55E" } :
+    pos >= 0.75 ? { label: "고가권 ↓", color: "#F04452" } :
+    pos < ppPos  ? { label: "피벗 아래", color: "#F59E0B" } :
+                   { label: "피벗 위", color: "#FF6B00" };
+
+  const fmt = (n: number) =>
+    n >= 100000000 ? `${(n / 100000000).toFixed(1)}억` :
+    n >= 10000     ? `${Math.round(n / 10000)}만` :
+    n.toLocaleString();
+
+  return (
+    <View style={[scalpStyles.wrap, { borderTopColor: c.separator }]}>
+      {/* 레이블 행 */}
+      <View style={scalpStyles.labelRow}>
+        <Text style={[scalpStyles.tag, { color: c.textTertiary }]}>스캘핑</Text>
+        <View style={[scalpStyles.zoneBadge, { backgroundColor: zone.color + "18" }]}>
+          <Text style={[scalpStyles.zoneLabel, { color: zone.color }]}>{zone.label}</Text>
+        </View>
+        <View style={scalpStyles.pivotRow}>
+          <Text style={[scalpStyles.pivotTxt, { color: "#22C55E" }]}>S1 {fmt(s1)}</Text>
+          <Text style={[scalpStyles.pivotTxt, { color: c.textTertiary }]}>PP {fmt(pp)}</Text>
+          <Text style={[scalpStyles.pivotTxt, { color: "#F04452" }]}>R1 {fmt(r1)}</Text>
+        </View>
+      </View>
+
+      {/* 범위 바 */}
+      <View style={scalpStyles.barTrack}>
+        {/* 배경 */}
+        <View style={[scalpStyles.barBg, { backgroundColor: isDark(c) ? "#2A2A2E" : "#E5E7EB" }]} />
+        {/* 채워진 부분 (저점→현재) */}
+        <View style={[scalpStyles.barFill, { width: `${pos * 100}%` as any, backgroundColor: zone.color + "60" }]} />
+        {/* PP 마커 */}
+        <View style={[scalpStyles.ppMark, { left: `${ppPos * 100}%` as any }]} />
+        {/* 현재가 도트 */}
+        <View style={[scalpStyles.priceDot, { left: `${pos * 100}%` as any, backgroundColor: zone.color }]} />
+        {/* 저/고 레이블 */}
+        <Text style={[scalpStyles.edgeTxt, { left: 0, color: c.textTertiary }]}>{fmt(low)}</Text>
+        <Text style={[scalpStyles.edgeTxt, { right: 0, color: c.textTertiary }]}>{fmt(high)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function isDark(c: any) { return c.background === "#000000" || c.background?.startsWith("#0") || c.card?.startsWith("#1"); }
 
 function formatPrice(p: number): string {
   if (p >= 100000000) return `${(p / 100000000).toFixed(1)}억`;
@@ -118,6 +184,12 @@ function StockCardInner({
   const deleteOpacity = slideAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] });
   const contentShift  = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 42] });
 
+  const israelLevel = ISRAEL_DATA[stock.id]?.level;
+  const israelDotColor = israelLevel && israelLevel !== "없음" ? ISRAEL_DOT[israelLevel] : null;
+
+  // 스캘핑 바: quote에 당일 고/저 데이터 있을 때만
+  const hasScalp = !!(quote && quote.high > 0 && quote.low > 0 && quote.high > quote.low);
+
   return (
     <View style={styles.wrapper}>
       <Animated.View
@@ -132,89 +204,100 @@ function StockCardInner({
       <Animated.View style={{ transform: [{ translateX: contentShift }] }}>
         <TouchableOpacity
           style={[
-            styles.row,
+            styles.card,
             { backgroundColor: c.card },
             !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.separator },
           ]}
           onPress={onPress}
           activeOpacity={editMode ? 1 : 0.6}
         >
-          {/* ── 왼쪽: 종목명 + 티커 ── */}
-          <View style={styles.left}>
-            <View style={styles.nameRow}>
-              <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
-                {stock.name}
-              </Text>
-              {showEntryMark && (
-                <View style={styles.entryMark}>
-                  <Ionicons name="flash" size={10} color="#F04452" />
-                  <Text style={styles.entryMarkText}>진입</Text>
-                </View>
+          {/* ── 메인 행 ── */}
+          <View style={styles.row}>
+            {/* 왼쪽: 종목명 + 티커 */}
+            <View style={styles.left}>
+              <View style={styles.nameRow}>
+                <Text style={[styles.name, { color: c.text }]} numberOfLines={1}>
+                  {stock.name}
+                </Text>
+                {showEntryMark && (
+                  <View style={styles.entryMark}>
+                    <Ionicons name="flash" size={10} color="#F04452" />
+                    <Text style={styles.entryMarkText}>진입</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.tickerRow}>
+                <Text style={[styles.ticker, { color: c.textSecondary }]}>
+                  {stock.ticker}  ·  {stock.market}
+                </Text>
+                {israelDotColor && (
+                  <View style={[styles.israelDot, { backgroundColor: israelDotColor }]} />
+                )}
+              </View>
+            </View>
+
+            {/* 가운데: 구간 배지 + 기술 지표 */}
+            <View style={styles.mid}>
+              <View style={[styles.boxBadge, { backgroundColor: boxColor + "20" }]}>
+                <Text style={[styles.boxText, { color: boxColor }]}>{boxPos}</Text>
+              </View>
+              {signal?.indicators && (() => {
+                const { rsi14, volumeRatio, ma20, currentPrice } = signal.indicators;
+                const rsiColor =
+                  rsi14 >= 70 ? "#F04452" :
+                  rsi14 <= 30 ? "#1B63E8" : c.textTertiary;
+                const rsiLabel =
+                  rsi14 >= 70 ? `RSI ${rsi14}▲` :
+                  rsi14 <= 30 ? `RSI ${rsi14}▼` : `RSI ${rsi14}`;
+                const ma20Dev = ma20 > 0
+                  ? +((currentPrice - ma20) / ma20 * 100).toFixed(1)
+                  : null;
+                const showVol = volumeRatio >= 1.8;
+                return (
+                  <View style={styles.indicatorRow}>
+                    <Text style={[styles.rsiText, { color: rsiColor }]}>{rsiLabel}</Text>
+                    {showVol && (
+                      <View style={[styles.volBadge, { backgroundColor: "#FF6B0018" }]}>
+                        <Text style={styles.volText}>Vol {volumeRatio.toFixed(1)}x</Text>
+                      </View>
+                    )}
+                    {ma20Dev !== null && (
+                      <Text style={[styles.maDevText, {
+                        color: ma20Dev >= 0 ? c.positive : c.negative,
+                      }]}>
+                        MA {ma20Dev >= 0 ? "+" : ""}{ma20Dev}%
+                      </Text>
+                    )}
+                  </View>
+                );
+              })()}
+            </View>
+
+            {/* 오른쪽: 가격 + 등락 */}
+            <View style={styles.right}>
+              <View style={styles.priceRow}>
+                <Text style={[styles.price, { color: c.text }]}>₩{formatPrice(displayPrice)}</Text>
+                {isLiveChange && <View style={styles.liveDot} />}
+              </View>
+              {stock.market === "NASDAQ" && (
+                <Text style={[styles.usdPrice, { color: c.textTertiary }]}>
+                  ${(displayPrice / USD_KRW_RATE).toFixed(2)}
+                </Text>
+              )}
+              {isLiveChange && (
+                <Text style={[styles.change, { color: isPositiveChange ? c.positive : c.negative }]}>
+                  {isPositiveChange ? "▲" : "▼"} {Math.abs(displayChangePct).toFixed(2)}%
+                </Text>
               )}
             </View>
-            <Text style={[styles.ticker, { color: c.textSecondary }]}>
-              {stock.ticker}  ·  {stock.market}
-            </Text>
-          </View>
 
-          {/* ── 가운데: 구간 배지 + 기술 지표 ── */}
-          <View style={styles.mid}>
-            <View style={[styles.boxBadge, { backgroundColor: boxColor + "20" }]}>
-              <Text style={[styles.boxText, { color: boxColor }]}>{boxPos}</Text>
-            </View>
-            {signal?.indicators && (() => {
-              const { rsi14, volumeRatio, ma20, currentPrice } = signal.indicators;
-              const rsiColor =
-                rsi14 >= 70 ? "#F04452" :
-                rsi14 <= 30 ? "#1B63E8" : c.textTertiary;
-              const rsiLabel =
-                rsi14 >= 70 ? `RSI ${rsi14}▲` :
-                rsi14 <= 30 ? `RSI ${rsi14}▼` : `RSI ${rsi14}`;
-              const ma20Dev = ma20 > 0
-                ? +((currentPrice - ma20) / ma20 * 100).toFixed(1)
-                : null;
-              const showVol = volumeRatio >= 1.8;
-              return (
-                <View style={styles.indicatorRow}>
-                  <Text style={[styles.rsiText, { color: rsiColor }]}>{rsiLabel}</Text>
-                  {showVol && (
-                    <View style={[styles.volBadge, { backgroundColor: "#FF6B0018" }]}>
-                      <Text style={styles.volText}>Vol {volumeRatio.toFixed(1)}x</Text>
-                    </View>
-                  )}
-                  {ma20Dev !== null && (
-                    <Text style={[styles.maDevText, {
-                      color: ma20Dev >= 0 ? c.positive : c.negative,
-                    }]}>
-                      MA {ma20Dev >= 0 ? "+" : ""}{ma20Dev}%
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
-          </View>
-
-          {/* ── 오른쪽: 가격 + 등락 ── */}
-          <View style={styles.right}>
-            <View style={styles.priceRow}>
-              <Text style={[styles.price, { color: c.text }]}>₩{formatPrice(displayPrice)}</Text>
-              {isLiveChange && <View style={styles.liveDot} />}
-            </View>
-            {stock.market === "NASDAQ" && (
-              <Text style={[styles.usdPrice, { color: c.textTertiary }]}>
-                ${(displayPrice / USD_KRW_RATE).toFixed(2)}
-              </Text>
-            )}
-            {isLiveChange && (
-              <Text style={[styles.change, { color: isPositiveChange ? c.positive : c.negative }]}>
-                {isPositiveChange ? "▲" : "▼"} {Math.abs(displayChangePct).toFixed(2)}%
-              </Text>
+            {!editMode && (
+              <Ionicons name="chevron-forward" size={14} color={c.textTertiary} style={styles.chevron} />
             )}
           </View>
 
-          {!editMode && (
-            <Ionicons name="chevron-forward" size={14} color={c.textTertiary} style={styles.chevron} />
-          )}
+          {/* ── 스캘핑 박스 바 ── */}
+          {hasScalp && <ScalpingBar quote={quote!} colors={c} />}
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -239,6 +322,7 @@ const styles = StyleSheet.create({
   wrapper:    { overflow: "hidden" },
   deleteWrap: { position: "absolute", left: 16, top: 0, bottom: 0, justifyContent: "center", zIndex: 1 },
   deleteBtn:  { width: 30, height: 30, borderRadius: 15, backgroundColor: "#F04452", justifyContent: "center", alignItems: "center" },
+  card:       { paddingBottom: 0 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -246,9 +330,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     minHeight: 64,
   },
-  left:    { flex: 1, gap: 4, marginRight: 8 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "nowrap" },
-  name:    { fontSize: 15, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  left:      { flex: 1, gap: 4, marginRight: 8 },
+  nameRow:   { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "nowrap" },
+  name:      { fontSize: 15, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  tickerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  israelDot: { width: 6, height: 6, borderRadius: 3 },
   entryMark: {
     flexDirection: "row",
     alignItems: "center",
@@ -275,4 +361,87 @@ const styles = StyleSheet.create({
   usdPrice:{ fontSize: 11, fontFamily: "Inter_400Regular" },
   change:  { fontSize: 12, fontFamily: "Inter_500Medium" },
   chevron: { marginLeft: 4 },
+});
+
+const scalpStyles = StyleSheet.create({
+  wrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  tag: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    minWidth: 36,
+  },
+  zoneBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  zoneLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+  },
+  pivotRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  pivotTxt: {
+    fontSize: 9,
+    fontFamily: "Inter_500Medium",
+  },
+  barTrack: {
+    height: 18,
+    position: "relative",
+    justifyContent: "center",
+  },
+  barBg: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 4,
+    borderRadius: 2,
+  },
+  barFill: {
+    position: "absolute",
+    left: 0,
+    height: 4,
+    borderRadius: 2,
+  },
+  ppMark: {
+    position: "absolute",
+    width: 2,
+    height: 10,
+    borderRadius: 1,
+    backgroundColor: "#94A3B8",
+    marginLeft: -1,
+    top: 4,
+  },
+  priceDot: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginLeft: -5,
+    top: -3,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  edgeTxt: {
+    position: "absolute",
+    fontSize: 8,
+    fontFamily: "Inter_400Regular",
+    bottom: -1,
+  },
 });

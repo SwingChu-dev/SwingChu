@@ -27,12 +27,13 @@ import DayFeaturesSection from "@/components/detail/DayFeaturesSection";
 import NewsSection from "@/components/detail/NewsSection";
 import BacktestSection from "@/components/detail/BacktestSection";
 import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
+import IsraelSection from "@/components/detail/IsraelSection";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
 
-type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "기술" | "리스크" | "요일" | "뉴스" | "백테스트";
+type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "기술" | "리스크" | "요일" | "뉴스" | "백테스트" | "이스라엘";
 
-const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "기술", "리스크", "요일", "뉴스", "백테스트"];
+const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "기술", "리스크", "요일", "뉴스", "백테스트", "이스라엘"];
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#3B82F6",
@@ -304,7 +305,7 @@ export default function StockDetailScreen() {
       </ScrollView>
 
       {/* stub 종목: AI 분석 중 전체 로딩 화면 */}
-      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
+      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#F59E0B" />
           <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
@@ -314,7 +315,7 @@ export default function StockDetailScreen() {
             분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
           </Text>
         </View>
-      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" ? (
+      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={c.tint} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>
@@ -328,7 +329,7 @@ export default function StockDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
         >
-          {activeTab !== "뉴스" && activeTab !== "백테스트" && (
+          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && (
             <>
               <View style={styles.descriptionBox}>
                 <Text style={[styles.description, { color: c.textSecondary }]}>
@@ -354,7 +355,7 @@ export default function StockDetailScreen() {
           )}
 
           {/* predefined 종목: AI 분석 중 탭 위에 오버레이 배너 */}
-          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && (
+          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && (
             <View style={[styles.aiOverlayBanner, { backgroundColor: "#F59E0B14" }]}>
               <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.75 }] }} />
               <Text style={[styles.aiOverlayText, { color: "#F59E0B" }]}>
@@ -397,6 +398,7 @@ export default function StockDetailScreen() {
             <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />
           )}
           {activeTab === "백테스트" && <BacktestSection stock={stock} />}
+          {activeTab === "이스라엘" && <IsraelSection stockId={stock.id} />}
 
           <View style={styles.bottomPad} />
         </ScrollView>
