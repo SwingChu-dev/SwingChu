@@ -9,7 +9,7 @@ const KIS_URL = "https://openapi.koreainvestment.com:9443";
 // ── 종목별 거래소 코드 매핑 (NYSE 상장 종목 명시, 나머지 NASDAQ) ───────────
 const NYSE_TICKERS = new Set([
   "XOM","CVX","BAC","WMT","JPM","JNJ","PG","KO","PFE","XLE","WFC","BRK","GS",
-  "GEV","BWXT",
+  "GEV","BWXT","LMT",
 ]);
 
 function exchangeCode(ticker: string): string {
