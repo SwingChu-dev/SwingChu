@@ -222,7 +222,35 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        <View style={{ height: 100 }} />
+        {/* ─── 도구 바로가기 ─── */}
+        {!editMode && (
+          <View style={[styles.toolsCard, { backgroundColor: c.card }]}>
+            <Text style={[styles.toolsHeader, { color: c.textSecondary }]}>도구</Text>
+            <View style={styles.toolsRow}>
+              {[
+                { icon: "radio-outline"      as const, label: "실시간\n레이더",  color: "#8B5CF6", path: "/realtime-radar"    },
+                { icon: "pulse-outline"      as const, label: "매매\n신호",      color: "#F04452", path: "/trade-signals"     },
+                { icon: "stats-chart-outline"as const, label: "섹터\n분석",      color: "#0064FF", path: "/sector-analysis"   },
+                { icon: "globe-outline"      as const, label: "지경학\n리스크",  color: "#FF6B00", path: "/geopolitical-risk" },
+                { icon: "shield-outline"     as const, label: "전략\n가이드",    color: "#22C55E", path: "/(tabs)/strategy"   },
+              ].map((t) => (
+                <TouchableOpacity
+                  key={t.path}
+                  style={styles.toolBtn}
+                  onPress={() => router.push(t.path as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.toolIcon, { backgroundColor: t.color + "18" }]}>
+                    <Ionicons name={t.icon} size={20} color={t.color} />
+                  </View>
+                  <Text style={[styles.toolLabel, { color: c.textSecondary }]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={{ height: 30 }} />
       </ScrollView>
     </View>
   );
@@ -275,4 +303,33 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   addBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+
+  toolsCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
+  toolsHeader: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 12,
+  },
+  toolsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  toolBtn: { alignItems: "center", gap: 6, flex: 1 },
+  toolIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  toolLabel: { fontSize: 10, fontFamily: "Inter_500Medium", textAlign: "center", lineHeight: 14 },
 });

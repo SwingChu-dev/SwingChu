@@ -61,26 +61,7 @@ export default function TabLayout() {
         name="explore"
         options={{ href: null }}
       />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: "더보기",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "ellipsis.circle.fill" : "ellipsis.circle"}
-                tintColor={color}
-                size={24}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "ellipsis-horizontal-circle" : "ellipsis-horizontal-circle-outline"}
-                size={22}
-                color={color}
-              />
-            ),
-        }}
-      />
+      <Tabs.Screen name="more" options={{ href: null }} />
 
       <Tabs.Screen name="signals"  options={{ href: null }} />
       <Tabs.Screen name="analysis" options={{ href: null }} />

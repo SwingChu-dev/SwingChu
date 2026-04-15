@@ -815,6 +815,12 @@ router.get("/stocks/detail", async (req, res) => {
     const name: string = univEntry?.name ?? pr?.shortName ?? q?.shortName ?? ticker;
     const recommendationKey: string    = fd?.recommendationKey ?? "";
 
+    // ── 공매도 데이터 (미국주식만; 한국주식은 Yahoo에서 제공 안 함) ──────────
+    const shortRatio:            number | null = isKorean ? null : (ks?.shortRatio            ?? null);
+    const shortPercentOfFloat:   number | null = isKorean ? null : (ks?.shortPercentOfFloat   ?? null);
+    const sharesShort:           number | null = isKorean ? null : (ks?.sharesShort           ?? null);
+    const sharesShortPriorMonth: number | null = isKorean ? null : (ks?.sharesShortPriorMonth ?? null);
+
     const payload = {
       ticker, market, name, currentPrice, priceKRW,
       high52w, low52w, high52wKRW, low52wKRW,
@@ -822,6 +828,7 @@ router.get("/stocks/detail", async (req, res) => {
       per, forwardPer, pbr, roe, debtRatio, revenueGrowth,
       targetMean, targetMeanKRW, targetHigh, targetLow,
       beta, recommendationKey,
+      shortRatio, shortPercentOfFloat, sharesShort, sharesShortPriorMonth,
     };
 
     detailCache.set(cacheKey, payload, TTL.DETAIL);

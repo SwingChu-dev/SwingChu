@@ -99,14 +99,6 @@ export default function MoreScreen() {
         <SectionHeader title="분석 도구" />
         <View style={styles.section}>
           <MenuItem
-            icon="bar-chart-outline"
-            iconColor="#0064FF"
-            title="분석"
-            description="RSI·볼린저밴드·기술적 지표 종합 분석"
-            onPress={() => router.navigate("/(tabs)/analysis")}
-          />
-          <View style={[styles.divider, { backgroundColor: c.separator }]} />
-          <MenuItem
             icon="shield-outline"
             iconColor="#22C55E"
             title="전략"
