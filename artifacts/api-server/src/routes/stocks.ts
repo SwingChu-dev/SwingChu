@@ -64,6 +64,35 @@ function toYahooTicker(ticker: string, market: string): string {
   return ticker;
 }
 
+// ─── Yahoo Finance 미국주식: 시간외(프리/포스트마켓) 포함 최신 시세 ────────────
+function bestUsPrice(q: any): { price: number; change: number; changePercent: number; source: string } {
+  const regular       = q.regularMarketPrice        ?? 0;
+  const prevClose     = q.regularMarketPreviousClose ?? regular;
+  const marketState: string = q.marketState ?? "CLOSED";
+
+  // 포스트마켓 (장 마감 후)
+  if (marketState === "POST" && q.postMarketPrice && q.postMarketPrice > 0) {
+    const price  = q.postMarketPrice;
+    const change = q.postMarketChange ?? (price - regular);
+    const pct    = q.postMarketChangePercent ?? (prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0);
+    return { price, change, changePercent: pct, source: "Yahoo-POST" };
+  }
+  // 프리마켓 (장 시작 전)
+  if (marketState === "PRE" && q.preMarketPrice && q.preMarketPrice > 0) {
+    const price  = q.preMarketPrice;
+    const change = q.preMarketChange ?? (price - regular);
+    const pct    = q.preMarketChangePercent ?? (prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0);
+    return { price, change, changePercent: pct, source: "Yahoo-PRE" };
+  }
+  // 정규장 또는 휴장
+  return {
+    price:         regular,
+    change:        q.regularMarketChange        ?? 0,
+    changePercent: q.regularMarketChangePercent ?? 0,
+    source:        "Yahoo-REG",
+  };
+}
+
 // ─── Yahoo Finance 기반 한국 주식 헬퍼 (.KS/.KQ 심볼) ───────────────────────
 interface KrQuote {
   close: number; open: number; high: number; low: number;
@@ -507,29 +536,32 @@ router.get("/stocks/quotes", async (req, res) => {
           _source:       "KIS",
         };
       }
-      // KIS 실패 → Yahoo Finance 폴백
+      // KIS 실패 → Yahoo Finance 폴백 (시간외 시세 포함)
       const missing = usTickers.filter(p => !usMap[p.ticker]);
       if (missing.length > 0) {
         await Promise.allSettled(missing.map(async p => {
           try {
             const q = await yahooFinance.quote(p.yahooTicker);
-            if (q?.regularMarketPrice) usMap[p.ticker] = {
-              close: q.regularMarketPrice ?? 0,
-              open:  q.regularMarketOpen ?? 0,
-              high:  q.regularMarketDayHigh ?? 0,
-              low:   q.regularMarketDayLow ?? 0,
-              volume: q.regularMarketVolume ?? 0,
-              change: q.regularMarketChange ?? 0,
-              changePercent: q.regularMarketChangePercent ?? 0,
-              prevClose: q.regularMarketPreviousClose ?? 0,
-              high52w: q.fiftyTwoWeekHigh ?? 0,
-              low52w:  q.fiftyTwoWeekLow ?? 0,
-              _name: q.shortName ?? q.longName ?? p.ticker,
-              _currency: q.currency ?? "USD",
-              _avgVol: q.averageDailyVolume10Day ?? 0,
-              _fiftyAvg: q.fiftyDayAverage ?? 0,
-              _source: "Yahoo",
-            };
+            if (q?.regularMarketPrice) {
+              const best = bestUsPrice(q);
+              usMap[p.ticker] = {
+                close:         best.price,
+                open:          q.regularMarketOpen ?? 0,
+                high:          q.regularMarketDayHigh ?? 0,
+                low:           q.regularMarketDayLow ?? 0,
+                volume:        q.regularMarketVolume ?? 0,
+                change:        best.change,
+                changePercent: best.changePercent,
+                prevClose:     q.regularMarketPreviousClose ?? 0,
+                high52w:       q.fiftyTwoWeekHigh ?? 0,
+                low52w:        q.fiftyTwoWeekLow ?? 0,
+                _name:         q.shortName ?? q.longName ?? p.ticker,
+                _currency:     q.currency ?? "USD",
+                _avgVol:       q.averageDailyVolume10Day ?? 0,
+                _fiftyAvg:     q.fiftyDayAverage ?? 0,
+                _source:       best.source,
+              };
+            }
           } catch {}
         }));
       }
@@ -537,22 +569,26 @@ router.get("/stocks/quotes", async (req, res) => {
       await Promise.allSettled(usTickers.map(async p => {
         try {
           const q = await yahooFinance.quote(p.yahooTicker);
-          if (q?.regularMarketPrice) usMap[p.ticker] = {
-            close: q.regularMarketPrice ?? 0,
-            open:  q.regularMarketOpen ?? 0,
-            high:  q.regularMarketDayHigh ?? 0,
-            low:   q.regularMarketDayLow ?? 0,
-            volume: q.regularMarketVolume ?? 0,
-            change: q.regularMarketChange ?? 0,
-            changePercent: q.regularMarketChangePercent ?? 0,
-            prevClose: q.regularMarketPreviousClose ?? 0,
-            high52w: q.fiftyTwoWeekHigh ?? 0,
-            low52w:  q.fiftyTwoWeekLow ?? 0,
-            _name: q.shortName ?? q.longName ?? p.ticker,
-            _currency: q.currency ?? "USD",
-            _avgVol: q.averageDailyVolume10Day ?? 0,
-            _fiftyAvg: q.fiftyDayAverage ?? 0,
-          };
+          if (q?.regularMarketPrice) {
+            const best = bestUsPrice(q);
+            usMap[p.ticker] = {
+              close:         best.price,
+              open:          q.regularMarketOpen ?? 0,
+              high:          q.regularMarketDayHigh ?? 0,
+              low:           q.regularMarketDayLow ?? 0,
+              volume:        q.regularMarketVolume ?? 0,
+              change:        best.change,
+              changePercent: best.changePercent,
+              prevClose:     q.regularMarketPreviousClose ?? 0,
+              high52w:       q.fiftyTwoWeekHigh ?? 0,
+              low52w:        q.fiftyTwoWeekLow ?? 0,
+              _name:         q.shortName ?? q.longName ?? p.ticker,
+              _currency:     q.currency ?? "USD",
+              _avgVol:       q.averageDailyVolume10Day ?? 0,
+              _fiftyAvg:     q.fiftyDayAverage ?? 0,
+              _source:       best.source,
+            };
+          }
         } catch {}
       }));
     }

@@ -133,15 +133,15 @@ export async function fetchKisKrQuote(ticker: string): Promise<KisKrQuote | null
   if (!price) return null;
   return {
     price,
-    change:        parseInt(o.prdy_vrss   ?? "0", 10),
-    changePercent: parseFloat(o.prdy_ctrt  ?? "0"),
-    volume:        parseInt(o.acml_vol    ?? "0", 10),
-    open:          parseInt(o.stck_oprc   ?? "0", 10),
-    high:          parseInt(o.stck_hgpr   ?? "0", 10),
-    low:           parseInt(o.stck_lwpr   ?? "0", 10),
-    prevClose:     parseInt(o.stck_sdpr   ?? "0", 10),
-    high52w:       parseInt(o.stck_mxpr   ?? "0", 10),
-    low52w:        parseInt(o.stck_mnpr   ?? "0", 10),
+    change:        parseInt(o.prdy_vrss        ?? "0", 10),
+    changePercent: parseFloat(o.prdy_ctrt       ?? "0"),
+    volume:        parseInt(o.acml_vol          ?? "0", 10),
+    open:          parseInt(o.stck_oprc         ?? "0", 10),
+    high:          parseInt(o.stck_hgpr         ?? "0", 10),
+    low:           parseInt(o.stck_lwpr         ?? "0", 10),
+    prevClose:     parseInt(o.stck_prdy_clpr    ?? o.stck_sdpr ?? "0", 10),
+    high52w:       parseInt(o.w52_hgpr          ?? "0", 10), // 52주 최고가 (stck_mxpr는 상한가로 잘못됨)
+    low52w:        parseInt(o.w52_lwpr          ?? "0", 10), // 52주 최저가 (stck_mnpr는 하한가로 잘못됨)
   };
 }
 
