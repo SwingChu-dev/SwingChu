@@ -14,7 +14,9 @@
       "backgroundColor": "#0A1628"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.swingjeongseok.app",
+      "buildNumber": "1"
     },
     "android": {},
     "web": {
