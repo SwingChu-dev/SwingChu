@@ -17,18 +17,19 @@ function exchangeCode(ticker: string): string {
   return "NAS"; // 기본: NASDAQ
 }
 
-// ── 액세스 토큰 캐시 (24시간) ─────────────────────────────────────────────
-let _token: string | null = null;
-let _tokenExpiry = 0;
+// ── 액세스 토큰 캐시 ──────────────────────────────────────────────────────
+let _token:        string | null = null;
+let _tokenExpiry   = 0;
+let _tokenPromise: Promise<string | null> | null = null; // 동시 요청 중복 방지
+let _retryAfter    = 0; // 실패 후 재시도 금지 시각
 
 export function isAvailable(): boolean {
   return !!(process.env.KIS_APPKEY && process.env.KIS_APPSECRET);
 }
 
-
-async function getToken(): Promise<string | null> {
-  if (!isAvailable()) return null;
-  if (_token && Date.now() < _tokenExpiry) return _token;
+async function fetchNewToken(): Promise<string | null> {
+  // 실패 쿨다운 중이면 null 반환 (로그 없음)
+  if (Date.now() < _retryAfter) return null;
 
   try {
     const res = await fetch(`${KIS_URL}/oauth2/tokenP`, {
@@ -42,18 +43,34 @@ async function getToken(): Promise<string | null> {
     });
     const json = await res.json() as any;
     if (!json.access_token) {
-      console.error("[KIS] 토큰 발급 실패:", json.error_description ?? JSON.stringify(json));
+      // KIS "1분당 1회" 제한 → 70초 후 재시도
+      _retryAfter = Date.now() + 70_000;
+      console.warn("[KIS] 토큰 발급 실패 (70초 후 재시도):", json.error_description ?? json.msg1 ?? "unknown");
       return null;
     }
-    _token = json.access_token;
-    // 만료 기준: 23시간 후 (1시간 여유)
-    _tokenExpiry = Date.now() + 23 * 60 * 60 * 1000;
+    _token       = json.access_token;
+    _tokenExpiry = Date.now() + 23 * 60 * 60 * 1000; // 23시간 캐시
+    _retryAfter  = 0;
     console.log("[KIS] 액세스 토큰 발급 성공");
     return _token;
   } catch (e) {
+    _retryAfter = Date.now() + 30_000;
     console.error("[KIS] 토큰 요청 오류:", e);
     return null;
   }
+}
+
+async function getToken(): Promise<string | null> {
+  if (!isAvailable()) return null;
+
+  // 유효한 토큰 있으면 즉시 반환
+  if (_token && Date.now() < _tokenExpiry) return _token;
+
+  // 이미 발급 요청 중이면 그 Promise 공유 (동시 중복 방지)
+  if (_tokenPromise) return _tokenPromise;
+
+  _tokenPromise = fetchNewToken().finally(() => { _tokenPromise = null; });
+  return _tokenPromise;
 }
 
 // ── 공통 요청 헬퍼 ────────────────────────────────────────────────────────
