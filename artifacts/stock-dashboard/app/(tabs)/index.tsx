@@ -232,7 +232,7 @@ export default function HomeScreen() {
                 { icon: "pulse-outline"      as const, label: "매매\n신호",      color: "#F04452", path: "/trade-signals"     },
 
                 { icon: "globe-outline"      as const, label: "지경학\n리스크",  color: "#FF6B00", path: "/geopolitical-risk" },
-                { icon: "shield-outline"     as const, label: "전략\n가이드",    color: "#22C55E", path: "/(tabs)/strategy"   },
+
               ].map((t) => (
                 <TouchableOpacity
                   key={t.path}

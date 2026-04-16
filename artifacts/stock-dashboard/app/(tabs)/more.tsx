@@ -95,18 +95,6 @@ export default function MoreScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* 분석 도구 */}
-        <SectionHeader title="분석 도구" />
-        <View style={styles.section}>
-          <MenuItem
-            icon="shield-outline"
-            iconColor="#22C55E"
-            title="전략"
-            description="30/30/40 스윙 전략·리스크 관리 가이드"
-            onPress={() => router.navigate("/(tabs)/strategy")}
-          />
-        </View>
-
         {/* 글로벌 리스크 */}
         <SectionHeader title="글로벌 리스크" />
         <View style={styles.section}>
