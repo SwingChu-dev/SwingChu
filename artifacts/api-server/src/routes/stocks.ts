@@ -946,6 +946,213 @@ router.get("/stocks/history", async (req, res) => {
   }
 });
 
+// ─── 과열진단: 기술적·밸류에이션 과열 신호 종합 ──────────────────────────────
+const overheatCache = new TtlCache<any>();
+
+function calcMa(closes: number[], n: number): number | null {
+  if (closes.length < n) return null;
+  const slice = closes.slice(closes.length - n);
+  return slice.reduce((a, b) => a + b, 0) / n;
+}
+
+type SignalType = "positive" | "negative" | "neutral";
+interface OSignal { type: SignalType; text: string }
+
+router.get("/stocks/overheating", async (req, res) => {
+  const ticker = (req.query.ticker as string) ?? "";
+  const market  = (req.query.market  as string) ?? "NASDAQ";
+  if (!ticker) return res.status(400).json({ error: "ticker required" });
+
+  const cacheKey = `${ticker}:${market}`;
+  const cached = overheatCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const yahooTicker = toYahooTicker(ticker, market);
+  const isKorean = market === "KOSPI" || market === "KOSDAQ";
+  const liveRate = await getLiveUsdKrw();
+
+  try {
+    // 1) 65일 일봉 데이터 (RSI-14 + MA20 + MA60 = 최소 74개 필요, 안전하게 90일)
+    const period1 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    let closes: number[] = [];
+    let currentPrice = 0;
+
+    if (isKorean) {
+      const bars = await yahooKrHistory(ticker, market, 90);
+      closes = bars.map(b => b.close);
+      currentPrice = closes.at(-1) ?? 0;
+    } else {
+      const result: any = await (yahooFinance as any)
+        .chart(yahooTicker, { period1, interval: "1d" })
+        .catch(() => ({ quotes: [] }));
+      const raw: any[] = (result?.quotes ?? []).filter((d: any) => d.close != null && d.close > 0);
+      closes = raw.map((d: any) => Math.round(d.close * liveRate));
+      currentPrice = closes.at(-1) ?? 0;
+    }
+
+    // 2) 기술 지표 계산
+    const rsi14 = calcRsi14Simple(closes);
+    const ma20  = calcMa(closes, 20);
+    const ma60  = calcMa(closes, 60);
+    const ma20Disparity = ma20 && currentPrice ? +((currentPrice / ma20 - 1) * 100).toFixed(1) : null;
+    const ma60Disparity = ma60 && currentPrice ? +((currentPrice / ma60 - 1) * 100).toFixed(1) : null;
+
+    // 3) 펀더멘털 (quoteSummary 재활용)
+    const [summary, rawQuote, krQ] = await Promise.all([
+      yahooFinance.quoteSummary(yahooTicker, {
+        modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
+      }).catch(() => null),
+      isKorean ? Promise.resolve(null) : yahooFinance.quote(yahooTicker).catch(() => null),
+      isKorean ? yahooKrQuote(ticker, market) : Promise.resolve(null),
+    ]);
+
+    const q  = rawQuote as any;
+    const fd = (summary as any)?.financialData ?? {};
+    const ks = (summary as any)?.defaultKeyStatistics ?? {};
+    const sd = (summary as any)?.summaryDetail ?? {};
+
+    const high52w: number = isKorean ? (krQ?.high52w ?? 0) : ((q?.fiftyTwoWeekHigh ?? 0));
+    const low52w:  number = isKorean ? (krQ?.low52w  ?? 0) : ((q?.fiftyTwoWeekLow  ?? 0));
+    const high52wKRW = isKorean ? high52w : Math.round(high52w * liveRate);
+    const low52wKRW  = isKorean ? low52w  : Math.round(low52w  * liveRate);
+    const position52w: number | null =
+      high52wKRW > low52wKRW && currentPrice > 0
+        ? +((currentPrice - low52wKRW) / (high52wKRW - low52wKRW) * 100).toFixed(1)
+        : null;
+
+    const trailingPer: number | null = sd?.trailingPE ?? null;
+    const forwardPer:  number | null = sd?.forwardPE  ?? null;
+    const targetMean:  number | null = fd?.targetMeanPrice ?? null;
+    const targetMeanKRW: number | null = targetMean
+      ? (isKorean ? Math.round(targetMean) : Math.round(targetMean * liveRate))
+      : null;
+    const analystUpside: number | null = targetMeanKRW && currentPrice > 0
+      ? +((targetMeanKRW / currentPrice - 1) * 100).toFixed(1)
+      : null;
+    const revenueGrowthRaw: number | null = fd?.revenueGrowth ?? null;
+    const revenueGrowth: number | null = revenueGrowthRaw != null
+      ? Math.round(revenueGrowthRaw * 1000) / 10
+      : null;
+    const epsGrowthRaw: number | null = fd?.earningsGrowth ?? null;
+    const epsGrowth: number | null = epsGrowthRaw != null
+      ? Math.round(epsGrowthRaw * 1000) / 10
+      : null;
+    const beta: number | null = sd?.beta ?? ks?.beta ?? null;
+
+    // 4) 과열 점수 (0 = 안전, 100 = 극과열)
+    let score = 0;
+    // RSI 기여 (최대 35점)
+    if (rsi14 >= 80)      score += 35;
+    else if (rsi14 >= 70) score += 20 + (rsi14 - 70) * 1.5;
+    else if (rsi14 >= 50) score += (rsi14 - 50) * 1.0;
+    // MA20 이격도 기여 (최대 25점)
+    if (ma20Disparity != null) {
+      if (ma20Disparity >= 20)      score += 25;
+      else if (ma20Disparity >= 10) score += 10 + (ma20Disparity - 10) * 1.5;
+      else if (ma20Disparity >= 5)  score += (ma20Disparity - 5) * 2;
+      else if (ma20Disparity < 0)   score += 0;
+    }
+    // MA60 이격도 기여 (최대 25점)
+    if (ma60Disparity != null) {
+      if (ma60Disparity >= 40)      score += 25;
+      else if (ma60Disparity >= 20) score += 10 + (ma60Disparity - 20) * 0.75;
+      else if (ma60Disparity >= 10) score += (ma60Disparity - 10) * 1.0;
+    }
+    // 52주 위치 기여 (최대 15점)
+    if (position52w != null) {
+      if (position52w >= 95)      score += 15;
+      else if (position52w >= 80) score += (position52w - 80) * 1.0;
+    }
+    score = Math.max(0, Math.min(100, Math.round(score)));
+
+    // 5) 시그널 리스트 생성
+    const signals: OSignal[] = [];
+
+    // RSI 시그널
+    if (rsi14 >= 85)
+      signals.push({ type: "negative", text: `RSI ${rsi14} — 극과열. 추격 매수 자제. 숨 고르기 대기.` });
+    else if (rsi14 >= 70)
+      signals.push({ type: "negative", text: `RSI ${rsi14} — 과열권. 단기 조정 가능성 있음.` });
+    else if (rsi14 >= 50)
+      signals.push({ type: "neutral",  text: `RSI ${rsi14} — 정상 추세권. 방향성 유지 중.` });
+    else if (rsi14 >= 30)
+      signals.push({ type: "positive", text: `RSI ${rsi14} — 중립 이하. 반등 잠재력 존재.` });
+    else
+      signals.push({ type: "positive", text: `RSI ${rsi14} — 과매도. 강한 반등 가능성.` });
+
+    // MA이격도 시그널
+    if (ma20Disparity != null) {
+      if (ma20Disparity >= 15)
+        signals.push({ type: "negative", text: `20일선 +${ma20Disparity}% 과이격 — 단기 조정 시 좋은 재진입 기회.` });
+      else if (ma20Disparity < -5)
+        signals.push({ type: "positive", text: `20일선 ${ma20Disparity}% 아래 — 지지 확인 후 매수 검토.` });
+    }
+    if (ma60Disparity != null) {
+      if (ma60Disparity >= 30)
+        signals.push({ type: "negative", text: `60일선 +${ma60Disparity}% 과이격 — 추세 과열, 중기 분할 매도 고려.` });
+      else if (ma60Disparity >= 10)
+        signals.push({ type: "neutral",  text: `60일선 +${ma60Disparity}% — 건강한 상승 추세 유지 중.` });
+    }
+
+    // 52주 위치
+    if (position52w != null) {
+      if (position52w >= 95)
+        signals.push({ type: "negative", text: `52주 고점 ${position52w}% 위치 — 저항권. 추격 주의.` });
+      else if (position52w >= 80)
+        signals.push({ type: "neutral",  text: `52주 고점 ${position52w}% 위치 — 상단 저항 의식 필요.` });
+      else if (position52w <= 25)
+        signals.push({ type: "positive", text: `52주 저점 ${position52w}% 위치 — 가격 매력 높음.` });
+    }
+
+    // 밸류에이션 시그널
+    if (forwardPer != null && trailingPer != null) {
+      if (forwardPer < trailingPer * 0.85)
+        signals.push({ type: "positive", text: `Forward P/E(${forwardPer.toFixed(1)}) < Trailing(${trailingPer.toFixed(1)}) — 이익 성장이 주가 상승을 앞섬.` });
+      else if (forwardPer > trailingPer * 1.15)
+        signals.push({ type: "negative", text: `Forward P/E(${forwardPer.toFixed(1)}) > Trailing(${trailingPer.toFixed(1)}) — 이익 모멘텀 둔화 주의.` });
+    } else if (forwardPer != null) {
+      if (forwardPer < 15)
+        signals.push({ type: "positive", text: `Forward P/E ${forwardPer.toFixed(1)} — 합리적 밸류에이션.` });
+      else if (forwardPer > 30)
+        signals.push({ type: "negative", text: `Forward P/E ${forwardPer.toFixed(1)} — 고평가 주의, 실적이 뒷받침해야 함.` });
+    }
+
+    if (analystUpside != null) {
+      if (analystUpside > 20)
+        signals.push({ type: "positive", text: `애널리스트 목표가 상승여력 +${analystUpside}% — 전문가 낙관론 강함.` });
+      else if (analystUpside < -5)
+        signals.push({ type: "negative", text: `현재가가 목표가 ${Math.abs(analystUpside)}% 초과 — 과평가 가능성.` });
+      else if (analystUpside >= 10)
+        signals.push({ type: "positive", text: `애널리스트 목표가 상승여력 +${analystUpside}%.` });
+    }
+
+    if (revenueGrowth != null && revenueGrowth > 20)
+      signals.push({ type: "positive", text: `매출 성장률 +${revenueGrowth}% — 펀더멘털 성장 지속.` });
+    else if (revenueGrowth != null && revenueGrowth < 0)
+      signals.push({ type: "negative", text: `매출 역성장 ${revenueGrowth}% — 실적 둔화 확인 필요.` });
+
+    if (epsGrowth != null && epsGrowth > 30)
+      signals.push({ type: "positive", text: `EPS 성장률 +${epsGrowth}% — 이익 가속화 진행 중.` });
+
+    const payload = {
+      ticker, market,
+      rsi14, ma20, ma60, currentPrice,
+      ma20Disparity, ma60Disparity,
+      high52wKRW, low52wKRW, position52w,
+      trailingPer, forwardPer,
+      analystUpside, targetMeanKRW,
+      revenueGrowth, epsGrowth, beta,
+      overheatScore: score,
+      signals,
+    };
+
+    overheatCache.set(cacheKey, payload, TTL.DETAIL);
+    return res.json(payload);
+  } catch (e) {
+    return res.status(500).json({ error: String(e) });
+  }
+});
+
 // ─── 종합 AI 분석: 1년 과거 데이터 기반 분할매수·익절·재무·리스크 자동 계산 ──────
 const analyzeCache = new TtlCache<any>();
 
