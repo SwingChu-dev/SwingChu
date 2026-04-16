@@ -124,13 +124,7 @@ export default function MoreScreen() {
             description="매수/매도 목표가 설정 + 섹터 자금 흐름 이상 감지"
             onPress={() => router.push("/trade-signals" as any)}
           />
-          <MenuItem
-            icon="stats-chart-outline"
-            iconColor="#0064FF"
-            title="섹터 수익률 분석"
-            description="에너지·반도체·원자력·구리 ETF와 내 종목 동조화 비교"
-            onPress={() => router.push("/sector-analysis" as any)}
-          />
+
           <MenuItem
             icon="globe-outline"
             iconColor="#FF6B00"
