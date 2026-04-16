@@ -22,17 +22,21 @@ interface DayData {
   volume: number;
 }
 
+// 5% 매수그물: 0/-5/-10/-15/-20%, 비중 10/15/20/25/30%
+const GRID_DROPS   = [0, 5, 10, 15, 20];
+const GRID_WEIGHTS = [0.10, 0.15, 0.20, 0.25, 0.30];
+// avg entry factor (기준가 대비 가중평균 비율)
+const AVG_ENTRY_FACTOR = GRID_DROPS.reduce(
+  (sum, d, i) => sum + GRID_WEIGHTS[i] * (1 - d / 100), 0
+); // ≈ 0.875
+
+// 3·5·8·15% 분할 익절 (25%씩)
+const EXIT_PCTS    = [3, 5, 8, 15];
+
 interface BacktestResult {
-  entryDate: string;
-  entry1Price: number;
-  entry2Price: number;
-  entry3Price: number;
-  exit1Price: number;
-  exit2Price: number;
-  exit3Price: number;
-  entry1Pct: number;
-  entry2Pct: number;
-  entry3Pct: number;
+  entry1Price: number; entry2Price: number; entry3Price: number;
+  entry4Price: number; entry5Price: number;
+  exit1Price: number;  exit2Price: number;  exit3Price: number; exit4Price: number;
   totalReturn: number;
   grossReturn: number;
   totalCost: number;
@@ -59,94 +63,85 @@ interface BacktestParams {
 
 function runBacktest(
   data: DayData[],
-  stock: StockInfo,
+  _stock: StockInfo,
   params: BacktestParams
 ): BacktestResult | null {
   if (data.length < 10) return null;
 
   const { commissionPct, slippagePct } = params;
-  const oneWayCost = commissionPct + slippagePct;   // 편도 비용 (%)
-  const roundTripCost = 2 * oneWayCost;            // 왕복 비용 (%)
+  const oneWayCost   = commissionPct + slippagePct;
+  const roundTripCost = 2 * oneWayCost;
 
-  const startPrice = data[0].close;
-  const endPrice = data[data.length - 1].close;
+  const startPrice  = data[0].close;
+  const endPrice    = data[data.length - 1].close;
   const periodReturn = startPrice > 0 ? ((endPrice - startPrice) / startPrice) * 100 : 0;
 
-  const e1 = stock.splitEntries[0]?.dropPercent ?? 8;
-  const e2 = stock.splitEntries[1]?.dropPercent ?? 15;
-  const e3 = stock.splitEntries[2]?.dropPercent ?? 25;
+  // 진입 트리거: 최근 20봉 고점 대비 -10% 이상 하락 시 (3차 그물망 진입 기준)
+  const TRIGGER_DROP = 10;
 
-  const pt1 = stock.profitTargets[0]?.percent ?? 5;
-  const pt2 = stock.profitTargets[1]?.percent ?? 10;
-  const pt3 = stock.profitTargets[2]?.percent ?? 20;
-
-  let wins = 0;
-  let tradeCount = 0;
-  let grossReturn = 0;
-  let netReturn = 0;
-  let maxDrawdown = 0;
+  let wins = 0, tradeCount = 0, grossReturn = 0, netReturn = 0, maxDrawdown = 0;
 
   for (let i = 5; i < data.length - 5; i++) {
-    const refHigh = Math.max(...data.slice(Math.max(0, i - 10), i).map((d) => d.high));
+    const refHigh = Math.max(...data.slice(Math.max(0, i - 20), i).map((d) => d.high));
     const cur = data[i].close;
     const dropFromHigh = refHigh > 0 ? ((cur - refHigh) / refHigh) * 100 : 0;
 
-    if (dropFromHigh <= -e2) {
+    if (dropFromHigh <= -TRIGGER_DROP) {
       tradeCount++;
 
-      // 30/30/40 가중 평균 진입가
-      const avgEntry =
-        0.3 * cur * (1 - e1 / 100) +
-        0.3 * cur * (1 - e2 / 100) +
-        0.4 * cur * (1 - e3 / 100);
-
-      // 슬리피지 반영: 실제 체결가는 진입가보다 불리하게
+      // 5% 그물망 가중평균 진입가 (0/-5/-10/-15/-20%, 10/15/20/25/30%)
+      const avgEntry = cur * AVG_ENTRY_FACTOR;
       const effectiveEntry = avgEntry * (1 + oneWayCost / 100);
 
-      const future = data.slice(i + 1, Math.min(i + 30, data.length));
+      const future = data.slice(i + 1, Math.min(i + 40, data.length));
       const peak   = future.reduce((m, d) => Math.max(m, d.high), 0);
       const trough = future.reduce((m, d) => Math.min(m, d.low), cur);
 
-      // 슬리피지 반영: 실제 매도가는 고점보다 불리하게
       const effectivePeak = peak > 0 ? peak * (1 - oneWayCost / 100) : 0;
-
       const gross = peak > 0 ? ((peak - avgEntry) / avgEntry) * 100 : 0;
-      const net   = effectivePeak > 0 ? ((effectivePeak - effectiveEntry) / effectiveEntry) * 100 : 0;
       const dd    = ((trough - avgEntry) / avgEntry) * 100;
 
       if (dd < maxDrawdown) maxDrawdown = dd;
 
+      const [pt1, pt2, pt3, pt4] = EXIT_PCTS;
       const wouldHit = gross >= pt1;
+
       if (wouldHit) {
         wins++;
+        // 3·5·8·15 분할 익절 (25%씩 가중 평균)
         const blendedGross =
-          0.3 * pt1 + 0.3 * Math.min(gross, pt2) + 0.4 * Math.min(gross, pt3);
-        const blendedNet = blendedGross - roundTripCost;
+          0.25 * pt1 +
+          0.25 * Math.min(gross, pt2) +
+          0.25 * Math.min(gross, pt3) +
+          0.25 * Math.min(gross, pt4);
         grossReturn += blendedGross;
-        netReturn   += blendedNet;
+        netReturn   += blendedGross - roundTripCost;
       } else {
         grossReturn += dd;
         netReturn   += dd - roundTripCost;
       }
+
+      // 같은 구간 중복 진입 방지: 5봉 건너뜀
+      i += 5;
     }
   }
 
-  const hitRate = tradeCount > 0 ? (wins / tradeCount) * 100 : 0;
+  const hitRate  = tradeCount > 0 ? (wins / tradeCount) * 100 : 0;
   const avgGross = tradeCount > 0 ? grossReturn / tradeCount : 0;
   const avgNet   = tradeCount > 0 ? netReturn   / tradeCount : 0;
   const totalCostImpact = avgGross - avgNet;
 
+  const p = endPrice;
   return {
-    entryDate: data[0].date,
-    entry1Price: Math.round(endPrice * (1 - e1 / 100)),
-    entry2Price: Math.round(endPrice * (1 - e2 / 100)),
-    entry3Price: Math.round(endPrice * (1 - e3 / 100)),
-    exit1Price: Math.round(endPrice * (1 + pt1 / 100)),
-    exit2Price: Math.round(endPrice * (1 + pt2 / 100)),
-    exit3Price: Math.round(endPrice * (1 + pt3 / 100)),
-    entry1Pct: -e1,
-    entry2Pct: -e2,
-    entry3Pct: -e3,
+    entry1Price: Math.round(p),
+    entry2Price: Math.round(p * 0.95),
+    entry3Price: Math.round(p * 0.90),
+    entry4Price: Math.round(p * 0.85),
+    entry5Price: Math.round(p * 0.80),
+    exit1Price:  Math.round(p * AVG_ENTRY_FACTOR * 1.03),
+    exit2Price:  Math.round(p * AVG_ENTRY_FACTOR * 1.05),
+    exit3Price:  Math.round(p * AVG_ENTRY_FACTOR * 1.08),
+    exit4Price:  Math.round(p * AVG_ENTRY_FACTOR * 1.15),
     totalReturn:  avgNet,
     grossReturn:  avgGross,
     totalCost:    totalCostImpact,
@@ -368,8 +363,8 @@ export default function BacktestSection({ stock }: Props) {
           {/* 전략 설명 */}
           <View style={[styles.stratCard, { backgroundColor: isDark ? "#141B2D" : "#F0F4FF" }]}>
             <View style={styles.stratHeader}>
-              <Ionicons name="git-branch-outline" size={16} color="#0064FF" />
-              <Text style={[styles.stratTitle, { color: c.text }]}>30/30/40 분할 매수 전략</Text>
+              <Ionicons name="git-network-outline" size={16} color="#0064FF" />
+              <Text style={[styles.stratTitle, { color: c.text }]}>5% 매수그물 · 3·5·8·15 익절</Text>
             </View>
             <Text style={[styles.stratDesc, { color: c.textSecondary }]}>
               {PERIOD_LABELS[period]} 기준 {result.tradeCount}번 진입 기회 · 왕복 비용 {roundTripCost.toFixed(3)}% 적용
@@ -445,14 +440,16 @@ export default function BacktestSection({ stock }: Props) {
             </View>
           </View>
 
-          {/* 현재가 기준 진입·익절 레벨 */}
+          {/* 현재가 기준 매수그물 · 익절 레벨 */}
           <View style={[styles.priceCard, { backgroundColor: c.card }]}>
-            <Text style={[styles.priceCardTitle, { color: c.text }]}>현재가 기준 매수·매도 레벨</Text>
+            <Text style={[styles.priceCardTitle, { color: c.text }]}>현재가 기준 매수·익절 레벨</Text>
             <View style={styles.priceTable}>
               {[
-                { label: "1차 매수 (-" + Math.abs(result.entry1Pct) + "%)", price: result.entry1Price, ratio: "30%", color: "#22C55E" },
-                { label: "2차 매수 (-" + Math.abs(result.entry2Pct) + "%)", price: result.entry2Price, ratio: "30%", color: "#F59E0B" },
-                { label: "3차 매수 (-" + Math.abs(result.entry3Pct) + "%)", price: result.entry3Price, ratio: "40%", color: "#F04452" },
+                { label: "1차 매수 (기준가)",  price: result.entry1Price, ratio: "10%", color: "#3B82F6" },
+                { label: "2차 매수 (-5%)",    price: result.entry2Price, ratio: "15%", color: "#6366F1" },
+                { label: "3차 매수 (-10%)",   price: result.entry3Price, ratio: "20%", color: "#8B5CF6" },
+                { label: "4차 매수 (-15%)",   price: result.entry4Price, ratio: "25%", color: "#A855F7" },
+                { label: "5차 매수 (-20%)",   price: result.entry5Price, ratio: "30%", color: "#EC4899" },
               ].map((r) => (
                 <View key={r.label} style={styles.priceRow}>
                   <View style={[styles.priceDot, { backgroundColor: r.color }]} />
@@ -465,14 +462,15 @@ export default function BacktestSection({ stock }: Props) {
               ))}
               <View style={[styles.priceDivider, { backgroundColor: c.separator }]} />
               {[
-                { label: "1차 익절 (+" + stock.profitTargets[0]?.percent + "%)", price: result.exit1Price, color: "#F04452" },
-                { label: "2차 익절 (+" + stock.profitTargets[1]?.percent + "%)", price: result.exit2Price, color: "#F04452" },
-                { label: "3차 익절 (+" + stock.profitTargets[2]?.percent + "%)", price: result.exit3Price, color: "#F04452" },
+                { label: "1차 익절 (+3%)",  price: result.exit1Price, color: "#F59E0B" },
+                { label: "2차 익절 (+5%)",  price: result.exit2Price, color: "#00C896" },
+                { label: "3차 익절 (+8%)",  price: result.exit3Price, color: "#3B82F6" },
+                { label: "4차 익절 (+15%)", price: result.exit4Price, color: "#A855F7" },
               ].map((r) => (
                 <View key={r.label} style={styles.priceRow}>
                   <View style={[styles.priceDot, { backgroundColor: r.color }]} />
                   <Text style={[styles.priceRowLabel, { color: c.textSecondary }]}>{r.label}</Text>
-                  <Text style={[styles.priceRowRatio, { color: c.textTertiary }]} />
+                  <Text style={[styles.priceRowRatio, { color: c.textTertiary }]}>25%</Text>
                   <Text style={[styles.priceRowVal, { color: r.color }]}>
                     ₩{r.price.toLocaleString()}
                   </Text>

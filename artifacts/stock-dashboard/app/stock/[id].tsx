@@ -278,7 +278,7 @@ export default function StockDetailScreen() {
         <View style={styles.statItem}>
           <Text style={[styles.statLabel, { color: c.textTertiary }]}>1차 진입</Text>
           <Text style={[styles.statValue, { color: c.tint }]}>
-            -{stock.splitEntries[0]?.dropPercent ?? 5}%
+            -5%
           </Text>
         </View>
       </View>

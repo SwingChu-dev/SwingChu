@@ -57,14 +57,7 @@ export default function TabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="explore"
-        options={{ href: null }}
-      />
       <Tabs.Screen name="more" options={{ href: null }} />
-
-      <Tabs.Screen name="signals"  options={{ href: null }} />
-      <Tabs.Screen name="analysis" options={{ href: null }} />
 
     </Tabs>
   );

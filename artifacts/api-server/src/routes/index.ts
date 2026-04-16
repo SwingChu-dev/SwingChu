@@ -4,15 +4,11 @@ import stocksRouter from "./stocks";
 import signalRouter from "./signalAnalysis";
 import marketRiskRouter from "./marketRisk";
 
-import trumpRiskRouter from "./trumpRisk";
-
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(stocksRouter);
 router.use(signalRouter);
 router.use(marketRiskRouter);
-
-router.use(trumpRiskRouter);
 
 export default router;
