@@ -1134,6 +1134,21 @@ router.get("/stocks/overheating", async (req, res) => {
     if (epsGrowth != null && epsGrowth > 30)
       signals.push({ type: "positive", text: `EPS 성장률 +${epsGrowth}% — 이익 가속화 진행 중.` });
 
+    // 공매도 신호 (미국주식만 — 과열진단·공매도 탭 일관성)
+    const shortPctFloat: number | null = isKorean ? null : ((ks?.shortPercentOfFloat ?? null) as number | null);
+    const shortRatioVal: number | null = isKorean ? null : ((ks?.shortRatio ?? null) as number | null);
+    if (shortPctFloat != null) {
+      const pof = +(shortPctFloat * 100).toFixed(1);
+      if (pof > 20)
+        signals.push({ type: "negative", text: `공매도 비율 ${pof}% — 세력 공매도 압박 강함. 반등 시 숏스퀴즈 가능성 공존.` });
+      else if (pof > 10)
+        signals.push({ type: "neutral",  text: `공매도 비율 ${pof}% — 경계 수준. 호재 시 숏스퀴즈 잠재력.` });
+      else if (pof < 3)
+        signals.push({ type: "positive", text: `공매도 비율 ${pof}% — 낮음. 공매도 압박 없는 우호적 환경.` });
+    }
+    if (shortRatioVal != null && shortRatioVal > 10)
+      signals.push({ type: "neutral", text: `Short Ratio ${shortRatioVal.toFixed(1)}일 — 청산 소요기간 길어 숏스퀴즈 폭발 잠재력.` });
+
     const payload = {
       ticker, market,
       rsi14, ma20, ma60, currentPrice,

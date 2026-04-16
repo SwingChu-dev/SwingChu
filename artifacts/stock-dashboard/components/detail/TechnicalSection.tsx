@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, useColorScheme, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, useColorScheme, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { API_BASE } from "@/utils/apiBase";
 
 export interface TechnicalSummary {
   rsi14:        number | null;
@@ -14,8 +15,27 @@ export interface TechnicalSummary {
   volumeSpike:  number | null;
 }
 
+interface LiveData {
+  rsi14:         number;
+  ma20:          number | null;
+  ma60:          number | null;
+  currentPrice:  number;
+  ma20Disparity: number | null;
+  ma60Disparity: number | null;
+}
+
 interface Props {
-  data: TechnicalSummary;
+  ticker:         string;
+  market:         string;
+  enrichedSummary?: TechnicalSummary | null;
+}
+
+function maAlignmentFromLive(live: LiveData): "정배열" | "역배열" | "혼재" | null {
+  const { currentPrice, ma20, ma60 } = live;
+  if (!ma20 || !ma60 || !currentPrice) return null;
+  if (currentPrice > ma20 && ma20 > ma60) return "정배열";
+  if (currentPrice < ma20 && ma20 < ma60) return "역배열";
+  return "혼재";
 }
 
 function DevBar({ pct, color }: { pct: number; color: string }) {
@@ -28,20 +48,40 @@ function DevBar({ pct, color }: { pct: number; color: string }) {
         style={[
           bar.fill,
           isPos
-            ? { left: "50%", width: `${clamp}%`, backgroundColor: color }
-            : { right: "50%", width: `${-clamp}%`, backgroundColor: color },
+            ? { left: "50%", width: `${clamp}%` as any, backgroundColor: color }
+            : { right: "50%", width: `${-clamp}%` as any, backgroundColor: color },
         ]}
       />
     </View>
   );
 }
 
-export default function TechnicalSection({ data }: Props) {
+export default function TechnicalSection({ ticker, market, enrichedSummary }: Props) {
   const isDark = useColorScheme() === "dark";
   const c = isDark ? Colors.dark : Colors.light;
   const [open, setOpen] = useState(true);
 
-  const { rsi14, rsiSignal, ma20Dev, ma60Dev, maAlignment, volumeSpike } = data;
+  const [live, setLive]         = useState<LiveData | null>(null);
+  const [loading, setLoading]   = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API_BASE}/stocks/overheating?ticker=${encodeURIComponent(ticker)}&market=${encodeURIComponent(market)}`)
+      .then(r => r.json())
+      .then((d: LiveData) => { setLive(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [ticker, market]);
+
+  const rsi14 = live?.rsi14 ?? enrichedSummary?.rsi14 ?? null;
+  const ma20Dev = live?.ma20Disparity ?? enrichedSummary?.ma20Dev ?? null;
+  const ma60Dev = live?.ma60Disparity ?? enrichedSummary?.ma60Dev ?? null;
+  const maAlignment = live ? maAlignmentFromLive(live) : (enrichedSummary?.maAlignment ?? null);
+  const volumeSpike = enrichedSummary?.volumeSpike ?? null;
+
+  const rsiSignal: "과매도" | "적정" | "과매수" | null =
+    rsi14 == null ? null :
+    rsi14 >= 70   ? "과매수" :
+    rsi14 <= 30   ? "과매도" : "적정";
 
   const rsiColor =
     rsiSignal === "과매수" ? "#F04452" :
@@ -59,18 +99,32 @@ export default function TechnicalSection({ data }: Props) {
   const devColor = (v: number | null) =>
     v == null ? c.textTertiary : v > 0 ? "#F04452" : "#1B63E8";
 
+  const hasData = rsi14 != null || ma20Dev != null || ma60Dev != null;
+
   return (
     <View style={[styles.card, { backgroundColor: c.card }]}>
       <TouchableOpacity style={styles.header} onPress={() => setOpen(v => !v)} activeOpacity={0.7}>
         <View style={styles.headerLeft}>
           <Ionicons name="pulse" size={15} color={c.tint} />
           <Text style={[styles.title, { color: c.text }]}>기술적 지표</Text>
+          {live && (
+            <View style={[styles.liveBadge, { backgroundColor: "#2DB55D18" }]}>
+              <View style={styles.liveDot} />
+              <Text style={[styles.liveTxt, { color: "#2DB55D" }]}>실시간</Text>
+            </View>
+          )}
         </View>
         <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={c.textTertiary} />
       </TouchableOpacity>
 
       {open && (
         <View style={styles.body}>
+          {loading && !hasData && (
+            <View style={styles.loadRow}>
+              <ActivityIndicator size="small" color={c.tint} />
+              <Text style={[styles.hint, { color: c.textTertiary }]}>실시간 지표 로딩 중...</Text>
+            </View>
+          )}
 
           {/* ── RSI14 게이지 ─────────────────────────── */}
           {rsi14 != null && (
@@ -80,13 +134,10 @@ export default function TechnicalSection({ data }: Props) {
                 <Text style={[styles.hint, { color: c.textTertiary }]}>상대강도지수</Text>
               </View>
               <View style={styles.rowRight}>
-                <View style={rsi.track}>
-                  {/* 과매도 영역 (0-30) */}
-                  <View style={[rsi.zone, { left: 0, width: "30%", backgroundColor: "#1B63E818" }]} />
-                  {/* 과매수 영역 (70-100) */}
-                  <View style={[rsi.zone, { right: 0, width: "30%", backgroundColor: "#F0445218" }]} />
-                  {/* 마커 */}
-                  <View style={[rsi.marker, { left: `${rsi14}%` as any, backgroundColor: rsiColor }]} />
+                <View style={rsiS.track}>
+                  <View style={[rsiS.zone, { left: 0, width: "30%", backgroundColor: "#1B63E818" }]} />
+                  <View style={[rsiS.zone, { right: 0, width: "30%", backgroundColor: "#F0445218" }]} />
+                  <View style={[rsiS.marker, { left: `${rsi14}%` as any, backgroundColor: rsiColor }]} />
                 </View>
                 <View style={styles.rsiLabels}>
                   <Text style={[styles.hint, { color: "#1B63E8" }]}>과매도 30</Text>
@@ -104,7 +155,7 @@ export default function TechnicalSection({ data }: Props) {
             </View>
           )}
 
-          <View style={[styles.divider, { backgroundColor: c.separator }]} />
+          {(rsi14 != null) && <View style={[styles.divider, { backgroundColor: c.separator }]} />}
 
           {/* ── MA20 괴리율 ──────────────────────────── */}
           {ma20Dev != null && (
@@ -143,7 +194,9 @@ export default function TechnicalSection({ data }: Props) {
             </View>
           )}
 
-          <View style={[styles.divider, { backgroundColor: c.separator }]} />
+          {(ma20Dev != null || ma60Dev != null) && (
+            <View style={[styles.divider, { backgroundColor: c.separator }]} />
+          )}
 
           {/* ── MA 배열 + 거래량 배율 ────────────────── */}
           <View style={styles.chipRow}>
@@ -154,9 +207,7 @@ export default function TechnicalSection({ data }: Props) {
                   size={11}
                   color={alignColor}
                 />
-                <Text style={[styles.chipText, { color: alignColor }]}>
-                  MA {maAlignment}
-                </Text>
+                <Text style={[styles.chipText, { color: alignColor }]}>MA {maAlignment}</Text>
               </View>
             )}
             {volumeSpike != null && (
@@ -165,15 +216,14 @@ export default function TechnicalSection({ data }: Props) {
               }]}>
                 <Ionicons name="bar-chart" size={11} color={volColor} />
                 <Text style={[styles.chipText, { color: volColor }]}>
-                  거래량 {volumeSpike.toFixed(1)}배
-                  {volumeSpike >= 3 ? " 🔥" : volumeSpike >= 1.8 ? " ↑" : ""}
+                  거래량 {volumeSpike.toFixed(1)}배{volumeSpike >= 3 ? " 🔥" : volumeSpike >= 1.8 ? " ↑" : ""}
                 </Text>
               </View>
             )}
           </View>
 
           {/* ── 해석 요약 ───────────────────────────── */}
-          {(rsi14 != null || maAlignment != null || volumeSpike != null) && (
+          {hasData && (
             <View style={[styles.interpretation, { backgroundColor: c.backgroundSecondary }]}>
               <Text style={[styles.interpretText, { color: c.textSecondary }]}>
                 {[
@@ -189,7 +239,6 @@ export default function TechnicalSection({ data }: Props) {
               </Text>
             </View>
           )}
-
         </View>
       )}
     </View>
@@ -197,29 +246,33 @@ export default function TechnicalSection({ data }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card:    { borderRadius: 16, marginHorizontal: 16, marginBottom: 12, overflow: "hidden" },
-  header:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14 },
+  card:       { borderRadius: 16, marginHorizontal: 16, marginBottom: 12, overflow: "hidden" },
+  header:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14 },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title:   { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  body:    { paddingBottom: 14 },
-  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 16, marginVertical: 4 },
-  row:     { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
-  rowLeft: { flex: 1, gap: 2 },
-  rowRight:{ flex: 1.4, gap: 6 },
-  label:   { fontSize: 13, fontFamily: "Inter_500Medium" },
-  hint:    { fontSize: 10, fontFamily: "Inter_400Regular" },
-  valueText: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  rsiLabels: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  signalBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  signalText:  { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 8, paddingTop: 6 },
-  chip:    { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20 },
-  chipText:{ fontSize: 11, fontFamily: "Inter_500Medium" },
+  title:      { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  liveBadge:  { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  liveDot:    { width: 5, height: 5, borderRadius: 3, backgroundColor: "#2DB55D" },
+  liveTxt:    { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  body:       { paddingBottom: 14 },
+  divider:    { height: StyleSheet.hairlineWidth, marginHorizontal: 16, marginVertical: 4 },
+  loadRow:    { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
+  row:        { flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
+  rowLeft:    { flex: 1, gap: 2 },
+  rowRight:   { flex: 1.4, gap: 6 },
+  label:      { fontSize: 13, fontFamily: "Inter_500Medium" },
+  hint:       { fontSize: 10, fontFamily: "Inter_400Regular" },
+  valueText:  { fontSize: 18, fontFamily: "Inter_700Bold" },
+  rsiLabels:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  signalBadge:{ alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  signalText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  chipRow:    { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, gap: 8, paddingTop: 6 },
+  chip:       { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20 },
+  chipText:   { fontSize: 11, fontFamily: "Inter_500Medium" },
   interpretation: { marginHorizontal: 16, marginTop: 10, padding: 12, borderRadius: 10 },
   interpretText:  { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
 });
 
-const rsi = StyleSheet.create({
+const rsiS = StyleSheet.create({
   track:  { height: 8, borderRadius: 4, backgroundColor: "#88888820", overflow: "hidden", position: "relative" },
   zone:   { position: "absolute", top: 0, bottom: 0 },
   marker: { position: "absolute", top: -3, width: 14, height: 14, borderRadius: 7, marginLeft: -7, borderWidth: 2, borderColor: "#fff" },

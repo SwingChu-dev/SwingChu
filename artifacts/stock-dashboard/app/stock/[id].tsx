@@ -371,28 +371,12 @@ export default function StockDetailScreen() {
           {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
           {activeTab === "전망"   && <ForecastSection     stock={stock} />}
           {activeTab === "재무"   && <FinancialsSection   stock={stock} />}
-          {activeTab === "기술"   && (
-            technicalSummary
-              ? <TechnicalSection data={technicalSummary} />
-              : (
-                <View style={styles.techUnavailWrap}>
-                  <Ionicons name="pulse-outline" size={32} color={c.textTertiary} />
-                  <Text style={[styles.techUnavailTitle, { color: c.text }]}>기술 지표 분석 대기 중</Text>
-                  <Text style={[styles.techUnavailText, { color: c.textSecondary }]}>
-                    AI 분석을 실행하면 RSI14 · 이동평균 괴리율 · 거래량 급증{"\n"}지표가 자동 계산됩니다.
-                  </Text>
-                  {showAiPrompt && (
-                    <TouchableOpacity
-                      style={[styles.techAnalyzeBtn, { backgroundColor: c.tint }]}
-                      onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="sparkles" size={13} color="#fff" />
-                      <Text style={styles.techAnalyzeBtnText}>AI 분석 실행</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )
+          {activeTab === "기술" && (
+            <TechnicalSection
+              ticker={stock.ticker}
+              market={stock.market}
+              enrichedSummary={technicalSummary}
+            />
           )}
           {activeTab === "리스크" && <RiskSection         stock={stock} />}
           {activeTab === "요일"   && <DayFeaturesSection  stock={stock} />}
