@@ -152,14 +152,6 @@ function RootLayoutNav() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
 
-        <Stack.Screen
-          name="trade-signals"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="realtime-radar"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
       </Stack>
     </>
   );

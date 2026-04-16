@@ -228,8 +228,6 @@ export default function HomeScreen() {
             <Text style={[styles.toolsHeader, { color: c.textSecondary }]}>도구</Text>
             <View style={styles.toolsRow}>
               {[
-                { icon: "radio-outline"      as const, label: "실시간\n레이더",  color: "#8B5CF6", path: "/realtime-radar"    },
-                { icon: "pulse-outline"      as const, label: "매매\n신호",      color: "#F04452", path: "/trade-signals"     },
 
                 { icon: "globe-outline"      as const, label: "지경학\n리스크",  color: "#FF6B00", path: "/geopolitical-risk" },
 

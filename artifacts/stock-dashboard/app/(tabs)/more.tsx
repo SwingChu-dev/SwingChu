@@ -99,21 +99,6 @@ export default function MoreScreen() {
         <SectionHeader title="글로벌 리스크" />
         <View style={styles.section}>
           <MenuItem
-            icon="radio-outline"
-            iconColor="#8B5CF6"
-            title="실시간 레이더"
-            description="EONR·NVDA·XLE·SOXX·URA 15초 자동갱신 + 섹터 디커플링 감지"
-            onPress={() => router.push("/realtime-radar" as any)}
-          />
-          <MenuItem
-            icon="pulse-outline"
-            iconColor="#F04452"
-            title="기계적 매매신호"
-            description="매수/매도 목표가 설정 + 섹터 자금 흐름 이상 감지"
-            onPress={() => router.push("/trade-signals" as any)}
-          />
-
-          <MenuItem
             icon="globe-outline"
             iconColor="#FF6B00"
             title="지경학적 리스크"
