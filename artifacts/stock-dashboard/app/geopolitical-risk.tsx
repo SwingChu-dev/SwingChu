@@ -144,7 +144,14 @@ export default function GeopoliticalRiskScreen() {
                 </View>
               </View>
               <ScoreGauge score={data.score} level={data.level} />
-              <Text style={[styles.recTxt, { color: c.text, marginTop: 14 }]}>
+
+              {/* AI 핵심 요인 한 줄 해석 */}
+              <View style={[styles.aiCommentRow, { backgroundColor: riskColor + "12", borderColor: riskColor + "30" }]}>
+                <Ionicons name="analytics-outline" size={14} color={riskColor} />
+                <Text style={[styles.aiCommentTxt, { color: riskColor }]}>{data.aiComment}</Text>
+              </View>
+
+              <Text style={[styles.recTxt, { color: c.text, marginTop: 10 }]}>
                 {data.recommendation}
               </Text>
             </>
@@ -286,5 +293,17 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: "flex-start",
   },
-  noteTxt:    { fontSize: 12, flex: 1, lineHeight: 20 },
+  noteTxt:      { fontSize: 12, flex: 1, lineHeight: 20 },
+  aiCommentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 2,
+  },
+  aiCommentTxt: { fontSize: 13, fontFamily: "Inter_500Medium", lineHeight: 18, flex: 1 },
 });

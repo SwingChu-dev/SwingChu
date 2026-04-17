@@ -33,9 +33,9 @@ import OverheatSection from "@/components/detail/OverheatSection";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
 
-type TabKey = "진입" | "익절" | "박스권" | "전망" | "재무" | "기술" | "리스크" | "요일" | "뉴스" | "백테스트" | "이스라엘" | "공매도" | "과열진단";
+type TabKey = "진입" | "익절" | "박스권" | "재무·전망" | "기술·진단" | "리스크" | "요일" | "뉴스" | "백테스트" | "이스라엘";
 
-const TABS: TabKey[] = ["진입", "익절", "박스권", "전망", "재무", "기술", "리스크", "요일", "뉴스", "백테스트", "이스라엘", "공매도", "과열진단"];
+const TABS: TabKey[] = ["진입", "익절", "박스권", "재무·전망", "기술·진단", "리스크", "요일", "뉴스", "백테스트", "이스라엘"];
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#3B82F6",
@@ -357,7 +357,7 @@ export default function StockDetailScreen() {
           )}
 
           {/* predefined 종목: AI 분석 중 탭 위에 오버레이 배너 */}
-          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && activeTab !== "공매도" && activeTab !== "과열진단" && (
+          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
             <View style={[styles.aiOverlayBanner, { backgroundColor: "#F59E0B14" }]}>
               <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.75 }] }} />
               <Text style={[styles.aiOverlayText, { color: "#F59E0B" }]}>
@@ -369,24 +369,36 @@ export default function StockDetailScreen() {
           {activeTab === "진입"   && <SplitEntrySection  stock={stock} livePrice={displayPrice} />}
           {activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
           {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
-          {activeTab === "전망"   && <ForecastSection     stock={stock} />}
-          {activeTab === "재무"   && <FinancialsSection   stock={stock} />}
-          {activeTab === "기술" && (
-            <TechnicalSection
-              ticker={stock.ticker}
-              market={stock.market}
-              enrichedSummary={technicalSummary}
-            />
+
+          {activeTab === "재무·전망" && (
+            <>
+              <FinancialsSection stock={stock} />
+              <ForecastSection   stock={stock} />
+            </>
           )}
-          {activeTab === "리스크" && <RiskSection         stock={stock} />}
-          {activeTab === "요일"   && <DayFeaturesSection  stock={stock} />}
-          {activeTab === "뉴스"   && (
-            <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />
+
+          {activeTab === "기술·진단" && (
+            <>
+              <TechnicalSection
+                ticker={stock.ticker}
+                market={stock.market}
+                enrichedSummary={technicalSummary}
+              />
+              <OverheatSection ticker={stock.ticker} market={stock.market} />
+            </>
           )}
+
+          {activeTab === "리스크" && (
+            <>
+              <ShortSellSection ticker={stock.ticker} market={stock.market} />
+              <RiskSection      stock={stock} />
+            </>
+          )}
+
+          {activeTab === "요일"     && <DayFeaturesSection stock={stock} />}
+          {activeTab === "뉴스"     && <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />}
           {activeTab === "백테스트" && <BacktestSection stock={stock} />}
           {activeTab === "이스라엘" && <IsraelSection stockId={stock.id} />}
-          {activeTab === "공매도"   && <ShortSellSection ticker={stock.ticker} market={stock.market} />}
-          {activeTab === "과열진단" && <OverheatSection ticker={stock.ticker} market={stock.market} />}
 
           <View style={styles.bottomPad} />
         </ScrollView>

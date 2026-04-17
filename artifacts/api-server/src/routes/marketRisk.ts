@@ -24,6 +24,7 @@ export interface MarketRiskData {
     goldPrice:  number;       // 금 현재가 ($/oz)
     dxyLevel:   number;       // DXY 지수
   };
+  aiComment:      string;       // 핵심 요인 한 줄 해석
   recommendation: string;     // 포트폴리오 행동 권고
   actions: string[];          // 구체적 행동 목록
   updatedAt: string;
@@ -94,6 +95,29 @@ router.get("/market/risk", async (_req, res) => {
 
   const score = Math.round(Math.min(100, vixScore + oilScore + goldScore + dxyScore));
 
+  // ── 핵심 요인 한 줄 해석 ────────────────────────────────────────────────
+  const factorRanks = [
+    { score: vixScore,  comment:
+        vix >= 30 ? `VIX ${vix.toFixed(1)} 급등 — 시장 공포가 위험도를 주도하고 있습니다` :
+        vix >= 20 ? `VIX ${vix.toFixed(1)} — 변동성 경계 구간, 포지션 관리 필요` :
+                   `VIX ${vix.toFixed(1)} — 시장 공포 낮음, 안정적 환경` },
+    { score: oilScore,  comment:
+        oilChange >= 3  ? `WTI $${oilPrice.toFixed(0)} (+${oilChange.toFixed(1)}%) — 유가 급등으로 지정학 위험 상승` :
+        oilChange >= 1.5? `WTI $${oilPrice.toFixed(0)} (+${oilChange.toFixed(1)}%) — 유가 소폭 상승으로 위험도 증가` :
+        oilChange <= -3 ? `WTI $${oilPrice.toFixed(0)} (${oilChange.toFixed(1)}%) — 유가 급락, 경기침체 우려 부상` :
+                         `WTI $${oilPrice.toFixed(0)} (${oilChange >= 0 ? "+" : ""}${oilChange.toFixed(1)}%) — 유가 안정권` },
+    { score: goldScore, comment:
+        goldChange >= 2   ? `금 +${goldChange.toFixed(1)}% 급등 — 안전자산 수요 급증, 위험 회피 심화` :
+        goldChange >= 0.5 ? `금 +${goldChange.toFixed(1)}% — 안전자산 선호로 방어적 심리 우세` :
+                           `금 ${goldChange >= 0 ? "+" : ""}${goldChange.toFixed(1)}% — 금 약세, 위험선호 환경` },
+    { score: dxyScore,  comment:
+        dxyChange >= 1   ? `달러인덱스 +${dxyChange.toFixed(1)}% 급등 — 달러 강세로 위험회피 신호 강화` :
+        dxyChange >= 0.5 ? `달러인덱스 +${dxyChange.toFixed(1)}% — 달러 소폭 강세, 긴축 우려 상존` :
+                          `달러인덱스 ${dxyChange.toFixed(1)}% — 달러 약세, 위험자산 환경 우호적` },
+  ];
+  const dominant = factorRanks.reduce((a, b) => b.score > a.score ? b : a);
+  const aiComment = dominant.comment;
+
   // ── 위험 수준 분류 ────────────────────────────────────────────────────────
   const level: RiskLevel =
     score >= 70 ? "위험" :
@@ -141,6 +165,7 @@ router.get("/market/risk", async (_req, res) => {
   const data: MarketRiskData = {
     score,
     level,
+    aiComment,
     components: {
       vix,
       oil:       Math.round(oilChange  * 100) / 100,

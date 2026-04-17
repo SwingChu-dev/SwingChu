@@ -15,6 +15,7 @@ export interface MarketRiskData {
     goldPrice:  number;
     dxyLevel:   number;
   };
+  aiComment:      string;
   recommendation: string;
   actions:        string[];
   updatedAt:      string;

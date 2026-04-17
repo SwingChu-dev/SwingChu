@@ -27,7 +27,7 @@ artifacts/
     │   ├── (tabs)/
     │   │   ├── index.tsx    # 관심종목 메인 탭
     │   │   └── more.tsx     # 더보기 메뉴
-    │   ├── stock/[id].tsx   # 종목 상세 (13탭)
+    │   ├── stock/[id].tsx   # 종목 상세 (10탭)
     │   ├── geopolitical-risk.tsx
     │   └── add-stock.tsx
     ├── components/detail/
@@ -43,14 +43,22 @@ artifacts/
     │   ├── DayFeaturesSection.tsx  # 요일 특성
     │   ├── NewsSection.tsx         # 뉴스
     │   ├── BoxRangeSection.tsx     # 박스권
-    │   └── IsraelSection.tsx       # 이스라엘 지경학
+    │   ├── IsraelSection.tsx       # 이스라엘 지경학
+    │   └── AlertSettingsModal.tsx  # 알림 설정
     └── constants/
         ├── stockData.ts    # 종목 정의 (15개)
         └── israelData.ts   # 이스라엘 관련 종목 데이터
 ```
 
-## 종목 상세 13탭
-진입 | 익절 | 박스권 | 전망 | 재무 | 기술 | 리스크 | 요일 | 뉴스 | 백테스트 | 이스라엘 | 공매도 | 과열진단
+## 종목 상세 10탭 (v2 — 연관 탭 묶기)
+진입 | 익절 | 박스권 | 재무·전망 | 기술·진단 | 리스크 | 요일 | 뉴스 | 백테스트 | 이스라엘
+- 재무·전망: FinancialsSection + ForecastSection (수직 배치)
+- 기술·진단: TechnicalSection + OverheatSection (수직 배치)
+- 리스크: ShortSellSection + RiskSection (수직 배치)
+
+## 지경학적 리스크 AI 코멘트
+marketRisk.ts에서 VIX·유가·금·달러 4개 요인 중 가중치 가장 높은 요인을 rule-based 선별,
+한 줄 해석(aiComment)을 API 응답에 포함 → geopolitical-risk.tsx 배너로 표시
 
 ## 매매 전략 (실제 적용)
 - **매수**: 5% 단위 매수그물 — 0/-5/-10/-15/-20%, 비중 10/15/20/25/30%
