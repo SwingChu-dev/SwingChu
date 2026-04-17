@@ -60,6 +60,16 @@ artifacts/
 marketRisk.ts에서 VIX·유가·금·달러 4개 요인 중 가중치 가장 높은 요인을 rule-based 선별,
 한 줄 해석(aiComment)을 API 응답에 포함 → geopolitical-risk.tsx 배너로 표시
 
+## 푸시 알림 시스템
+- expo-notifications: 포그라운드/백그라운드 즉시 로컬 알림
+- expo-background-fetch + expo-task-manager: 앱 종료 후에도 15분마다 가격 체크
+- AlertContext.checkPrices() → 조건 충족 시 sendAlertNotification() 호출
+- AlertSettingsModal: 전략 퀵셋 버튼 추가
+  - 매수 타점: -5/-10/-15/-20% (현재가 기준 원터치 등록)
+  - 익절 타점: +3/+5/+8/+15% (원터치 등록)
+  - 중복 등록 방지 (초록 체크 표시)
+- 알림 유형: 매수 타점 진입 ↓ / 목표가 도달 ↑ / RSI 과매수·과매도 / 수익 목표 달성
+
 ## 매매 전략 (실제 적용)
 - **매수**: 5% 단위 매수그물 — 0/-5/-10/-15/-20%, 비중 10/15/20/25/30%
 - **매도**: 3·5·8·15% 4단계 분할 익절, 각 25%씩

@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { sendAlertNotification } from "@/utils/notifications";
 
 export interface PriceAlert {
   id: string;
@@ -117,9 +118,11 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 
           if (shouldTrigger) {
             checkedRef.current.add(alert.id);
-            setTriggeredAlert({ alert: { ...alert, triggered: true }, currentPrice: info.priceKRW });
+            const updated = { ...alert, triggered: true, triggeredAt: new Date().toISOString() };
+            setTriggeredAlert({ alert: updated, currentPrice: info.priceKRW });
+            sendAlertNotification(updated, info.priceKRW).catch(() => {});
             changed = true;
-            return { ...alert, triggered: true, triggeredAt: new Date().toISOString() };
+            return updated;
           }
           return alert;
         });

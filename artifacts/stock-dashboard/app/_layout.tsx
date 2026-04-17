@@ -21,6 +21,8 @@ import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { setupNotifications } from "@/utils/notifications";
+import { registerBackgroundPriceTask } from "@/utils/backgroundPriceFetch";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -170,6 +172,8 @@ export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
     const t = setTimeout(() => setTimerDone(true), 5000);
+    setupNotifications().catch(() => {});
+    registerBackgroundPriceTask().catch(() => {});
     return () => clearTimeout(t);
   }, []);
 
