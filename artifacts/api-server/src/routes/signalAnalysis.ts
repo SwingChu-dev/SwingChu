@@ -1,6 +1,6 @@
 import { Router } from "express";
 import NodeCache from "node-cache";
-
+import Anthropic from "@anthropic-ai/sdk";
 import YahooFinanceClass from "yahoo-finance2";
 interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number }
 
@@ -37,31 +37,17 @@ async function fetchHistory(ticker: string, market: string, days: number): Promi
 const router = Router();
 const cache  = new NodeCache({ stdTTL: 10 * 60 });
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
-const GEMINI_MODEL = "gemini-2.5-flash";
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? "" });
 
-async function callGemini(prompt: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: 2048,
-      temperature: 0.2,
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-  };
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+async function callClaude(prompt: string): Promise<string> {
+  const msg = await anthropic.messages.create({
+    model: "claude-3-5-haiku-latest",
+    max_tokens: 1024,
+    temperature: 0.2,
+    messages: [{ role: "user", content: prompt }],
   });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(`Gemini HTTP ${resp.status}: ${JSON.stringify(err)}`);
-  }
-  const data: any = await resp.json();
-  const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
-  return parts.map((p: any) => p.text ?? "").join("");
+  const block = msg.content[0];
+  return block.type === "text" ? block.text : "";
 }
 
 // ─── 기술적 지표 계산 ─────────────────────────────────────────────────────────
@@ -223,8 +209,7 @@ async function analyzeWithAI(
 - 관망: MA 배열 혼재, 거래량 평범, 방향성 불명확`;
 
   try {
-    const text = await callGemini(prompt);
-    // 마크다운 코드블록(```json ... ```) 또는 순수 JSON 모두 처리
+    const text = await callClaude(prompt);
     const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonMatch = codeBlock ? codeBlock[1].match(/\{[\s\S]*\}/) : text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
