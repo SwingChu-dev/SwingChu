@@ -1,0 +1,851 @@
+좋습니다. 스윙의 정석 앱에 바로 이식할 수 있는 개발자 스펙으로 변환할게요. React Native 기준이지만 로직은 플랫폼 중립적으로 작성했습니다.
+
+📦 데이터 모델
+
+// types/portfolio.ts
+
+type Category = 'A_CORE' | 'B_EVENT' | 'C_CONTRARIAN' | 'D_SPECULATIVE' | 'E_DOMESTIC';
+
+type Sector = 
+  | 'SEMICONDUCTOR' 
+  | 'ENERGY' 
+  | 'DEFENSE' 
+  | 'SHIPBUILDING' 
+  | 'NUCLEAR' 
+  | 'BIGTECH_AI' 
+  | 'QUANTUM' 
+  | 'MICROCAP';
+
+type Position = {
+  id: string;
+  ticker: string;
+  name: string;
+  market: 'KOSPI' | 'NASDAQ' | 'NYSE';
+  category: Category;
+  sectors: Sector[];           // 다중 섹터 가능 (예: SK하이닉스 = SEMICONDUCTOR + BIGTECH_AI)
+  
+  // 포지션 데이터
+  avgPrice: number;
+  quantity: number;
+  currentPrice: number;
+  currency: 'KRW' | 'USD';
+  
+  // 매수 시점 기록
+  entryDate: Date;
+  entryReason: string;          // 필수, 최소 3줄
+  stopLoss: number;             // 필수
+  takeProfitLevels: number[];   // [+3%, +5%, +8%, +15%]
+  
+  // 상태 플래그
+  isImpulseBuy: boolean;        // 뇌동 라벨 (사후 표시 가능)
+  isInLiquidationMode: boolean; // 정리 모드
+  
+  // 메타
+  lastReviewedAt: Date;
+  notes: string[];
+};
+
+type Portfolio = {
+  totalValue: number;
+  cashBalance: number;
+  positions: Position[];
+  
+  // 집계
+  categoryAllocation: Record<Category, number>;  // % 비중
+  sectorAllocation: Record<Sector, number>;
+  
+  // 월간 트래킹
+  monthlyPnL: number;
+  monthlyPnLPercent: number;
+  monthStartValue: number;
+};
+
+type CategoryLimit = {
+  category: Category;
+  targetAllocation: number;      // 이상적 비중
+  maxSinglePosition: number;     // 단일 종목 상한
+};
+
+type SectorLimit = {
+  sector: Sector;
+  maxAllocation: number;         // 섹터 집중도 상한
+};
+
+
+⚙️ 설정 상수
+
+// constants/rules.ts
+
+export const CATEGORY_LIMITS: CategoryLimit[] = [
+  { category: 'A_CORE',         targetAllocation: 60, maxSinglePosition: 20 },
+  { category: 'B_EVENT',        targetAllocation: 20, maxSinglePosition: 15 },
+  { category: 'C_CONTRARIAN',   targetAllocation: 12, maxSinglePosition: 10 },
+  { category: 'D_SPECULATIVE',  targetAllocation: 5,  maxSinglePosition: 5  },
+];
+
+export const SECTOR_LIMITS: SectorLimit[] = [
+  { sector: 'SEMICONDUCTOR', maxAllocation: 35 },
+  { sector: 'ENERGY',        maxAllocation: 20 },
+  { sector: 'DEFENSE',       maxAllocation: 20 },
+  { sector: 'SHIPBUILDING',  maxAllocation: 25 },
+  { sector: 'NUCLEAR',       maxAllocation: 15 },
+  { sector: 'QUANTUM',       maxAllocation: 5  },
+  { sector: 'MICROCAP',      maxAllocation: 5  },
+];
+
+export const ABSOLUTE_LIMITS = {
+  MAX_SINGLE_POSITION: 25,           // % — 절대 상한
+  COOLDOWN_HOURS_NORMAL: 24,         // 일반 매수 쿨다운
+  COOLDOWN_HOURS_LARGE: 48,          // 평균의 1.5배 초과 시
+  MAX_POSITION_MULTIPLIER: 1.5,      // 평균 포지션 대비 배수
+  MONTHLY_LOSS_WARNING: -5,          // % — 신규 진입 중단
+  MONTHLY_LOSS_CRITICAL: -10,        // % — 전체 축소
+  STOP_LOSS_DEFAULT: -7,             // % — 기본 손절선 (평단 대비)
+  MIN_ENTRY_REASON_LENGTH: 100,      // 글자수
+};
+
+export const TAKE_PROFIT_LADDER = [
+  { trigger: 3,  sellPercent: 25 },  // +3% → 25% 매도
+  { trigger: 5,  sellPercent: 25 },
+  { trigger: 8,  sellPercent: 25 },
+  { trigger: 15, sellPercent: 25 },
+];
+
+export const IMPULSE_TRIGGER_WORDS = [
+  '반드시', '확실', '역대급', '무조건', '놓치면', 
+  '지금 안 사면', '무조건 간다', '오른다', '가즈아'
+];
+
+
+🛡️ 핵심 검증 로직
+1. 매수 전 검증 (진입 차단 로직)
+
+// services/entryValidator.ts
+
+type EntryRequest = {
+  ticker: string;
+  category: Category;
+  sectors: Sector[];
+  targetAmount: number;       // 매수 금액
+  entryReason: string;
+  stopLoss: number | null;
+  takeProfitLevels: number[];
+  userAckImpulseChecklist: boolean[];  // 7개 항목
+};
+
+type ValidationResult = {
+  passed: boolean;
+  blockers: string[];         // 진입 불가 사유
+  warnings: string[];         // 경고 (진입 가능)
+  requiredCooldownHours: number;
+};
+
+function validateEntry(
+  req: EntryRequest, 
+  portfolio: Portfolio,
+  userHistory: TradingHistory
+): ValidationResult {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  let cooldown = 0;
+
+  // ─── BLOCKER 1: 필수 입력값 검증 ───
+  if (!req.entryReason || req.entryReason.length < 100) {
+    blockers.push('매수 근거 3줄(100자) 이상 필수');
+  }
+  if (req.stopLoss === null) {
+    blockers.push('손절가 미설정');
+  }
+  if (req.takeProfitLevels.length === 0) {
+    blockers.push('익절 구간 미설정');
+  }
+
+  // ─── BLOCKER 2: 단일 종목 상한 ───
+  const newPositionPercent = 
+    (req.targetAmount / portfolio.totalValue) * 100;
+  
+  if (newPositionPercent > ABSOLUTE_LIMITS.MAX_SINGLE_POSITION) {
+    blockers.push(
+      `단일 종목 ${ABSOLUTE_LIMITS.MAX_SINGLE_POSITION}% 초과 (현재 요청: ${newPositionPercent.toFixed(1)}%)`
+    );
+  }
+
+  // ─── BLOCKER 3: 카테고리 상한 ───
+  const catLimit = CATEGORY_LIMITS.find(c => c.category === req.category);
+  if (catLimit && newPositionPercent > catLimit.maxSinglePosition) {
+    blockers.push(
+      `${req.category} 카테고리 단일 종목 상한 ${catLimit.maxSinglePosition}% 초과`
+    );
+  }
+
+  // ─── BLOCKER 4: 섹터 집중도 ───
+  for (const sector of req.sectors) {
+    const currentSectorAlloc = portfolio.sectorAllocation[sector] || 0;
+    const newSectorAlloc = currentSectorAlloc + newPositionPercent;
+    const limit = SECTOR_LIMITS.find(s => s.sector === sector);
+    
+    if (limit && newSectorAlloc > limit.maxAllocation) {
+      blockers.push(
+        `${sector} 섹터 상한 ${limit.maxAllocation}% 초과 (신규 진입 시 ${newSectorAlloc.toFixed(1)}%)`
+      );
+    }
+  }
+
+  // ─── BLOCKER 5: 월간 손실 한도 ───
+  if (portfolio.monthlyPnLPercent <= ABSOLUTE_LIMITS.MONTHLY_LOSS_WARNING) {
+    blockers.push(
+      `월간 손실 ${portfolio.monthlyPnLPercent.toFixed(1)}% — 신규 진입 중단 구간`
+    );
+  }
+
+  // ─── BLOCKER 6: 뇌동 체크리스트 ───
+  const impulseFailures = req.userAckImpulseChecklist.filter(Boolean).length;
+  if (impulseFailures >= 3) {
+    blockers.push(
+      `뇌동 체크리스트 ${impulseFailures}개 해당 — 진입 보류 권장`
+    );
+  }
+
+  // ─── BLOCKER 7: 근거 텍스트의 감정어 검출 ───
+  const emotionalWords = IMPULSE_TRIGGER_WORDS.filter(
+    word => req.entryReason.includes(word)
+  );
+  if (emotionalWords.length >= 2) {
+    blockers.push(
+      `감정어 과다 사용: ${emotionalWords.join(', ')} — 근거 재작성 필요`
+    );
+  }
+
+  // ─── COOLDOWN 계산 ───
+  const avgPositionSize = calculateAvgPositionSize(userHistory);
+  const sizeMultiplier = req.targetAmount / avgPositionSize;
+  
+  if (sizeMultiplier > ABSOLUTE_LIMITS.MAX_POSITION_MULTIPLIER) {
+    cooldown = ABSOLUTE_LIMITS.COOLDOWN_HOURS_LARGE;
+    warnings.push(
+      `평균 사이즈의 ${sizeMultiplier.toFixed(1)}배 — 48시간 쿨다운 적용`
+    );
+  } else {
+    cooldown = ABSOLUTE_LIMITS.COOLDOWN_HOURS_NORMAL;
+  }
+
+  // ─── WARNING: 카테고리 비중 편향 ───
+  const currentCatAlloc = portfolio.categoryAllocation[req.category] || 0;
+  const targetCatAlloc = catLimit?.targetAllocation || 0;
+  if (currentCatAlloc + newPositionPercent > targetCatAlloc * 1.2) {
+    warnings.push(
+      `${req.category} 카테고리 목표 비중 초과 (목표 ${targetCatAlloc}%, 예정 ${(currentCatAlloc + newPositionPercent).toFixed(1)}%)`
+    );
+  }
+
+  return {
+    passed: blockers.length === 0,
+    blockers,
+    warnings,
+    requiredCooldownHours: cooldown,
+  };
+}
+
+function calculateAvgPositionSize(history: TradingHistory): number {
+  const recentTrades = history.trades
+    .filter(t => t.type === 'BUY')
+    .slice(-20);  // 최근 20건
+  
+  if (recentTrades.length === 0) return 0;
+  
+  return recentTrades.reduce((sum, t) => sum + t.amount, 0) / recentTrades.length;
+}
+
+
+2. 쿨다운 타이머
+
+// services/cooldownManager.ts
+
+type PendingEntry = {
+  id: string;
+  request: EntryRequest;
+  createdAt: Date;
+  cooldownUntil: Date;
+  status: 'PENDING' | 'APPROVED' | 'CANCELLED' | 'EXECUTED';
+};
+
+class CooldownManager {
+  async createPendingEntry(
+    req: EntryRequest, 
+    cooldownHours: number
+  ): Promise<PendingEntry> {
+    const now = new Date();
+    const cooldownUntil = new Date(now.getTime() + cooldownHours * 60 * 60 * 1000);
+    
+    const entry: PendingEntry = {
+      id: generateId(),
+      request: req,
+      createdAt: now,
+      cooldownUntil,
+      status: 'PENDING',
+    };
+    
+    await this.persist(entry);
+    await this.scheduleNotification(entry);
+    
+    return entry;
+  }
+  
+  async checkAndExecute(entryId: string): Promise<boolean> {
+    const entry = await this.get(entryId);
+    if (!entry) return false;
+    
+    if (new Date() < entry.cooldownUntil) {
+      const remaining = this.formatRemaining(entry.cooldownUntil);
+      throw new Error(`쿨다운 ${remaining} 남음`);
+    }
+    
+    // 쿨다운 종료 후 재검증 (상황이 바뀌었을 수 있음)
+    const revalidation = validateEntry(entry.request, ...);
+    if (!revalidation.passed) {
+      throw new Error('쿨다운 중 조건 변경 — 재검증 실패');
+    }
+    
+    entry.status = 'APPROVED';
+    return true;
+  }
+  
+  async cancelPending(entryId: string, reason: string): Promise<void> {
+    // 쿨다운 중 취소 시 → 뇌동 방지 성공 사례로 기록
+    await this.logCooldownSave(entryId, reason);
+  }
+}
+
+
+3. 자동 익절·손절 모니터
+
+// services/positionMonitor.ts
+
+type PriceAlert = {
+  positionId: string;
+  type: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TRAIL_STOP';
+  triggerPrice: number;
+  action: 'SELL_ALL' | 'SELL_PARTIAL';
+  sellPercent?: number;
+};
+
+class PositionMonitor {
+  // 실시간 가격 체크 (웹소켓 or 폴링)
+  async onPriceUpdate(ticker: string, price: number): Promise<void> {
+    const positions = await this.getPositionsByTicker(ticker);
+    
+    for (const pos of positions) {
+      // 손절선 체크
+      if (price <= pos.stopLoss) {
+        await this.triggerAlert({
+          positionId: pos.id,
+          type: 'STOP_LOSS',
+          triggerPrice: pos.stopLoss,
+          action: 'SELL_ALL',
+        });
+        continue;
+      }
+      
+      // 익절 사다리 체크
+      for (const tp of pos.takeProfitLevels) {
+        const targetPrice = pos.avgPrice * (1 + tp / 100);
+        const ladderConfig = TAKE_PROFIT_LADDER.find(l => l.trigger === tp);
+        
+        if (price >= targetPrice && !pos.executedTakeProfits?.includes(tp)) {
+          await this.triggerAlert({
+            positionId: pos.id,
+            type: 'TAKE_PROFIT',
+            triggerPrice: targetPrice,
+            action: 'SELL_PARTIAL',
+            sellPercent: ladderConfig?.sellPercent || 25,
+          });
+        }
+      }
+      
+      // 트레일링 스탑 (이동평균 하단 -2%)
+      const ma5 = await this.getMA(ticker, 5);
+      const ma20 = await this.getMA(ticker, 20);
+      const trailStop = Math.min(ma5, ma20) * 0.98;
+      
+      if (price <= trailStop && price > pos.avgPrice) {
+        // 수익 상태에서 이평 이탈 → 트레일 스탑
+        await this.triggerAlert({
+          positionId: pos.id,
+          type: 'TRAIL_STOP',
+          triggerPrice: trailStop,
+          action: 'SELL_PARTIAL',
+          sellPercent: 50,
+        });
+      }
+    }
+  }
+  
+  private async triggerAlert(alert: PriceAlert): Promise<void> {
+    // 1. 푸시 알림
+    await PushNotification.send({
+      title: alert.type === 'STOP_LOSS' ? '⚠️ 손절 도달' : '✅ 익절 도달',
+      body: this.formatAlertMessage(alert),
+      priority: 'high',
+      sound: 'alert.wav',
+    });
+    
+    // 2. 앱 내 뱃지
+    await BadgeManager.increment();
+    
+    // 3. 로그
+    await this.logAlert(alert);
+  }
+}
+
+
+4. 포트폴리오 집계 및 경고
+
+// services/portfolioAnalyzer.ts
+
+type HealthCheck = {
+  healthScore: number;          // 0~100
+  issues: Issue[];
+  recommendations: string[];
+};
+
+type Issue = {
+  severity: 'INFO' | 'WARN' | 'CRITICAL';
+  category: 'CONCENTRATION' | 'SECTOR' | 'IMPULSE' | 'LOSS' | 'RULE_VIOLATION';
+  message: string;
+  suggestedAction?: string;
+};
+
+class PortfolioAnalyzer {
+  async analyze(portfolio: Portfolio): Promise<HealthCheck> {
+    const issues: Issue[] = [];
+    let score = 100;
+    
+    // ─── 1. 단일 종목 집중도 ───
+    for (const pos of portfolio.positions) {
+      const pct = (pos.currentValue / portfolio.totalValue) * 100;
+      
+      if (pct > 25) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'CONCENTRATION',
+          message: `${pos.name}: ${pct.toFixed(1)}% (상한 25% 초과)`,
+          suggestedAction: `${pct - 25}% 이상 익절 또는 매도`,
+        });
+        score -= 20;
+      } else if (pct > 20) {
+        issues.push({
+          severity: 'WARN',
+          category: 'CONCENTRATION',
+          message: `${pos.name}: ${pct.toFixed(1)}% (주의 구간)`,
+        });
+        score -= 5;
+      }
+    }
+    
+    // ─── 2. 섹터 집중도 ───
+    for (const [sector, alloc] of Object.entries(portfolio.sectorAllocation)) {
+      const limit = SECTOR_LIMITS.find(s => s.sector === sector);
+      if (limit && alloc > limit.maxAllocation) {
+        issues.push({
+          severity: 'WARN',
+          category: 'SECTOR',
+          message: `${sector} 섹터 ${alloc.toFixed(1)}% (상한 ${limit.maxAllocation}%)`,
+        });
+        score -= 10;
+      }
+    }
+    
+    // ─── 3. 뇌동 포지션 잔존 ───
+    const impulsePositions = portfolio.positions.filter(p => p.isImpulseBuy);
+    if (impulsePositions.length > 0) {
+      const totalImpulsePct = impulsePositions.reduce(
+        (sum, p) => sum + (p.currentValue / portfolio.totalValue) * 100, 
+        0
+      );
+      
+      if (totalImpulsePct > 10) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'IMPULSE',
+          message: `뇌동 포지션 ${totalImpulsePct.toFixed(1)}% — 정리 필요`,
+          suggestedAction: '각 종목별 정리 플랜 수립',
+        });
+        score -= 15;
+      }
+    }
+    
+    // ─── 4. 월간 손실 ───
+    if (portfolio.monthlyPnLPercent < -10) {
+      issues.push({
+        severity: 'CRITICAL',
+        category: 'LOSS',
+        message: `월간 손실 ${portfolio.monthlyPnLPercent.toFixed(1)}% — 포트 재점검`,
+      });
+      score -= 20;
+    } else if (portfolio.monthlyPnLPercent < -5) {
+      issues.push({
+        severity: 'WARN',
+        category: 'LOSS',
+        message: `월간 손실 ${portfolio.monthlyPnLPercent.toFixed(1)}% — 신규 진입 자제`,
+      });
+      score -= 10;
+    }
+    
+    // ─── 5. 손절선 미설정 ───
+    const noStopLoss = portfolio.positions.filter(p => !p.stopLoss);
+    if (noStopLoss.length > 0) {
+      issues.push({
+        severity: 'CRITICAL',
+        category: 'RULE_VIOLATION',
+        message: `손절선 미설정 종목 ${noStopLoss.length}개`,
+        suggestedAction: '즉시 손절선 지정',
+      });
+      score -= 15;
+    }
+    
+    return {
+      healthScore: Math.max(0, score),
+      issues,
+      recommendations: this.generateRecommendations(issues, portfolio),
+    };
+  }
+}
+
+
+5. 뇌동 체크리스트 UI 컴포넌트
+
+// components/ImpulseChecklist.tsx
+
+const IMPULSE_CHECKLIST_ITEMS = [
+  '"놓치면 안 될 것 같다"는 초조함이 있다 (FOMO)',
+  '평소 포지션보다 큰 사이즈를 고려 중이다',
+  '매수 근거가 3문장 이상 명확히 설명되지 않는다',
+  '손절 가격을 아직 정하지 않았다',
+  '"반드시", "확실히", "역대급" 같은 감정어를 쓰고 있다',
+  '최근 수익을 많이 낸 후 자신감 과잉 상태다',
+  '최근 손실을 회복하고 싶은 심리가 있다',
+];
+
+export const ImpulseChecklist: FC<Props> = ({ onComplete }) => {
+  const [checked, setChecked] = useState<boolean[]>(
+    new Array(IMPULSE_CHECKLIST_ITEMS.length).fill(false)
+  );
+  
+  const checkedCount = checked.filter(Boolean).length;
+  const isBlocked = checkedCount >= 3;
+  
+  return (
+    <View>
+      <Text style={styles.title}>
+        🧠 매수 전 뇌동 체크리스트
+      </Text>
+      <Text style={styles.subtitle}>
+        3개 이상 해당 시 진입이 보류됩니다
+      </Text>
+      
+      {IMPULSE_CHECKLIST_ITEMS.map((item, i) => (
+        <CheckboxRow
+          key={i}
+          label={item}
+          checked={checked[i]}
+          onToggle={() => {
+            const next = [...checked];
+            next[i] = !next[i];
+            setChecked(next);
+          }}
+        />
+      ))}
+      
+      <View style={[
+        styles.summary,
+        isBlocked && styles.summaryBlocked
+      ]}>
+        <Text>체크: {checkedCount}/7</Text>
+        {isBlocked && (
+          <Text style={styles.blockedText}>
+            ⚠️ 진입 보류 — 쿨다운 48시간 적용
+          </Text>
+        )}
+      </View>
+      
+      <Button
+        title={isBlocked ? '쿨다운 시작' : '계속 진행'}
+        onPress={() => onComplete(checked, isBlocked)}
+      />
+    </View>
+  );
+};
+
+
+6. 주간 리포트 생성
+
+// services/weeklyReport.ts
+
+type WeeklyReport = {
+  weekOf: string;
+  summary: {
+    totalTrades: number;
+    winRate: number;
+    realizedPnL: number;
+    realizedPnLPercent: number;
+    biggestWin: Trade;
+    biggestLoss: Trade;
+  };
+  ruleCompliance: {
+    totalEntries: number;
+    passedValidation: number;
+    cooldownTriggered: number;
+    impulseChecklistFailures: number;
+    stopLossSetRate: number;      // %
+    ruleViolations: RuleViolation[];
+  };
+  portfolioHealth: HealthCheck;
+  upcomingEvents: Event[];          // 다음 주 실적, 배당 등
+  learnings: string[];              // AI 생성 인사이트
+};
+
+class WeeklyReportGenerator {
+  async generate(userId: string): Promise<WeeklyReport> {
+    const weekStart = startOfWeek(new Date());
+    const weekEnd = endOfWeek(new Date());
+    
+    const trades = await this.getTrades(userId, weekStart, weekEnd);
+    const validations = await this.getValidations(userId, weekStart, weekEnd);
+    const portfolio = await this.getPortfolio(userId);
+    
+    return {
+      weekOf: format(weekStart, 'yyyy-MM-dd'),
+      summary: this.summarize(trades),
+      ruleCompliance: this.analyzeCompliance(trades, validations),
+      portfolioHealth: await new PortfolioAnalyzer().analyze(portfolio),
+      upcomingEvents: await this.fetchUpcomingEvents(portfolio.positions),
+      learnings: await this.generateLearnings(trades, validations),
+    };
+  }
+  
+  private async generateLearnings(
+    trades: Trade[], 
+    validations: Validation[]
+  ): Promise<string[]> {
+    // 예: AI(LLM)로 패턴 분석
+    const prompt = `
+      이번 주 매매 ${trades.length}건, 승률 ${winRate}%, 
+      뇌동 경고 ${impulseCount}회, 쿨다운 ${cooldownCount}회 발생.
+      가장 큰 손실 종목: ${biggestLoss.ticker} (${biggestLoss.pnl}%).
+      이 데이터에서 개선점 3가지를 뽑아줘.
+    `;
+    
+    const response = await AIService.generate(prompt);
+    return response.insights;
+  }
+}
+
+
+📱 화면 플로우
+
+[홈]
+  └─ 포트폴리오 헬스 스코어 (상단)
+  └─ 카테고리/섹터 비중 바
+  └─ 경고 카드 (CRITICAL 이슈만)
+  └─ [+ 매수] 버튼
+
+[매수 플로우]
+  (1) 종목 검색/선택
+  (2) 카테고리·섹터 태깅
+  (3) 금액·수량 입력
+  (4) 손절가/익절구간 입력 (필수)
+  (5) 매수 근거 3줄 (100자+)
+  (6) 뇌동 체크리스트 7개
+  (7) validateEntry() 실행
+       ├─ PASS → (8) 쿨다운 예약
+       └─ BLOCK → 사유 표시, 수정 or 취소
+
+[쿨다운 대기 화면]
+  └─ 남은 시간 카운트다운
+  └─ [진행 확정] (버튼 비활성, 시간 후 활성화)
+  └─ [취소하기] (뇌동 방지 성공 기록)
+
+[보유 종목 상세]
+  └─ 현재 수익률
+  └─ 손절선까지 거리
+  └─ 다음 익절 레벨
+  └─ [정리 모드 전환] (뇌동 포지션 관리)
+
+[주간 리포트]
+  └─ 매주 월요일 아침 푸시
+  └─ 룰 준수율
+  └─ 개선 포인트 3개
+
+
+🗄️ DB 스키마 (Postgres 기준)
+
+CREATE TABLE positions (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL,
+  ticker VARCHAR(20) NOT NULL,
+  category VARCHAR(20) NOT NULL CHECK (category IN ('A_CORE','B_EVENT','C_CONTRARIAN','D_SPECULATIVE','E_DOMESTIC')),
+  sectors TEXT[] NOT NULL,
+  avg_price DECIMAL(20,4) NOT NULL,
+  quantity DECIMAL(20,8) NOT NULL,
+  stop_loss DECIMAL(20,4) NOT NULL,
+  take_profit_levels DECIMAL[] NOT NULL,
+  entry_reason TEXT NOT NULL CHECK (length(entry_reason) >= 100),
+  is_impulse_buy BOOLEAN DEFAULT false,
+  is_liquidation_mode BOOLEAN DEFAULT false,
+  entry_date TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE pending_entries (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL,
+  request JSONB NOT NULL,
+  cooldown_until TIMESTAMPTZ NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE rule_violations (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL,
+  violation_type VARCHAR(50) NOT NULL,
+  severity VARCHAR(20) NOT NULL,
+  details JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE cooldown_saves (
+  -- 쿨다운 중 취소한 기록 (뇌동 방지 성공 사례)
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL,
+  pending_entry_id UUID REFERENCES pending_entries(id),
+  cancel_reason TEXT,
+  estimated_saved_amount DECIMAL(20,4),  -- 만약 샀다면 손실 추정치
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_positions_user ON positions(user_id);
+CREATE INDEX idx_pending_cooldown ON pending_entries(cooldown_until) WHERE status = 'PENDING';
+
+
+🔌 이벤트·알림 시스템
+
+// events/eventBus.ts
+
+type TradingEvent =
+  | { type: 'ENTRY_BLOCKED'; reason: string }
+  | { type: 'COOLDOWN_STARTED'; duration: number }
+  | { type: 'COOLDOWN_SAVED'; savedAmount: number }
+  | { type: 'STOP_LOSS_TRIGGERED'; position: Position }
+  | { type: 'TAKE_PROFIT_TRIGGERED'; position: Position; level: number }
+  | { type: 'MONTHLY_LOSS_WARNING'; currentLoss: number }
+  | { type: 'CONCENTRATION_ALERT'; position: Position; percent: number }
+  | { type: 'IMPULSE_DETECTED'; failedChecks: number };
+
+class EventBus {
+  private subscribers: Map<string, Handler[]> = new Map();
+  
+  emit(event: TradingEvent): void {
+    // 1. UI 업데이트
+    this.notifyUI(event);
+    
+    // 2. 푸시 알림 (중요 이벤트만)
+    if (this.isPushWorthy(event)) {
+      PushNotification.send(this.formatPush(event));
+    }
+    
+    // 3. 로그
+    AnalyticsLogger.log(event);
+    
+    // 4. 주간 리포트용 누적
+    WeeklyAggregator.add(event);
+  }
+}
+
+
+✅ 테스트 시나리오
+
+// __tests__/entryValidator.test.ts
+
+describe('Entry Validator', () => {
+  it('차단: 단일 종목 25% 초과', () => {
+    const req = mockRequest({ targetAmount: 30000000 });
+    const portfolio = mockPortfolio({ totalValue: 100000000 });
+    
+    const result = validateEntry(req, portfolio, mockHistory());
+    
+    expect(result.passed).toBe(false);
+    expect(result.blockers).toContain('단일 종목 25% 초과');
+  });
+  
+  it('차단: 뇌동 체크리스트 3개 이상', () => {
+    const req = mockRequest({ 
+      userAckImpulseChecklist: [true, true, true, false, false, false, false] 
+    });
+    
+    const result = validateEntry(req, mockPortfolio(), mockHistory());
+    
+    expect(result.passed).toBe(false);
+  });
+  
+  it('경고 + 48시간 쿨다운: 평균의 1.5배 초과', () => {
+    const history = mockHistory({ avgPositionSize: 1000000 });
+    const req = mockRequest({ targetAmount: 2000000 });
+    
+    const result = validateEntry(req, mockPortfolio(), history);
+    
+    expect(result.requiredCooldownHours).toBe(48);
+  });
+  
+  it('통과: 모든 조건 만족', () => {
+    const req = mockRequest({
+      targetAmount: 5000000,
+      entryReason: 'HD현대중공업 조선 슈퍼사이클 초중반 국면. 수주잔고 2027년까지 가득 차 있고 환경규제로 LNG선 수요 지속. PER 밸류에이션 매력 구간.',
+      stopLoss: 450000,
+      takeProfitLevels: [3, 5, 8, 15],
+      userAckImpulseChecklist: [false, false, false, false, false, false, false],
+    });
+    
+    const result = validateEntry(req, mockPortfolio(), mockHistory());
+    
+    expect(result.passed).toBe(true);
+  });
+});
+
+
+🚀 구현 우선순위 (MVP → Full)
+Phase 1 (MVP, 2~3주)
+	1.	데이터 모델 + DB 스키마
+	2.	validateEntry 핵심 로직 (BLOCKER 1~5)
+	3.	뇌동 체크리스트 UI
+	4.	포트폴리오 비중 계산 + 카테고리/섹터 바 차트
+	5.	손절선 필수 입력
+Phase 2 (안정화, 2~3주)
+6. 쿨다운 타이머 + 푸시 알림
+7. 자동 익절/손절 모니터
+8. 헬스 스코어 + 이슈 리스트
+Phase 3 (고도화, 4~6주)
+9. 주간 리포트 생성 (AI 인사이트 포함)
+10. 트레일링 스탑
+11. 감정어 자동 감지 (NLP)
+12. 뇌동 방지 성공 기록 (cooldown_saves)
+Phase 4 (차별화, 장기)
+13. AI 기반 매수 근거 품질 평가
+14. 유사 사용자 패턴 학습
+15. 매크로 이벤트 자동 알림 (FOMC, 실적 등)
+
+💡 추가 설계 팁
+1. “쿨다운 방지 성공 알림”이 핵심 UX
+쿨다운 중 취소한 사례를 적극적으로 시각화하세요. “이번 달 뇌동 방지로 약 XXX만원 손실 회피(추정)” 같은 메시지가 사용자에게 앱의 가치를 증명합니다. 가상의 “내가 그때 샀다면” 시나리오를 실제 주가 추이로 보여주면 설득력 최대.
+2. 카테고리 분류는 AI에게 위임 가능
+종목 티커만 입력하면 GPT/Claude API로 카테고리·섹터 자동 추천. 사용자는 승인만. 진입 장벽 확 낮아집니다.
+3. 규칙 커스터마이징
+기본값은 보수적으로 두되, 상급자는 일부 수치(단일 종목 상한 등)를 조정 가능하게. 단, 절대 룰(손절가 필수, 쿨다운) 비활성화는 불가.
+4. A/B 테스트 설계
+	•	A 그룹: 풀 룰 적용
+	•	B 그룹: 룰 없음 (대조군)
+	•	6개월 후 수익률 비교 → 마케팅 자료화
+
+이 스펙으로 구현하시면 **“뇌동 방지 투자 코치”**라는 명확한 가치 제안이 만들어집니다. 경쟁 앱들은 대부분 차트·호가만 보여주는데, 스윙의 정석은 **“매매 행동 자체를 관리”**하는 앱이 되는 거예요. 차별화 포인트 확실합니다.
+코드 중 특정 부분을 더 파고들거나, UI 와이어프레임이 필요하시면 말씀해주세요.​​​​​​​​​​​​​​​​
