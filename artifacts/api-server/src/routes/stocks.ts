@@ -816,10 +816,13 @@ router.get("/stocks/detail", async (req, res) => {
     const recommendationKey: string    = fd?.recommendationKey ?? "";
 
     // ── 공매도 데이터 (미국주식만; 한국주식은 Yahoo에서 제공 안 함) ──────────
-    const shortRatio:            number | null = isKorean ? null : (ks?.shortRatio            ?? null);
-    const shortPercentOfFloat:   number | null = isKorean ? null : (ks?.shortPercentOfFloat   ?? null);
-    const sharesShort:           number | null = isKorean ? null : (ks?.sharesShort           ?? null);
-    const sharesShortPriorMonth: number | null = isKorean ? null : (ks?.sharesShortPriorMonth ?? null);
+    const shortRatio:            number | null = isKorean ? null : (typeof ks?.shortRatio === "number" ? ks.shortRatio : null);
+    const shortPercentOfFloat:   number | null = isKorean ? null : (typeof ks?.shortPercentOfFloat === "number" ? ks.shortPercentOfFloat : null);
+    const sharesShort:           number | null = isKorean ? null : (typeof ks?.sharesShort === "number" && ks.sharesShort > 0 ? ks.sharesShort : null);
+    // sharesShortPriorMonth — number 타입 검증 (Yahoo Finance가 날짜 객체를 반환하는 경우 방어)
+    const sharesShortPriorMonthRaw = ks?.sharesShortPriorMonth;
+    const sharesShortPriorMonth: number | null = isKorean ? null
+      : (typeof sharesShortPriorMonthRaw === "number" && sharesShortPriorMonthRaw > 0 ? sharesShortPriorMonthRaw : null);
 
     const payload = {
       ticker, market, name, currentPrice, priceKRW,
@@ -898,7 +901,7 @@ router.get("/stocks/news", async (req, res) => {
 });
 
 // ─── 과거 주가 데이터 (백테스팅용) ─────────────────────────────────────────────
-const PERIOD_DAYS: Record<string, number> = { "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365 };
+const PERIOD_DAYS: Record<string, number> = { "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "2y": 730 };
 
 router.get("/stocks/history", async (req, res) => {
   const ticker = (req.query.ticker as string) ?? "";

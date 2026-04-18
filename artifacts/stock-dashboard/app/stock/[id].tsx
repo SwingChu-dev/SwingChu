@@ -33,9 +33,9 @@ import OverheatSection from "@/components/detail/OverheatSection";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
 
-type TabKey = "진입" | "익절" | "박스권" | "재무·전망" | "기술·진단" | "리스크" | "요일" | "뉴스" | "백테스트" | "이스라엘";
+type TabKey = "진입" | "익절" | "박스권" | "재무·전망" | "기술·진단" | "리스크" | "요일" | "뉴스" | "백테스트" | "지정학";
 
-const TABS: TabKey[] = ["진입", "익절", "박스권", "재무·전망", "기술·진단", "리스크", "요일", "뉴스", "백테스트", "이스라엘"];
+const TABS: TabKey[] = ["진입", "익절", "박스권", "재무·전망", "기술·진단", "리스크", "요일", "뉴스", "백테스트", "지정학"];
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#3B82F6",
@@ -68,6 +68,29 @@ export default function StockDetailScreen() {
   const [detail, setDetail] = useState<StockDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
+
+  const [tradingStatus, setTradingStatus] = useState<{
+    score: number; title: string; color: string; icon: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!baseStock) return;
+    fetch(`${API_BASE}/stocks/overheating?ticker=${encodeURIComponent(baseStock.ticker)}&market=${encodeURIComponent(baseStock.market)}`)
+      .then(r => r.json())
+      .then(d => {
+        const score = d.overheatScore as number;
+        if (score == null || isNaN(score)) return;
+        let title = "저평가 — 매수 진입 우호 구간";
+        let color = "#0064FF";
+        let icon  = "rocket-outline";
+        if      (score >= 80) { title = "극과열 — 신규 진입 자제";       color = "#F04452"; icon = "flame-outline";    }
+        else if (score >= 60) { title = "과열 — 추격 매수 주의";          color = "#FF6B00"; icon = "warning-outline";  }
+        else if (score >= 40) { title = "주의 — 모멘텀 확인 후 진입";    color = "#F59E0B"; icon = "analytics-outline"; }
+        else if (score >= 20) { title = "적정 — 건강한 매수 구간";        color = "#2DB55D"; icon = "trending-up-outline"; }
+        setTradingStatus({ score, title, color, icon });
+      })
+      .catch(() => {});
+  }, [baseStock?.ticker, baseStock?.market]);
 
   // stub 종목: 자동으로 detail + enrichment 실행
   useEffect(() => {
@@ -159,15 +182,21 @@ export default function StockDetailScreen() {
             </View>
           </View>
           <View style={styles.headerPriceRow}>
-            <Text style={[styles.headerPrice, { color: c.text }]}>
-              ₩{displayPrice.toLocaleString()}
-            </Text>
-            {stock.market === "NASDAQ" && (
-              <View style={[styles.usdBadge, { backgroundColor: "#0064FF14" }]}>
-                <Text style={[styles.usdBadgeText, { color: "#0064FF" }]}>
+            {stock.market === "NASDAQ" ? (
+              <>
+                <Text style={[styles.headerPrice, { color: c.text }]}>
                   ${(displayPrice / USD_KRW_RATE).toFixed(2)}
                 </Text>
-              </View>
+                <View style={[styles.usdBadge, { backgroundColor: c.backgroundTertiary }]}>
+                  <Text style={[styles.usdBadgeText, { color: c.textSecondary }]}>
+                    ₩{displayPrice.toLocaleString()}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <Text style={[styles.headerPrice, { color: c.text }]}>
+                ₩{displayPrice.toLocaleString()}
+              </Text>
             )}
             {isLive && (
               <View style={styles.liveBadge}>
@@ -190,7 +219,7 @@ export default function StockDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* AI 분석하기 버튼 — predefined 종목이고 아직 분석 안 된 경우 */}
+      {/* AI 요약하기 버튼 — predefined 종목이고 아직 분석 안 된 경우 */}
       {showAiPrompt && (
         <TouchableOpacity
           style={[styles.aiPromptBanner, { backgroundColor: "#0064FF0D" }]}
@@ -202,7 +231,7 @@ export default function StockDetailScreen() {
             AI가 실시간 데이터로 전략을 재계산할 수 있어요
           </Text>
           <View style={styles.aiReanalyzeBtn}>
-            <Text style={styles.aiReanalyzeText}>AI 분석</Text>
+            <Text style={styles.aiReanalyzeText}>AI 요약</Text>
           </View>
         </TouchableOpacity>
       )}
@@ -218,13 +247,13 @@ export default function StockDetailScreen() {
             <>
               <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.8 }] }} />
               <Text style={[styles.aiBannerText, { color: "#F59E0B" }]}>
-                AI 분석 중 — 1년 실데이터 기반 전략 계산 중...
+                AI 요약 중 — 1년 실데이터 기반 전략 계산 중...
               </Text>
             </>
           ) : enrichmentFailed ? (
             <>
               <Ionicons name="warning-outline" size={14} color="#F04452" />
-              <Text style={[styles.aiBannerText, { color: "#F04452" }]}>AI 분석 실패</Text>
+              <Text style={[styles.aiBannerText, { color: "#F04452" }]}>AI 요약 실패</Text>
               <TouchableOpacity
                 onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
                 style={styles.aiRetryBtn}
@@ -236,7 +265,7 @@ export default function StockDetailScreen() {
             <>
               <Ionicons name="sparkles" size={14} color="#0064FF" />
               <Text style={[styles.aiBannerText, { color: "#0064FF" }]}>
-                AI 분석 완료 — 1년 실데이터 기반 · 분할매수·익절·재무 자동 계산
+                AI 요약 완료 — 1년 실데이터 기반 · 분할매수·익절·재무 자동 계산
               </Text>
               <TouchableOpacity
                 onPress={() => reEnrichStock(id!, baseStock.ticker, baseStock.market)}
@@ -246,6 +275,24 @@ export default function StockDetailScreen() {
               </TouchableOpacity>
             </>
           )}
+        </View>
+      )}
+
+      {/* 매매 상태 배너 — overheat score 기반 */}
+      {tradingStatus && (
+        <View style={[styles.tradingStatusBanner, {
+          backgroundColor: tradingStatus.color + "12",
+          borderBottomColor: tradingStatus.color + "28",
+        }]}>
+          <Ionicons name={tradingStatus.icon as any} size={14} color={tradingStatus.color} />
+          <Text style={[styles.tradingStatusText, { color: tradingStatus.color }]}>
+            매매 상태 · {tradingStatus.title}
+          </Text>
+          <View style={[styles.tradingStatusBadge, { backgroundColor: tradingStatus.color + "22" }]}>
+            <Text style={[styles.tradingStatusScore, { color: tradingStatus.color }]}>
+              {tradingStatus.score}
+            </Text>
+          </View>
         </View>
       )}
 
@@ -307,7 +354,7 @@ export default function StockDetailScreen() {
       </ScrollView>
 
       {/* stub 종목: AI 분석 중 전체 로딩 화면 */}
-      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && activeTab !== "공매도" && activeTab !== "과열진단" ? (
+      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "공매도" && activeTab !== "과열진단" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#F59E0B" />
           <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
@@ -317,7 +364,7 @@ export default function StockDetailScreen() {
             분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
           </Text>
         </View>
-      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && activeTab !== "공매도" && activeTab !== "과열진단" ? (
+      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "공매도" && activeTab !== "과열진단" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={c.tint} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>
@@ -331,7 +378,7 @@ export default function StockDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
         >
-          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && activeTab !== "공매도" && activeTab !== "과열진단" && (
+          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "공매도" && activeTab !== "과열진단" && (
             <>
               <View style={styles.descriptionBox}>
                 <Text style={[styles.description, { color: c.textSecondary }]}>
@@ -356,17 +403,17 @@ export default function StockDetailScreen() {
             </>
           )}
 
-          {/* predefined 종목: AI 분석 중 탭 위에 오버레이 배너 */}
-          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "이스라엘" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
+          {/* predefined 종목: AI 요약 중 탭 위에 오버레이 배너 */}
+          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
             <View style={[styles.aiOverlayBanner, { backgroundColor: "#F59E0B14" }]}>
               <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.75 }] }} />
               <Text style={[styles.aiOverlayText, { color: "#F59E0B" }]}>
-                AI 분석 중 — 완료 후 전략이 자동 업데이트됩니다
+                AI 요약 중 — 완료 후 전략이 자동 업데이트됩니다
               </Text>
             </View>
           )}
 
-          {activeTab === "진입"   && <SplitEntrySection  stock={stock} livePrice={displayPrice} />}
+          {activeTab === "진입"   && <SplitEntrySection  stock={stock} livePrice={displayPrice} overheatScore={tradingStatus?.score} />}
           {activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
           {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
 
@@ -398,7 +445,7 @@ export default function StockDetailScreen() {
           {activeTab === "요일"     && <DayFeaturesSection stock={stock} />}
           {activeTab === "뉴스"     && <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />}
           {activeTab === "백테스트" && <BacktestSection stock={stock} />}
-          {activeTab === "이스라엘" && <IsraelSection stockId={stock.id} />}
+          {activeTab === "지정학"   && <IsraelSection stockId={stock.id} />}
 
           <View style={styles.bottomPad} />
         </ScrollView>
@@ -494,6 +541,14 @@ const styles = StyleSheet.create({
     padding: 10, borderRadius: 10,
   },
   aiOverlayText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
+  tradingStatusBanner: {
+    flexDirection: "row", alignItems: "center", gap: 7,
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  tradingStatusText: { flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  tradingStatusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  tradingStatusScore: { fontSize: 12, fontFamily: "Inter_700Bold" },
   descriptionBox:{ paddingHorizontal: 16, paddingVertical: 12 },
   description:   { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
   errorBanner: {

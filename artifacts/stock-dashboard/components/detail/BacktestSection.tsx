@@ -48,12 +48,13 @@ interface BacktestResult {
   periodReturn: number;
 }
 
-const PERIODS = ["1mo", "3mo", "6mo", "1y"] as const;
+const PERIODS = ["1mo", "3mo", "6mo", "1y", "2y"] as const;
 const PERIOD_LABELS: Record<typeof PERIODS[number], string> = {
   "1mo": "1개월",
   "3mo": "3개월",
   "6mo": "6개월",
-  "1y": "1년",
+  "1y":  "1년",
+  "2y":  "2년↓",
 };
 
 interface BacktestParams {
@@ -176,6 +177,10 @@ export default function BacktestSection({ stock }: Props) {
   const c = isDark ? Colors.dark : Colors.light;
 
   const isKorean = stock.market === "KOSPI" || stock.market === "KOSDAQ";
+  const fmtPrice = (n: number) =>
+    isKorean
+      ? `₩${Math.round(n).toLocaleString()}`
+      : `$${n.toFixed(2)}`;
   const [period, setPeriod] = useState<typeof PERIODS[number]>("6mo");
   const [commissionPct, setCommissionPct] = useState(isKorean ? 0.015 : 0.1);
   const [slippagePct, setSlippagePct] = useState(0.05);
@@ -360,6 +365,21 @@ export default function BacktestSection({ stock }: Props) {
 
       {!loading && !error && result && (
         <>
+          {/* 2022 약세장 컨텍스트 배너 */}
+          {period === "2y" && (
+            <View style={[styles.bearCard, { backgroundColor: isDark ? "#2A1A1A" : "#FFF5F5", borderColor: "#F0445230" }]}>
+              <View style={styles.stratHeader}>
+                <Ionicons name="trending-down-outline" size={16} color="#F04452" />
+                <Text style={[styles.stratTitle, { color: "#F04452" }]}>2022 약세장 포함 구간</Text>
+              </View>
+              <Text style={[styles.stratDesc, { color: c.textSecondary }]}>
+                2022년은 미국 나스닥 -33%, 한국 KOSPI -25%의 대형 약세장이었습니다.
+                금리 인상 사이클 속 기술주 전반이 고점 대비 50~80% 폭락했습니다.
+                이 구간 포함 결과는 전략의 하방 내성을 보여주는 스트레스 테스트입니다.
+              </Text>
+            </View>
+          )}
+
           {/* 전략 설명 */}
           <View style={[styles.stratCard, { backgroundColor: isDark ? "#141B2D" : "#F0F4FF" }]}>
             <View style={styles.stratHeader}>
@@ -456,7 +476,7 @@ export default function BacktestSection({ stock }: Props) {
                   <Text style={[styles.priceRowLabel, { color: c.textSecondary }]}>{r.label}</Text>
                   <Text style={[styles.priceRowRatio, { color: c.textTertiary }]}>{r.ratio}</Text>
                   <Text style={[styles.priceRowVal, { color: c.text }]}>
-                    ₩{r.price.toLocaleString()}
+                    {fmtPrice(r.price)}
                   </Text>
                 </View>
               ))}
@@ -472,7 +492,7 @@ export default function BacktestSection({ stock }: Props) {
                   <Text style={[styles.priceRowLabel, { color: c.textSecondary }]}>{r.label}</Text>
                   <Text style={[styles.priceRowRatio, { color: c.textTertiary }]}>25%</Text>
                   <Text style={[styles.priceRowVal, { color: r.color }]}>
-                    ₩{r.price.toLocaleString()}
+                    {fmtPrice(r.price)}
                   </Text>
                 </View>
               ))}
@@ -519,6 +539,7 @@ const styles = StyleSheet.create({
   costNoteTxt:   { fontSize: 11, flex: 1, lineHeight: 16 },
 
   stratCard:     { borderRadius: 14, padding: 14, gap: 6 },
+  bearCard:      { borderRadius: 14, padding: 14, gap: 6, borderWidth: 1 },
   stratHeader:   { flexDirection: "row", alignItems: "center", gap: 6 },
   stratTitle:    { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   stratDesc:     { fontSize: 12, lineHeight: 18 },

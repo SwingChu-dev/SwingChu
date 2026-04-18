@@ -5,8 +5,9 @@ import Colors from "@/constants/colors";
 import { StockInfo } from "@/constants/stockData";
 
 interface SplitEntrySectionProps {
-  stock:      StockInfo;
-  livePrice?: number;
+  stock:          StockInfo;
+  livePrice?:     number;
+  overheatScore?: number;
 }
 
 // 5% 매수그물: 0 / -5 / -10 / -15 / -20% 단계별 체증 비중
@@ -33,7 +34,7 @@ function fmtDate(d: Date) {
   return `${d.getMonth() + 1}/${d.getDate()}(${["일","월","화","수","목","금","토"][d.getDay()]})`;
 }
 
-export default function SplitEntrySection({ stock, livePrice }: SplitEntrySectionProps) {
+export default function SplitEntrySection({ stock, livePrice, overheatScore }: SplitEntrySectionProps) {
   const isDark = useColorScheme() === "dark";
   const c = isDark ? Colors.dark : Colors.light;
 
@@ -65,17 +66,48 @@ export default function SplitEntrySection({ stock, livePrice }: SplitEntrySectio
   const fmt = (n: number) =>
     isKRW ? `₩${n.toLocaleString()}` : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
+  const isOverheat = overheatScore != null && overheatScore >= 60;
+  const isExtremeOverheat = overheatScore != null && overheatScore >= 80;
+  const overheatColor = isExtremeOverheat ? "#F04452" : "#FF6B00";
+
   return (
-    <View style={[styles.section, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+    <View style={[styles.section, { backgroundColor: c.card, borderColor: isOverheat ? overheatColor + "55" : c.cardBorder }]}>
+
+      {/* 과열 경고 배너 */}
+      {isOverheat && (
+        <View style={[styles.overheatBanner, { backgroundColor: overheatColor + "14", borderBottomColor: overheatColor + "30" }]}>
+          <Ionicons name={isExtremeOverheat ? "flame" : "warning"} size={15} color={overheatColor} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.overheatTitle, { color: overheatColor }]}>
+              {isExtremeOverheat ? "극과열 — 신규 매수 그물 자제" : "과열 — 추격 매수 주의"}
+            </Text>
+            <Text style={[styles.overheatSub, { color: c.textSecondary }]}>
+              {isExtremeOverheat
+                ? "현재 과열 지수 " + overheatScore + ". 기존 포지션은 분할 익절 검토. 신규 진입은 조정 대기."
+                : "현재 과열 지수 " + overheatScore + ". 조정 후 저점 진입이 유리합니다."}
+            </Text>
+          </View>
+          <View style={[styles.overheatScoreBadge, { backgroundColor: overheatColor + "22" }]}>
+            <Text style={[styles.overheatScore, { color: overheatColor }]}>{overheatScore}</Text>
+          </View>
+        </View>
+      )}
 
       {/* 헤더 */}
       <View style={styles.sectionHeader}>
-        <Ionicons name="git-network-outline" size={18} color={c.tint} />
+        <Ionicons name="git-network-outline" size={18} color={isOverheat ? overheatColor : c.tint} />
         <Text style={[styles.sectionTitle, { color: c.text }]}>5% 매수그물 전략</Text>
         {isLive && (
           <View style={[styles.liveBadge, { backgroundColor: "#F04452" + "18" }]}>
             <View style={styles.liveDot} />
             <Text style={[styles.liveTxt, { color: "#F04452" }]}>실시간</Text>
+          </View>
+        )}
+        {isOverheat && (
+          <View style={[styles.liveBadge, { backgroundColor: overheatColor + "18" }]}>
+            <Text style={[styles.liveTxt, { color: overheatColor }]}>
+              {isExtremeOverheat ? "극과열" : "과열"}
+            </Text>
           </View>
         )}
       </View>
@@ -166,6 +198,17 @@ export default function SplitEntrySection({ stock, livePrice }: SplitEntrySectio
 
 const styles = StyleSheet.create({
   section:       { borderRadius: 16, borderWidth: 1, marginHorizontal: 16, marginBottom: 12, overflow: "hidden" },
+
+  overheatBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  overheatTitle:      { fontSize: 13, fontFamily: "Inter_700Bold", marginBottom: 2 },
+  overheatSub:        { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  overheatScoreBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignItems: "center" },
+  overheatScore:      { fontSize: 15, fontFamily: "Inter_700Bold" },
+
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, padding: 16, paddingBottom: 12 },
   sectionTitle:  { fontSize: 15, fontFamily: "Inter_600SemiBold", flex: 1 },
   liveBadge:     { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
