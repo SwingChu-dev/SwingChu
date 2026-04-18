@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, useColorScheme,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
@@ -8,8 +9,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { usePortfolio } from "@/context/PortfolioContext";
-import { buildWeeklyReport } from "@/services/weeklyReport";
+import { buildWeeklyReport, fetchWeeklyCoach, type CoachComment } from "@/services/weeklyReport";
 import { CATEGORY_COLOR, CATEGORY_LABEL, SECTOR_LABEL } from "@/types/portfolio";
+import { analyzePortfolio } from "@/services/portfolioAnalyzer";
 
 function fmtDate(ts: number): string {
   const d = new Date(ts);
@@ -27,12 +29,38 @@ export default function WeeklyReportScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { portfolio, cooldownSaves } = usePortfolio();
+  const { portfolio, cooldownSaves, settings } = usePortfolio();
 
   const r = useMemo(
     () => buildWeeklyReport(portfolio, cooldownSaves),
     [portfolio, cooldownSaves],
   );
+  const health = useMemo(
+    () => analyzePortfolio(portfolio, settings.fxRateUSDKRW),
+    [portfolio, settings.fxRateUSDKRW],
+  );
+
+  const [coach,        setCoach]        = useState<CoachComment | null>(null);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachError,   setCoachError]   = useState<string | null>(null);
+
+  const loadCoach = async () => {
+    setCoachLoading(true);
+    setCoachError(null);
+    try {
+      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore);
+      setCoach(result);
+    } catch (e: any) {
+      setCoachError(e?.message ?? "AI 코치 호출 실패");
+    } finally {
+      setCoachLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCoach();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top }]}>
@@ -52,6 +80,61 @@ export default function WeeklyReportScreen() {
           <Text style={[styles.periodValue, { color: c.text }]}>
             {fmtDate(r.period.from)} ~ {fmtDate(r.period.to)}
           </Text>
+        </View>
+
+        {/* AI 코치 코멘트 */}
+        <View style={[styles.coachCard, { backgroundColor: c.card, borderColor: c.tint + "44" }]}>
+          <View style={styles.coachHeader}>
+            <Ionicons name="sparkles" size={16} color={c.tint} />
+            <Text style={[styles.coachTitle, { color: c.text }]}>AI 코치 코멘트</Text>
+            {!coachLoading && (
+              <TouchableOpacity onPress={loadCoach} style={{ marginLeft: "auto" }}>
+                <Ionicons name="refresh" size={16} color={c.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {coachLoading && (
+            <View style={styles.coachLoading}>
+              <ActivityIndicator size="small" color={c.tint} />
+              <Text style={[styles.coachLoadingText, { color: c.textSecondary }]}>
+                Gemini가 이번 주를 분석 중...
+              </Text>
+            </View>
+          )}
+
+          {coachError && !coachLoading && (
+            <Text style={[styles.coachError, { color: "#F04452" }]}>
+              {coachError}
+            </Text>
+          )}
+
+          {coach && !coachLoading && (
+            <View style={{ gap: 10 }}>
+              {coach.praise ? (
+                <View>
+                  <Text style={[styles.coachLabel, { color: "#22C55E" }]}>👍 잘한 점</Text>
+                  <Text style={[styles.coachText, { color: c.text }]}>{coach.praise}</Text>
+                </View>
+              ) : null}
+              {coach.warning ? (
+                <View>
+                  <Text style={[styles.coachLabel, { color: "#F59E0B" }]}>⚠ 위험 신호</Text>
+                  <Text style={[styles.coachText, { color: c.text }]}>{coach.warning}</Text>
+                </View>
+              ) : null}
+              {coach.nextWeek.length > 0 && (
+                <View>
+                  <Text style={[styles.coachLabel, { color: c.tint }]}>📌 다음 주 가이드</Text>
+                  {coach.nextWeek.map((g, i) => (
+                    <Text key={i} style={[styles.coachText, { color: c.text }]}>
+                      · {g}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         {/* 핵심 수치 4분할 */}
@@ -255,4 +338,15 @@ const styles = StyleSheet.create({
   },
   allocLabel:   { fontSize: 13 },
   allocPct:     { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  coachCard:        {
+    borderRadius: 12, padding: 14, gap: 10, borderWidth: 1,
+  },
+  coachHeader:      { flexDirection: "row", alignItems: "center", gap: 6 },
+  coachTitle:       { fontSize: 14, fontFamily: "Inter_700Bold" },
+  coachLoading:     { flexDirection: "row", gap: 8, alignItems: "center", paddingVertical: 12 },
+  coachLoadingText: { fontSize: 12 },
+  coachError:       { fontSize: 12 },
+  coachLabel:       { fontSize: 11, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  coachText:        { fontSize: 13, lineHeight: 19 },
 });

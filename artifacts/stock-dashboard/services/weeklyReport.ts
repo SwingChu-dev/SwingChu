@@ -2,6 +2,40 @@ import {
   Position, CooldownSave, Portfolio, Category, Sector,
   CATEGORY_LABEL, SECTOR_LABEL,
 } from "@/types/portfolio";
+import { API_BASE } from "@/utils/apiBase";
+
+export interface CoachComment {
+  praise:   string;
+  warning:  string;
+  nextWeek: string[];
+}
+
+export async function fetchWeeklyCoach(
+  report: WeeklyReport,
+  portfolio: Portfolio,
+  healthScore: number,
+): Promise<CoachComment> {
+  const body = {
+    newPositions:         report.newPositions.length,
+    cooldownSaves:        report.cooldownSaves.length,
+    totalSavedKRW:        report.totalSavedKRW,
+    firedStopLossCount:   report.firedStopLossCount,
+    firedTakeProfitCount: report.firedTakeProfitCount,
+    impulseCount:         report.impulseCount,
+    monthlyPnLPercent:    portfolio.monthlyPnLPercent,
+    healthScore,
+    topCategories:        report.topCategories.map(c => ({ label: c.label, pct: c.pct })),
+    topSectors:           report.topSectors.map(s => ({ label: s.label, pct: s.pct })),
+    recentTickers:        report.newPositions.map(p => p.ticker.toUpperCase()),
+  };
+  const resp = await fetch(`${API_BASE}/weekly-coach`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(`coach ${resp.status}`);
+  return resp.json();
+}
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
