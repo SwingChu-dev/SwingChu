@@ -9,12 +9,12 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { STOCKS, StockInfo } from "@/constants/stockData";
 
-const STORAGE_KEY = "@watchlist_ids_v4";
+const STORAGE_KEY = "@watchlist_ids_v5";
 const DEFAULT_IDS = STOCKS.map((s) => s.id);
 const VALID_IDS   = new Set(DEFAULT_IDS);
 
 const LEGACY_KEYS = [
-  "@watchlist_ids_v3", "@watchlist_ids_v2",
+  "@watchlist_ids_v4", "@watchlist_ids_v3", "@watchlist_ids_v2",
   "@custom_stocks_v4", "@custom_stocks_v3", "@custom_stocks_v2",
 ];
 
