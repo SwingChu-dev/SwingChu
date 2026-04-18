@@ -84,13 +84,22 @@ export default function PortfolioScreen() {
             총 {fmtKRW(portfolio.totalValue)}원 · 보유 {portfolio.positions.length}종목
           </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: c.tint }]}
-          onPress={() => router.push("/positions")}
-        >
-          <Ionicons name="settings-outline" size={16} color="#fff" />
-          <Text style={styles.addBtnText}>보유 관리</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: isDark ? "#2A2A2C" : "#E5E5EA" }]}
+            onPress={() => router.push("/weekly-report")}
+          >
+            <Ionicons name="document-text-outline" size={16} color={c.text} />
+            <Text style={[styles.addBtnText, { color: c.text }]}>주간</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: c.tint }]}
+            onPress={() => router.push("/positions")}
+          >
+            <Ionicons name="settings-outline" size={16} color="#fff" />
+            <Text style={styles.addBtnText}>보유 관리</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView

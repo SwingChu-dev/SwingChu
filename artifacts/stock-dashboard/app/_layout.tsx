@@ -19,7 +19,7 @@ import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
-import { PortfolioProvider } from "@/context/PortfolioContext";
+import { PortfolioProvider, usePortfolio } from "@/context/PortfolioContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setupNotifications } from "@/utils/notifications";
@@ -94,7 +94,13 @@ const disclaimerStyles = StyleSheet.create({
 
 function PriceBridge({ children }: { children: React.ReactNode }) {
   const { watchlistStocks } = useWatchlist();
-  const watchlist = watchlistStocks.map((s) => ({ ticker: s.ticker, market: s.market }));
+  const { positions } = usePortfolio();
+  const watchlist = React.useMemo(() => {
+    const map = new Map<string, { ticker: string; market: string }>();
+    for (const s of watchlistStocks) map.set(`${s.ticker}:${s.market}`, { ticker: s.ticker, market: s.market });
+    for (const p of positions)      map.set(`${p.ticker.toUpperCase()}:${p.market}`, { ticker: p.ticker.toUpperCase(), market: p.market });
+    return Array.from(map.values());
+  }, [watchlistStocks, positions]);
   return <StockPriceProvider watchlist={watchlist}>{children}</StockPriceProvider>;
 }
 
@@ -107,12 +113,16 @@ function AISignalBridge({ children }: { children: React.ReactNode }) {
 function AlertChecker() {
   const { quotes } = useStockPrice();
   const { checkPrices } = useAlerts();
+  const { checkPositionAlerts } = usePortfolio();
   React.useEffect(() => {
     const map: Record<string, { priceKRW: number }> = {};
     Object.entries(quotes).forEach(([key, q]) => {
       map[key] = { priceKRW: q.priceKRW };
     });
-    if (Object.keys(map).length > 0) checkPrices(map);
+    if (Object.keys(map).length > 0) {
+      checkPrices(map);
+      checkPositionAlerts(map);
+    }
   }, [quotes]);
   return null;
 }
@@ -168,6 +178,10 @@ function RootLayoutNav() {
         />
         <Stack.Screen
           name="positions"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="weekly-report"
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
 

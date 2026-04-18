@@ -30,7 +30,51 @@ export async function setupNotifications(): Promise<void> {
       lightColor: "#0064FF",
       sound: "default",
     });
+    await Notifications.setNotificationChannelAsync("cooldown", {
+      name: "쿨다운 종료",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#22C55E",
+      sound: "default",
+    });
   }
+}
+
+/** 쿨다운 종료 시점에 알림을 예약하고 notificationId 반환. 권한 없거나 시점이 지났으면 null. */
+export async function scheduleCooldownEnd(
+  entryId:  string,
+  ticker:   string,
+  name:     string,
+  triggerAt: number,
+): Promise<string | null> {
+  const ms = triggerAt - Date.now();
+  if (ms <= 1000) return null;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") return null;
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `⏰ 쿨다운 종료 — ${name}`,
+        body:  `${ticker.toUpperCase()} 진입 검토 시간입니다. 다시 한번 근거를 점검하세요.`,
+        sound: true,
+        data:  { type: "cooldown_end", entryId, ticker },
+      },
+      trigger: {
+        type:    Notifications.SchedulableTriggerInputTypes.DATE,
+        date:    new Date(triggerAt),
+        channelId: Platform.OS === "android" ? "cooldown" : undefined,
+      } as Notifications.DateTriggerInput,
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+export async function cancelScheduledNotification(id: string | undefined): Promise<void> {
+  if (!id) return;
+  try { await Notifications.cancelScheduledNotificationAsync(id); } catch {}
 }
 
 export async function sendAlertNotification(

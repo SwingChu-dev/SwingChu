@@ -18,6 +18,8 @@ import {
   CooldownSave,
 } from "@/types/portfolio";
 import { CATEGORY_LIMITS } from "@/constants/rules";
+import { scheduleCooldownEnd, cancelScheduledNotification } from "@/utils/notifications";
+import { sendStopLossNotification, sendTakeProfitNotification } from "@/utils/positionAlerts";
 
 const POSITIONS_KEY     = "@portfolio_positions_v1";
 const PENDING_KEY       = "@portfolio_pending_v1";
@@ -52,6 +54,9 @@ interface PortfolioContextValue {
 
   setCashBalance:   (krw: number) => Promise<void>;
   setFxRate:        (rate: number) => Promise<void>;
+
+  /** 외부(StockPriceContext)에서 현재가를 주입해 손절/익절 알림 발사 */
+  checkPositionAlerts: (priceMap: Record<string, { priceKRW: number }>) => void;
 
   addPendingEntry:    (e: Omit<PendingEntry, "id" | "createdAt" | "status">) => Promise<PendingEntry>;
   cancelPendingEntry: (id: string, reason: string, savedKRW: number | null) => Promise<void>;
@@ -158,6 +163,31 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     };
   }, [positions, settings, monthStart]);
 
+  // 부팅 시 알림 재예약 (앱/기기 재시작으로 사라질 수 있어서)
+  useEffect(() => {
+    if (!loaded) return;
+    (async () => {
+      const now = Date.now();
+      const updates: Array<{ id: string; nid: string }> = [];
+      for (const p of pending) {
+        if (p.status !== "PENDING") continue;
+        if (p.cooldownUntil <= now) continue;
+        if (p.notificationId) continue;
+        const nid = await scheduleCooldownEnd(
+          p.id, p.request.ticker, p.request.name, p.cooldownUntil,
+        );
+        if (nid) updates.push({ id: p.id, nid });
+      }
+      if (updates.length > 0) {
+        setPending(prev => prev.map(p => {
+          const u = updates.find(x => x.id === p.id);
+          return u ? { ...p, notificationId: u.nid } : p;
+        }));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
   // 월 첫 진입 시 monthStart 자동 캡처
   useEffect(() => {
     if (!loaded) return;
@@ -206,11 +236,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const addPendingEntry = useCallback(async (
     e: Omit<PendingEntry, "id" | "createdAt" | "status">,
   ) => {
+    const id = genId();
+    const notificationId = await scheduleCooldownEnd(
+      id, e.request.ticker, e.request.name, e.cooldownUntil,
+    );
     const entry: PendingEntry = {
       ...e,
-      id: genId(),
+      id,
       createdAt: Date.now(),
       status: "PENDING",
+      notificationId: notificationId ?? undefined,
     };
     setPending(prev => [entry, ...prev]);
     return entry;
@@ -221,8 +256,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   ) => {
     const target = pending.find(p => p.id === id);
     if (!target) return;
+    await cancelScheduledNotification(target.notificationId);
     setPending(prev => prev.map(p =>
-      p.id === id ? { ...p, status: "CANCELLED" } : p,
+      p.id === id ? { ...p, status: "CANCELLED", notificationId: undefined } : p,
     ));
     setSaves(prev => ([
       {
@@ -239,9 +275,59 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     ]));
   }, [pending]);
 
+  // ── 손절/익절 모니터 ──
+  const checkPositionAlerts = useCallback((
+    priceMap: Record<string, { priceKRW: number }>,
+  ) => {
+    const fx = settings.fxRateUSDKRW;
+    const updates: Array<{ id: string; patch: Partial<Position> }> = [];
+
+    for (const p of positions) {
+      const key = `${p.ticker.toUpperCase()}:${p.market}`;
+      const q   = priceMap[key];
+      if (!q || !Number.isFinite(q.priceKRW)) continue;
+
+      // priceKRW를 포지션 통화로 환산
+      const priceInPosCurrency = p.currency === "USD" ? q.priceKRW / fx : q.priceKRW;
+      const avgPrice           = p.avgPrice;
+      const gainPct            = ((priceInPosCurrency - avgPrice) / avgPrice) * 100;
+
+      // 손절 (한 번만)
+      if (p.stopLoss > 0 && priceInPosCurrency <= p.stopLoss && !p.firedStopLossAt) {
+        sendStopLossNotification(p.ticker, p.name, priceInPosCurrency, p.stopLoss).catch(() => {});
+        updates.push({ id: p.id, patch: { firedStopLossAt: Date.now() } });
+        continue;
+      }
+
+      // 익절 레벨 (각 레벨당 한 번)
+      const fired = p.firedTakeProfitAlerts ?? [];
+      const newlyFired: number[] = [];
+      for (const lv of p.takeProfitLevels) {
+        if (gainPct >= lv && !fired.includes(lv)) {
+          sendTakeProfitNotification(p.ticker, p.name, lv, priceInPosCurrency, gainPct).catch(() => {});
+          newlyFired.push(lv);
+        }
+      }
+      if (newlyFired.length > 0) {
+        updates.push({ id: p.id, patch: { firedTakeProfitAlerts: [...fired, ...newlyFired] } });
+      }
+    }
+
+    if (updates.length > 0) {
+      setPositions(prev => prev.map(p => {
+        const u = updates.find(x => x.id === p.id);
+        return u ? { ...p, ...u.patch } : p;
+      }));
+    }
+  }, [positions, settings.fxRateUSDKRW]);
+
   const executePendingEntry = useCallback(async (id: string) => {
-    setPending(prev => prev.map(p => p.id === id ? { ...p, status: "EXECUTED" } : p));
-  }, []);
+    const target = pending.find(p => p.id === id);
+    await cancelScheduledNotification(target?.notificationId);
+    setPending(prev => prev.map(p =>
+      p.id === id ? { ...p, status: "EXECUTED", notificationId: undefined } : p,
+    ));
+  }, [pending]);
 
   const value: PortfolioContextValue = {
     loaded,
@@ -260,6 +346,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     addPendingEntry,
     cancelPendingEntry,
     executePendingEntry,
+    checkPositionAlerts,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

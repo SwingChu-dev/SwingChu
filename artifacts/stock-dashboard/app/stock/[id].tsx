@@ -174,6 +174,13 @@ export default function StockDetailScreen() {
         >
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: "/buy", params: { stockId: id } })}
+          style={[styles.buyBtn, { backgroundColor: "#22C55E" }]}
+        >
+          <Ionicons name="cart" size={16} color="#fff" />
+          <Text style={styles.buyBtnText}>매수 검토</Text>
+        </TouchableOpacity>
         <View style={styles.headerInfo}>
           <View style={styles.headerNameRow}>
             <Text style={[styles.headerName, { color: c.text }]}>{stock.name}</Text>
@@ -483,6 +490,11 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19,
     justifyContent: "center", alignItems: "center",
   },
+  buyBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 19,
+  },
+  buyBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
   headerInfo:    { flex: 1 },
   headerNameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
   headerName:    { fontSize: 20, fontFamily: "Inter_700Bold" },

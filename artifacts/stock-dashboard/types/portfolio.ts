@@ -61,6 +61,10 @@ export interface Position {
   isImpulseBuy:        boolean;
   isInLiquidationMode: boolean;
   notes:               string[];
+  /** 손절 알림 발사 시각 (중복 방지) */
+  firedStopLossAt?:    number;
+  /** 알림 발사된 익절 레벨 (예: [3, 5]) */
+  firedTakeProfitAlerts?: number[];
 }
 
 export interface Portfolio {
@@ -110,6 +114,7 @@ export interface PendingEntry {
   createdAt:        number;
   cooldownUntil:    number;
   status:           "PENDING" | "APPROVED" | "CANCELLED" | "EXECUTED";
+  notificationId?:  string;
 }
 
 export interface CooldownSave {
