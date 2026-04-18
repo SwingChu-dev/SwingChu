@@ -4,24 +4,50 @@ import NodeCache from "node-cache";
 const router = Router();
 const cache  = new NodeCache({ stdTTL: 30 * 60 });
 
+const CLAUDE_MODEL = "claude-haiku-4-5";
 const GEMINI_MODEL = "gemini-2.5-flash";
+
+async function callClaude(prompt: string): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY ?? "";
+  if (!key) throw new Error("ANTHROPIC_API_KEY missing");
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:  "POST",
+    headers: {
+      "content-type":      "application/json",
+      "x-api-key":         key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model:       CLAUDE_MODEL,
+      max_tokens:  1024,
+      temperature: 0.4,
+      messages:    [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`Claude ${resp.status}: ${JSON.stringify(err)}`);
+  }
+  const data: any = await resp.json();
+  const blocks: any[] = data?.content ?? [];
+  return blocks.map((b: any) => b?.text ?? "").join("");
+}
 
 async function callGemini(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY ?? "";
   if (!key) throw new Error("GEMINI_API_KEY missing");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: 1024,
-      temperature: 0.4,
-      thinkingConfig: { thinkingBudget: 0 },
-    },
-  };
   const resp = await fetch(url, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(body),
+    body:    JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 1024,
+        temperature: 0.4,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
+    }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
@@ -30,6 +56,19 @@ async function callGemini(prompt: string): Promise<string> {
   const data: any = await resp.json();
   const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
   return parts.map((p: any) => p.text ?? "").join("");
+}
+
+async function callCoachLLM(prompt: string): Promise<{ text: string; provider: "claude" | "gemini" }> {
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const text = await callClaude(prompt);
+      return { text, provider: "claude" };
+    } catch (e) {
+      console.error("[weekly-coach] Claude failed, falling back to Gemini:", e);
+    }
+  }
+  const text = await callGemini(prompt);
+  return { text, provider: "gemini" };
 }
 
 interface CoachInput {
@@ -50,6 +89,7 @@ interface CoachOutput {
   praise:     string;
   warning:    string;
   nextWeek:   string[];
+  provider:   "claude" | "gemini";
 }
 
 router.post("/weekly-coach", async (req, res) => {
@@ -90,7 +130,7 @@ router.post("/weekly-coach", async (req, res) => {
 - 격려보다 사실 우선
 - 비속어/이모지 금지`;
 
-    const text = await callGemini(prompt);
+    const { text, provider } = await callCoachLLM(prompt);
     const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonMatch = codeBlock ? codeBlock[1].match(/\{[\s\S]*\}/) : text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
@@ -102,6 +142,7 @@ router.post("/weekly-coach", async (req, res) => {
       nextWeek: Array.isArray(parsed.nextWeek)
         ? parsed.nextWeek.slice(0, 4).map((x: any) => String(x))
         : [],
+      provider,
     };
     cache.set(cacheKey, out);
     return res.json(out);

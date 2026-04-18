@@ -86,7 +86,9 @@ export default function WeeklyReportScreen() {
         <View style={[styles.coachCard, { backgroundColor: c.card, borderColor: c.tint + "44" }]}>
           <View style={styles.coachHeader}>
             <Ionicons name="sparkles" size={16} color={c.tint} />
-            <Text style={[styles.coachTitle, { color: c.text }]}>AI 코치 코멘트</Text>
+            <Text style={[styles.coachTitle, { color: c.text }]}>
+              AI 코치 코멘트{coach?.provider ? ` · ${coach.provider === "claude" ? "Claude" : "Gemini"}` : ""}
+            </Text>
             {!coachLoading && (
               <TouchableOpacity onPress={loadCoach} style={{ marginLeft: "auto" }}>
                 <Ionicons name="refresh" size={16} color={c.textSecondary} />
