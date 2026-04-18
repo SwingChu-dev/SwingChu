@@ -19,6 +19,7 @@ import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
+import { PortfolioProvider } from "@/context/PortfolioContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setupNotifications } from "@/utils/notifications";
@@ -153,6 +154,22 @@ function RootLayoutNav() {
           name="geopolitical-risk"
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
+        <Stack.Screen
+          name="buy"
+          options={{
+            presentation: "modal",
+            headerShown: false,
+            animation: "slide_from_bottom",
+          }}
+        />
+        <Stack.Screen
+          name="cooldown/[id]"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="positions"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
 
       </Stack>
     </>
@@ -192,15 +209,17 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <WatchlistProvider>
-                <EnrichmentProvider>
-                  <AISignalBridge>
-                    <PriceBridge>
-                      <AlertProvider>
-                        <RootLayoutNav />
-                      </AlertProvider>
-                    </PriceBridge>
-                  </AISignalBridge>
-                </EnrichmentProvider>
+                <PortfolioProvider>
+                  <EnrichmentProvider>
+                    <AISignalBridge>
+                      <PriceBridge>
+                        <AlertProvider>
+                          <RootLayoutNav />
+                        </AlertProvider>
+                      </PriceBridge>
+                    </AISignalBridge>
+                  </EnrichmentProvider>
+                </PortfolioProvider>
               </WatchlistProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

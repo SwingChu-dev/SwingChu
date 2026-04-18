@@ -2,7 +2,7 @@ export const USD_KRW_RATE = 1450;
 
 export type Market = "NASDAQ" | "KOSPI" | "KOSDAQ";
 export type MarketRegion = "미국장" | "국내장";
-export type StockGrade = "우량주" | "중형주" | "소형주";
+export type StockGrade = "우량주" | "중형주" | "소형주" | "성장주";
 export type Theme = string;
 
 export interface SplitEntry {
@@ -34,7 +34,7 @@ export interface FinancialAnalysis {
   roe: number;
   debtRatio: number;
   revenueGrowth: number;
-  evaluation: "심각한 거품" | "거품" | "적정" | "저평가" | "강한 저평가" | "성장주";
+  evaluation: "심각한 거품" | "거품" | "적정" | "저평가" | "강한 저평가" | "성장주" | "성장 프리미엄";
   summary: string;
 }
 
