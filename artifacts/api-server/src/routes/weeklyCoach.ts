@@ -4,9 +4,15 @@ import NodeCache from "node-cache";
 const router = Router();
 const cache  = new NodeCache({ stdTTL: 30 * 60 });
 
-const CLAUDE_MODEL = "claude-haiku-4-5";
+type ClaudeTier = "haiku" | "sonnet" | "opus";
 
-async function callClaude(prompt: string): Promise<string> {
+const MODEL_MAP: Record<ClaudeTier, string> = {
+  haiku:  "claude-haiku-4-5",
+  sonnet: "claude-sonnet-4-5",
+  opus:   "claude-opus-4-1",
+};
+
+async function callClaude(prompt: string, tier: ClaudeTier): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY ?? "";
   if (!key) throw new Error("ANTHROPIC_API_KEY missing");
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -17,7 +23,7 @@ async function callClaude(prompt: string): Promise<string> {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model:       CLAUDE_MODEL,
+      model:       MODEL_MAP[tier],
       max_tokens:  1024,
       temperature: 0.4,
       messages:    [{ role: "user", content: prompt }],
@@ -51,16 +57,20 @@ interface CoachOutput {
   warning:    string;
   nextWeek:   string[];
   provider:   "claude";
+  model:      string;
+  tier:       ClaudeTier;
 }
 
 router.post("/weekly-coach", async (req, res) => {
   try {
-    const input = req.body as CoachInput;
+    const input = req.body as CoachInput & { tier?: ClaudeTier };
     if (!input || typeof input !== "object") {
       return res.status(400).json({ error: "Invalid body" });
     }
+    const tier: ClaudeTier =
+      input.tier === "sonnet" || input.tier === "opus" ? input.tier : "haiku";
 
-    const cacheKey = JSON.stringify(input);
+    const cacheKey = `${tier}|${JSON.stringify({ ...input, tier: undefined })}`;
     const cached   = cache.get<CoachOutput>(cacheKey);
     if (cached) return res.json(cached);
 
@@ -91,7 +101,7 @@ router.post("/weekly-coach", async (req, res) => {
 - 격려보다 사실 우선
 - 비속어/이모지 금지`;
 
-    const text = await callClaude(prompt);
+    const text = await callClaude(prompt, tier);
     const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonMatch = codeBlock ? codeBlock[1].match(/\{[\s\S]*\}/) : text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
@@ -104,6 +114,8 @@ router.post("/weekly-coach", async (req, res) => {
         ? parsed.nextWeek.slice(0, 4).map((x: any) => String(x))
         : [],
       provider: "claude",
+      model:    MODEL_MAP[tier],
+      tier,
     };
     cache.set(cacheKey, out);
     return res.json(out);

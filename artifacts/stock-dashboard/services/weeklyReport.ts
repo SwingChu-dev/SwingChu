@@ -4,17 +4,22 @@ import {
 } from "@/types/portfolio";
 import { API_BASE } from "@/utils/apiBase";
 
+export type ClaudeTier = "haiku" | "sonnet" | "opus";
+
 export interface CoachComment {
   praise:   string;
   warning:  string;
   nextWeek: string[];
   provider?: "claude";
+  model?:   string;
+  tier?:    ClaudeTier;
 }
 
 export async function fetchWeeklyCoach(
   report: WeeklyReport,
   portfolio: Portfolio,
   healthScore: number,
+  tier: ClaudeTier = "haiku",
 ): Promise<CoachComment> {
   const body = {
     newPositions:         report.newPositions.length,
@@ -28,6 +33,7 @@ export async function fetchWeeklyCoach(
     topCategories:        report.topCategories.map(c => ({ label: c.label, pct: c.pct })),
     topSectors:           report.topSectors.map(s => ({ label: s.label, pct: s.pct })),
     recentTickers:        report.newPositions.map(p => p.ticker.toUpperCase()),
+    tier,
   };
   const resp = await fetch(`${API_BASE}/weekly-coach`, {
     method:  "POST",
