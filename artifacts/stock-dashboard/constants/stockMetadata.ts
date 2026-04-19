@@ -54,6 +54,11 @@ export const STOCK_METADATA: Record<string, StockMetadata> = {
     sectors: ["DEFENSE"],
     actionLabel: "방향성 확인 대기",
   },
+  crml: {
+    category: "C_CONTRARIAN",
+    sectors: ["ENERGY", "MICROCAP"],
+    actionLabel: "정책 모멘텀 추적 · -25% 손절 필수",
+  },
 
   // ── 카테고리 D: 투기 테마 ──
   ionq:   { category: "D_SPECULATIVE", sectors: ["QUANTUM"] },

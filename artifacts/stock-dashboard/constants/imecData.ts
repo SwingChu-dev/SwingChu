@@ -41,6 +41,11 @@ export const IMEC_MAP: Record<string, ImecStock> = {
     exposure: "수혜",
     reason:   "중동·인도 재생에너지 인프라 확장 수혜. IMEC 그린에너지 코리더 연계 가능",
   },
+  CRML: {
+    ticker:   "CRML",
+    exposure: "중립",
+    reason:   "그린란드 중희토류 광산은 미·EU 탈중국 공급망 핵심이나 IMEC 물류 루트와는 직접 연계 약함. 서방 핵심광물 정책에 더 민감",
+  },
   BNAI: {
     ticker:   "BNAI",
     exposure: "중립",
