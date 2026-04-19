@@ -8,7 +8,7 @@ export interface CoachComment {
   praise:   string;
   warning:  string;
   nextWeek: string[];
-  provider?: "claude" | "gemini";
+  provider?: "claude";
 }
 
 export async function fetchWeeklyCoach(
