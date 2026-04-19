@@ -37,31 +37,32 @@ async function fetchHistory(ticker: string, market: string, days: number): Promi
 const router = Router();
 const cache  = new NodeCache({ stdTTL: 10 * 60 });
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const CLAUDE_MODEL = "claude-haiku-4-5";
 
-async function callGemini(prompt: string): Promise<string> {
-  const key = process.env.GEMINI_API_KEY ?? "";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      maxOutputTokens: 2048,
-      temperature: 0.2,
-      thinkingConfig: { thinkingBudget: 0 },
+async function callClaude(prompt: string): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY ?? "";
+  if (!key) throw new Error("ANTHROPIC_API_KEY missing");
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:  "POST",
+    headers: {
+      "content-type":      "application/json",
+      "x-api-key":         key,
+      "anthropic-version": "2023-06-01",
     },
-  };
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      model:       CLAUDE_MODEL,
+      max_tokens:  2048,
+      temperature: 0.2,
+      messages:    [{ role: "user", content: prompt }],
+    }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(`Gemini ${resp.status}: ${JSON.stringify(err)}`);
+    throw new Error(`Claude ${resp.status}: ${JSON.stringify(err)}`);
   }
   const data: any = await resp.json();
-  const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
-  return parts.map((p: any) => p.text ?? "").join("");
+  const blocks: any[] = data?.content ?? [];
+  return blocks.map((b: any) => b.text ?? "").join("");
 }
 
 // ─── 기술적 지표 계산 ─────────────────────────────────────────────────────────
@@ -178,7 +179,7 @@ export interface StockSignal {
   generatedAt: string;
 }
 
-// ─── AI 신호 분석 (Gemini Flash) ─────────────────────────────────────────────
+// ─── AI 신호 분석 (Claude Haiku) ─────────────────────────────────────────────
 
 async function analyzeWithAI(
   ticker: string,
@@ -223,7 +224,7 @@ async function analyzeWithAI(
 - 관망: MA 배열 혼재, 거래량 평범, 방향성 불명확`;
 
   try {
-    const text = await callGemini(prompt);
+    const text = await callClaude(prompt);
     const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonMatch = codeBlock ? codeBlock[1].match(/\{[\s\S]*\}/) : text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
