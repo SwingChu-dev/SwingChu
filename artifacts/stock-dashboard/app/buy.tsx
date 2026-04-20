@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
-  Alert, useColorScheme, Switch,
+  useColorScheme, Switch,
 } from "react-native";
+import { showAlert } from "@/utils/crossAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -113,15 +114,15 @@ export default function BuyScreen() {
     const tpArr = tpLevels.split(/[,\s]+/).map(s => Number(s.trim())).filter(n => !isNaN(n) && n > 0);
 
     if (!ticker.trim() || !name.trim()) {
-      Alert.alert("입력 누락", "종목 티커와 이름을 입력하세요.");
+      showAlert("입력 누락", "종목 티커와 이름을 입력하세요.");
       return;
     }
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
-      Alert.alert("입력 누락", "매수 단가를 입력하세요.");
+      showAlert("입력 누락", "매수 단가를 입력하세요.");
       return;
     }
     if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
-      Alert.alert("입력 누락", "매수 수량을 입력하세요.");
+      showAlert("입력 누락", "매수 수량을 입력하세요.");
       return;
     }
     const amountNum = totalCostKRW;
@@ -142,7 +143,7 @@ export default function BuyScreen() {
     );
 
     if (!result.passed) {
-      Alert.alert(
+      showAlert(
         "진입 차단",
         result.blockers.map((b, i) => `${i + 1}. ${b}`).join("\n"),
         [
@@ -174,7 +175,7 @@ export default function BuyScreen() {
       ? `\n\n경고:\n${result.warnings.map(w => `· ${w}`).join("\n")}`
       : "";
 
-    Alert.alert(
+    showAlert(
       "검증 통과",
       `${result.requiredCooldownHours}시간 쿨다운 후 매수 가능합니다.${warningMsg}`,
       [

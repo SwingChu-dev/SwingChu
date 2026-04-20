@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
   Alert, useColorScheme, Switch,
 } from "react-native";
+import { showAlert } from "@/utils/crossAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -52,11 +53,11 @@ export default function PositionsScreen() {
     if (!isNaN(krw)) await setCashBalance(krw);
     if (!isNaN(usd)) await setCashBalanceUSD(usd);
     if (!isNaN(fx) && fx > 0) await setFxRate(fx);
-    Alert.alert("저장", "현금/환율이 업데이트되었습니다.");
+    showAlert("저장", "현금/환율이 업데이트되었습니다.");
   };
 
   const handleDelete = (p: Position) => {
-    Alert.alert(
+    showAlert(
       "삭제 확인",
       `${p.name}을(를) 보유 종목에서 제거할까요?`,
       [
@@ -188,7 +189,7 @@ function PositionCard({ data, c, onDelete, onToggleImpulse, onSavePrice }: PCPro
     const price = Number(priceStr.replace(/,/g, ""));
     const qty   = Number(qtyStr.replace(/,/g, ""));
     if (!Number.isFinite(price) || !Number.isFinite(qty) || price <= 0 || qty <= 0) {
-      Alert.alert("입력 오류", "단가와 수량은 0보다 큰 숫자여야 합니다.");
+      showAlert("입력 오류", "단가와 수량은 0보다 큰 숫자여야 합니다.");
       return;
     }
     onSavePrice(price, qty);
