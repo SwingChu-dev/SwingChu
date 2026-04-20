@@ -162,6 +162,7 @@ export default function PositionsScreen() {
             onDelete={() => handleDelete(m.position)}
             onToggleImpulse={(v) => markImpulse(m.position.id, v)}
             onSavePrice={(price, qty) => updatePosition(m.position.id, { avgPrice: price, quantity: qty })}
+            onSell={() => router.push(`/sell/${m.position.id}`)}
           />
         ))}
       </ScrollView>
@@ -175,9 +176,10 @@ interface PCProps {
   onDelete: () => void;
   onToggleImpulse: (v: boolean) => void;
   onSavePrice: (price: number, qty: number) => void;
+  onSell:    () => void;
 }
 
-function PositionCard({ data, c, onDelete, onToggleImpulse, onSavePrice }: PCProps) {
+function PositionCard({ data, c, onDelete, onToggleImpulse, onSavePrice, onSell }: PCProps) {
   const { position: p, currentPrice, marketValueKRW, unrealizedPnLKRW, pnlPercent, hasLivePrice } = data;
   const [editing, setEditing]     = useState(false);
   const [priceStr, setPriceStr]   = useState(String(p.avgPrice));
@@ -284,9 +286,14 @@ function PositionCard({ data, c, onDelete, onToggleImpulse, onSavePrice }: PCPro
         </View>
       ) : (
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={() => setEditing(true)}>
-            <Text style={[styles.editLink, { color: c.tint }]}>평단·수량 수정</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 14 }}>
+            <TouchableOpacity onPress={() => setEditing(true)}>
+              <Text style={[styles.editLink, { color: c.tint }]}>평단·수량 수정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onSell}>
+              <Text style={[styles.editLink, { color: "#3478F6" }]}>매도 기록</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.toggleRow}>
             <Text style={[styles.toggleLabel, { color: c.textSecondary }]}>뇌동</Text>
             <Switch value={p.isImpulseBuy} onValueChange={onToggleImpulse} />

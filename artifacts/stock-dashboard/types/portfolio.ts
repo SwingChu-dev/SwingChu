@@ -139,3 +139,88 @@ export interface HealthCheck {
   issues:          Issue[];
   recommendations: string[];
 }
+
+// ── 청산(매도) 기록 ──
+export type ExitType =
+  | "TAKE_PROFIT_PARTIAL"   // 부분 익절 (사다리)
+  | "TAKE_PROFIT_FULL"      // 목표 도달 전량 익절
+  | "STOP_LOSS"             // 손절
+  | "BREAK_EVEN"            // 본전 청산
+  | "DISCRETIONARY";        // 재량 청산 (시나리오 변경/리밸런싱 등)
+
+export const EXIT_TYPE_LABEL: Record<ExitType, string> = {
+  TAKE_PROFIT_PARTIAL: "부분 익절",
+  TAKE_PROFIT_FULL:    "전량 익절",
+  STOP_LOSS:           "손절",
+  BREAK_EVEN:          "본전",
+  DISCRETIONARY:       "재량 청산",
+};
+
+export const EXIT_TYPE_COLOR: Record<ExitType, string> = {
+  TAKE_PROFIT_PARTIAL: "#22C55E",
+  TAKE_PROFIT_FULL:    "#FF3B30", // 토스 빨강(수익)
+  STOP_LOSS:           "#3478F6", // 토스 파랑(손실)
+  BREAK_EVEN:          "#A1A1AA",
+  DISCRETIONARY:       "#F59E0B",
+};
+
+export type DeviationReason = "FOMO" | "FEAR" | "NEWS_REACTION" | "OTHER";
+
+export const DEVIATION_LABEL: Record<DeviationReason, string> = {
+  FOMO:          "FOMO (놓칠까봐)",
+  FEAR:          "공포 (더 떨어질까봐)",
+  NEWS_REACTION: "뉴스 반응",
+  OTHER:         "기타",
+};
+
+export interface ClosedTrade {
+  id:                string;
+  /** 매도 시점에 보유 포지션과 연결된 ID (전량 청산 후 삭제돼도 기록은 유지) */
+  positionId:        string | null;
+  ticker:            string;
+  name:              string;
+  market:            "KOSPI" | "KOSDAQ" | "NASDAQ";
+  category:          Category;
+  sectors:           Sector[];
+  currency:          "KRW" | "USD";
+  /** 진입 정보 (스냅샷) */
+  avgEntryPrice:     number;
+  entryDate:         number;
+  entryReason:       string;
+  /** 청산 정보 */
+  exitDate:          number;
+  exitPrice:         number;
+  quantitySold:      number;
+  exitType:          ExitType;
+  /** 결과 (포지션 통화 기준) */
+  realizedPnL:       number;
+  /** KRW 환산 (당시 환율) */
+  realizedPnLKRW:    number;
+  pnlPercent:        number;
+  holdingDays:       number;
+  /** 사후 메모 */
+  followedRules:     boolean;
+  deviationReason:   DeviationReason | null;
+  deviationNote:     string;
+  nextChange:        string;
+  isImpulseEntry:    boolean;
+}
+
+export interface TradeStats {
+  totalCount:        number;
+  winCount:          number;
+  lossCount:         number;
+  breakEvenCount:    number;
+  winRate:           number;          // 0–1
+  avgWinKRW:         number;
+  avgLossKRW:        number;          // 음수 (예: -120,000)
+  totalPnLKRW:       number;
+  /** 손익비 = avgWin / |avgLoss|. avgLoss==0 일 때 +Infinity */
+  payoffRatio:       number;
+  /** 기대값(KRW) = winRate * avgWin + (1-winRate) * avgLoss */
+  expectancyKRW:     number;
+  /** 트레이드당 평균 보유일수 */
+  avgHoldingDays:    number;
+  /** 원칙 준수 비율 0–1 */
+  ruleAdherence:     number;
+}

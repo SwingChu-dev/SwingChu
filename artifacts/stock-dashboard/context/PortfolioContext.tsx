@@ -16,6 +16,9 @@ import {
   Sector,
   PendingEntry,
   CooldownSave,
+  ClosedTrade,
+  ExitType,
+  DeviationReason,
 } from "@/types/portfolio";
 import { CATEGORY_LIMITS } from "@/constants/rules";
 import { scheduleCooldownEnd, cancelScheduledNotification } from "@/utils/notifications";
@@ -26,6 +29,18 @@ const PENDING_KEY       = "@portfolio_pending_v1";
 const SAVES_KEY         = "@portfolio_cooldown_saves_v1";
 const SETTINGS_KEY      = "@portfolio_settings_v1";
 const MONTH_START_KEY   = "@portfolio_month_start_v1";
+const CLOSED_KEY        = "@portfolio_closed_trades_v1";
+
+export interface SellRequest {
+  positionId:      string;
+  exitPrice:       number;        // 포지션 통화 기준
+  quantity:        number;
+  exitType:        ExitType;
+  followedRules:   boolean;
+  deviationReason: DeviationReason | null;
+  deviationNote:   string;
+  nextChange:      string;
+}
 
 interface PortfolioSettings {
   cashBalanceKRW: number;
@@ -46,6 +61,7 @@ interface PortfolioContextValue {
   settings:         PortfolioSettings;
   pendingEntries:   PendingEntry[];
   cooldownSaves:    CooldownSave[];
+  closedTrades:     ClosedTrade[];
   /** 최근 매수 평균 사이즈 (KRW 환산) */
   avgPositionSize:  number;
 
@@ -59,6 +75,8 @@ interface PortfolioContextValue {
   setFxRate:        (rate: number) => Promise<void>;
   /** 매수 체결: 보유 등록 + 현금 자동 차감 (해당 통화에서) */
   executeBuy:       (p: Omit<Position, "id">) => Promise<Position>;
+  /** 매도 체결: 보유 수량 차감(전량 시 삭제) + 현금 환입 + ClosedTrade 기록 */
+  sellPosition:     (req: SellRequest) => Promise<ClosedTrade>;
 
   /** 외부(StockPriceContext)에서 현재가를 주입해 손절/익절 알림 발사 */
   checkPositionAlerts: (priceMap: Record<string, { priceKRW: number }>) => void;
@@ -84,6 +102,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [pending, setPending]     = useState<PendingEntry[]>([]);
   const [saves, setSaves]         = useState<CooldownSave[]>([]);
+  const [closed, setClosed]       = useState<ClosedTrade[]>([]);
   const [settings, setSettings]   = useState<PortfolioSettings>(DEFAULT_SETTINGS);
   const [monthStart, setMonthStart] = useState<{ ym: string; value: number }>({
     ym: ymKey(new Date()),
@@ -94,18 +113,20 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const [rawPos, rawPend, rawSav, rawSet, rawMonth] = await Promise.all([
+        const [rawPos, rawPend, rawSav, rawSet, rawMonth, rawClosed] = await Promise.all([
           AsyncStorage.getItem(POSITIONS_KEY),
           AsyncStorage.getItem(PENDING_KEY),
           AsyncStorage.getItem(SAVES_KEY),
           AsyncStorage.getItem(SETTINGS_KEY),
           AsyncStorage.getItem(MONTH_START_KEY),
+          AsyncStorage.getItem(CLOSED_KEY),
         ]);
-        if (rawPos)  setPositions(JSON.parse(rawPos));
-        if (rawPend) setPending(JSON.parse(rawPend));
-        if (rawSav)  setSaves(JSON.parse(rawSav));
-        if (rawSet)  setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSet) });
-        if (rawMonth) setMonthStart(JSON.parse(rawMonth));
+        if (rawPos)    setPositions(JSON.parse(rawPos));
+        if (rawPend)   setPending(JSON.parse(rawPend));
+        if (rawSav)    setSaves(JSON.parse(rawSav));
+        if (rawSet)    setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSet) });
+        if (rawMonth)  setMonthStart(JSON.parse(rawMonth));
+        if (rawClosed) setClosed(JSON.parse(rawClosed));
       } catch (e) {
         console.warn("[PortfolioContext] load failed", e);
       } finally {
@@ -130,6 +151,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loaded) AsyncStorage.setItem(MONTH_START_KEY, JSON.stringify(monthStart));
   }, [monthStart, loaded]);
+  useEffect(() => {
+    if (loaded) AsyncStorage.setItem(CLOSED_KEY, JSON.stringify(closed));
+  }, [closed, loaded]);
 
   // ── 포트폴리오 집계 ──
   const portfolio = useMemo<Portfolio>(() => {
@@ -251,6 +275,66 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     return newPos;
   }, []);
 
+  const sellPosition = useCallback(async (req: SellRequest): Promise<ClosedTrade> => {
+    const pos = positions.find(p => p.id === req.positionId);
+    if (!pos) throw new Error("포지션을 찾을 수 없습니다.");
+    const qtySold = Math.min(req.quantity, pos.quantity);
+    if (qtySold <= 0 || !Number.isFinite(req.exitPrice) || req.exitPrice <= 0) {
+      throw new Error("청산 수량/가격이 올바르지 않습니다.");
+    }
+    const fx = settings.fxRateUSDKRW;
+    const proceeds = req.exitPrice * qtySold;
+    const cost     = pos.avgPrice  * qtySold;
+    const realized = proceeds - cost;
+    const realizedKRW = pos.currency === "USD" ? realized * fx : realized;
+    const pnlPct   = (req.exitPrice / pos.avgPrice - 1) * 100;
+    const holdDays = Math.max(0, Math.floor((Date.now() - pos.entryDate) / 86400_000));
+
+    const trade: ClosedTrade = {
+      id:             genId(),
+      positionId:     pos.id,
+      ticker:         pos.ticker,
+      name:           pos.name,
+      market:         pos.market,
+      category:       pos.category,
+      sectors:        pos.sectors,
+      currency:       pos.currency,
+      avgEntryPrice:  pos.avgPrice,
+      entryDate:      pos.entryDate,
+      entryReason:    pos.entryReason,
+      exitDate:       Date.now(),
+      exitPrice:      req.exitPrice,
+      quantitySold:   qtySold,
+      exitType:       req.exitType,
+      realizedPnL:    realized,
+      realizedPnLKRW: realizedKRW,
+      pnlPercent:     pnlPct,
+      holdingDays:    holdDays,
+      followedRules:  req.followedRules,
+      deviationReason:req.followedRules ? null : req.deviationReason,
+      deviationNote:  req.deviationNote,
+      nextChange:     req.nextChange,
+      isImpulseEntry: pos.isImpulseBuy,
+    };
+
+    // 보유 차감 / 전량 청산 시 삭제
+    setPositions(prev => {
+      return prev
+        .map(p => p.id === pos.id ? { ...p, quantity: p.quantity - qtySold } : p)
+        .filter(p => p.quantity > 0);
+    });
+
+    // 현금 환입 (해당 통화)
+    setSettings(s => pos.currency === "USD"
+      ? { ...s, cashBalanceUSD: s.cashBalanceUSD + proceeds }
+      : { ...s, cashBalanceKRW: s.cashBalanceKRW + proceeds });
+
+    // 청산 기록
+    setClosed(prev => [trade, ...prev]);
+
+    return trade;
+  }, [positions, settings.fxRateUSDKRW]);
+
   const addPendingEntry = useCallback(async (
     e: Omit<PendingEntry, "id" | "createdAt" | "status">,
   ) => {
@@ -354,6 +438,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     settings,
     pendingEntries: pending,
     cooldownSaves:  saves,
+    closedTrades:   closed,
     avgPositionSize,
     addPosition,
     updatePosition,
@@ -363,6 +448,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     setCashBalanceUSD,
     setFxRate,
     executeBuy,
+    sellPosition,
     addPendingEntry,
     cancelPendingEntry,
     executePendingEntry,
