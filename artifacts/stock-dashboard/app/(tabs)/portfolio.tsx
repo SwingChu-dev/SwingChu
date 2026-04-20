@@ -8,6 +8,8 @@ import { useRouter } from "expo-router";
 
 import Colors from "@/constants/colors";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useStockPrice } from "@/context/StockPriceContext";
+import { usePortfolioMarket } from "@/hooks/usePortfolioMarket";
 import { analyzePortfolio } from "@/services/portfolioAnalyzer";
 import {
   CATEGORY_LABEL, CATEGORY_COLOR, SECTOR_LABEL, Category, Sector,
@@ -32,9 +34,11 @@ const SECTOR_COLORS: Partial<Record<Sector, string>> = {
 };
 
 function fmtKRW(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(2)}억`;
-  if (n >= 10_000)      return `${(n / 10_000).toFixed(1)}만`;
-  return n.toLocaleString();
+  const sign = n < 0 ? "-" : "";
+  const a = Math.abs(n);
+  if (a >= 100_000_000) return `${sign}${(a / 100_000_000).toFixed(2)}억`;
+  if (a >= 10_000)      return `${sign}${(a / 10_000).toFixed(1)}만`;
+  return `${sign}${Math.round(a).toLocaleString()}`;
 }
 
 export default function PortfolioScreen() {
@@ -43,11 +47,17 @@ export default function PortfolioScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { portfolio, pendingEntries, cooldownSaves, settings } = usePortfolio();
+  const { lastUpdate } = useStockPrice();
+  const market = usePortfolioMarket();
 
   const health = useMemo(
-    () => analyzePortfolio(portfolio, settings.fxRateUSDKRW),
-    [portfolio, settings.fxRateUSDKRW],
+    () => analyzePortfolio(portfolio, market.fxRate),
+    [portfolio, market.fxRate],
   );
+
+  const pnlColor = market.totalPnLKRW > 0 ? "#FF3B30"
+                : market.totalPnLKRW < 0 ? "#3478F6"
+                : c.textSecondary;
 
   const categorySegments = useMemo(() => CATEGORY_LIMITS.map((cl) => ({
     key:   cl.category,
@@ -81,7 +91,7 @@ export default function PortfolioScreen() {
         <View>
           <Text style={[styles.headerTitle, { color: c.text }]}>포트폴리오</Text>
           <Text style={[styles.headerSub, { color: c.textSecondary }]}>
-            총 {fmtKRW(portfolio.totalValue)}원 · 보유 {portfolio.positions.length}종목
+            총 자산 {fmtKRW(market.totalAssetKRW)}원 · 보유 {market.positions.length}종목
           </Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -106,26 +116,88 @@ export default function PortfolioScreen() {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* 헬스 스코어 */}
-        <HealthScoreCard health={health} />
-
-        {/* 월간 손익 */}
-        <View style={[styles.monthCard, { backgroundColor: c.card }]}>
-          <View style={styles.monthRow}>
-            <Text style={[styles.monthLabel, { color: c.textSecondary }]}>이달 누적 손익</Text>
-            <Text style={[styles.monthValue, {
-              color: portfolio.monthlyPnL >= 0 ? "#FF3B30" : "#3478F6",
-            }]}>
-              {portfolio.monthlyPnL >= 0 ? "+" : ""}
-              {portfolio.monthlyPnL.toLocaleString()}원
-              {" · "}
-              {portfolio.monthlyPnLPercent.toFixed(2)}%
+        {/* 평가금액 + 평가손익 (토스식) */}
+        <View style={[styles.heroCard, { backgroundColor: c.card }]}>
+          <Text style={[styles.heroLabel, { color: c.textSecondary }]}>내 투자 평가금액</Text>
+          <Text style={[styles.heroValue, { color: c.text }]}>
+            {fmtKRW(market.positionsValueKRW)}원
+          </Text>
+          <View style={styles.heroPnlRow}>
+            <Text style={[styles.heroPnlText, { color: pnlColor }]}>
+              {market.totalPnLKRW >= 0 ? "+" : ""}{fmtKRW(market.totalPnLKRW)}원
+            </Text>
+            <Text style={[styles.heroPnlPct, { color: pnlColor }]}>
+              ({market.totalPnLPercent >= 0 ? "+" : ""}{market.totalPnLPercent.toFixed(2)}%)
             </Text>
           </View>
-          <Text style={[styles.monthHint, { color: c.textTertiary }]}>
-            기준: 월초 {fmtKRW(portfolio.monthStartValue)}원 · 현재 {fmtKRW(portfolio.totalValue)}원
-          </Text>
+          {lastUpdate && (
+            <Text style={[styles.heroUpdated, { color: c.textTertiary }]}>
+              실시간 · {new Date(lastUpdate).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 갱신
+              {" · "}USD/KRW {market.fxRate.toLocaleString()}원
+            </Text>
+          )}
         </View>
+
+        {/* 원화/달러 잔고 카드 */}
+        <View style={styles.cashRow}>
+          <View style={[styles.cashCard, { backgroundColor: c.card }]}>
+            <View style={styles.cashHead}>
+              <Text style={[styles.cashFlag]}>🇰🇷</Text>
+              <Text style={[styles.cashLabel, { color: c.textSecondary }]}>원화 잔고</Text>
+            </View>
+            <Text style={[styles.cashValue, { color: c.text }]}>
+              {Math.round(market.cashKRW).toLocaleString()}원
+            </Text>
+          </View>
+          <View style={[styles.cashCard, { backgroundColor: c.card }]}>
+            <View style={styles.cashHead}>
+              <Text style={[styles.cashFlag]}>🇺🇸</Text>
+              <Text style={[styles.cashLabel, { color: c.textSecondary }]}>달러 잔고</Text>
+            </View>
+            <Text style={[styles.cashValue, { color: c.text }]}>
+              ${market.cashUSD.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </Text>
+            <Text style={[styles.cashSub, { color: c.textTertiary }]}>
+              ≈ {fmtKRW(market.cashUSDinKRW)}원
+            </Text>
+          </View>
+        </View>
+
+        {/* 보유 종목 라이브 카드 */}
+        {market.positions.length > 0 && (
+          <View style={[styles.section, { backgroundColor: c.card }]}>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>보유 종목</Text>
+            {market.positions.map((m) => {
+              const col = m.unrealizedPnLKRW > 0 ? "#FF3B30"
+                       : m.unrealizedPnLKRW < 0 ? "#3478F6" : c.textSecondary;
+              return (
+                <View key={m.position.id} style={[styles.posRow, { borderTopColor: c.separator }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.posTicker, { color: c.text }]}>
+                      {m.position.ticker.toUpperCase()}
+                      <Text style={[styles.posQty, { color: c.textTertiary }]}>  {m.position.quantity}주</Text>
+                    </Text>
+                    <Text style={[styles.posName, { color: c.textSecondary }]} numberOfLines={1}>
+                      {m.position.name}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={[styles.posValue, { color: c.text }]}>
+                      {fmtKRW(m.marketValueKRW)}원
+                    </Text>
+                    <Text style={[styles.posPnl, { color: col }]}>
+                      {m.unrealizedPnLKRW >= 0 ? "+" : ""}{fmtKRW(m.unrealizedPnLKRW)}원
+                      {" "}({m.pnlPercent >= 0 ? "+" : ""}{m.pnlPercent.toFixed(2)}%)
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* 헬스 스코어 */}
+        <HealthScoreCard health={health} />
 
         {/* 카테고리 비중 */}
         <AllocationBar
@@ -226,11 +298,31 @@ const styles = StyleSheet.create({
 
   scroll:        { padding: 16, gap: 12 },
 
-  monthCard:     { borderRadius: 14, padding: 16, gap: 4 },
-  monthRow:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  monthLabel:    { fontSize: 12, fontFamily: "Inter_500Medium" },
-  monthValue:    { fontSize: 18, fontFamily: "Inter_700Bold" },
-  monthHint:     { fontSize: 11 },
+  heroCard:      { borderRadius: 16, padding: 18, gap: 4 },
+  heroLabel:     { fontSize: 12, fontFamily: "Inter_500Medium" },
+  heroValue:     { fontSize: 28, fontFamily: "Inter_700Bold", marginTop: 4 },
+  heroPnlRow:    { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 4 },
+  heroPnlText:   { fontSize: 16, fontFamily: "Inter_700Bold" },
+  heroPnlPct:    { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  heroUpdated:   { fontSize: 11, marginTop: 8 },
+
+  cashRow:       { flexDirection: "row", gap: 10 },
+  cashCard:      { flex: 1, borderRadius: 14, padding: 14, gap: 4 },
+  cashHead:      { flexDirection: "row", alignItems: "center", gap: 6 },
+  cashFlag:      { fontSize: 16 },
+  cashLabel:     { fontSize: 12, fontFamily: "Inter_500Medium" },
+  cashValue:     { fontSize: 18, fontFamily: "Inter_700Bold", marginTop: 2 },
+  cashSub:       { fontSize: 11, marginTop: 2 },
+
+  posRow:        {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  posTicker:     { fontSize: 14, fontFamily: "Inter_700Bold" },
+  posQty:        { fontSize: 12, fontFamily: "Inter_500Medium" },
+  posName:       { fontSize: 11, marginTop: 2 },
+  posValue:      { fontSize: 14, fontFamily: "Inter_700Bold" },
+  posPnl:        { fontSize: 12, fontFamily: "Inter_600SemiBold", marginTop: 2 },
 
   cta:           {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,

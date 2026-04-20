@@ -11,12 +11,17 @@ import Colors from "@/constants/colors";
 import { STOCKS } from "@/constants/stockData";
 import { getStockMetadata } from "@/constants/stockMetadata";
 import {
-  Category, Sector, CATEGORY_LABEL, CATEGORY_COLOR, SECTOR_LABEL,
+  Category, Sector, CATEGORY_LABEL, CATEGORY_COLOR, SECTOR_LABEL, Position,
 } from "@/types/portfolio";
 import { CATEGORY_LIMITS, ABSOLUTE_LIMITS } from "@/constants/rules";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useStockPrice } from "@/context/StockPriceContext";
 import { validateEntry } from "@/services/entryValidator";
 import ImpulseChecklist from "@/components/ImpulseChecklist";
+
+type Mkt  = Position["market"];
+type Curr = Position["currency"];
+const ALL_MARKETS: Mkt[] = ["KOSPI", "KOSDAQ", "NASDAQ"];
 
 const ALL_SECTORS: Sector[] = [
   "SEMICONDUCTOR", "ENERGY", "DEFENSE", "SHIPBUILDING", "NUCLEAR",
@@ -32,24 +37,46 @@ export default function BuyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ stockId?: string }>();
-  const { portfolio, avgPositionSize, addPendingEntry, addPosition } = usePortfolio();
+  const { portfolio, settings, avgPositionSize, addPendingEntry, executeBuy } = usePortfolio();
+  const { getQuote, usdKrw } = useStockPrice();
 
   const initialStock = params.stockId
     ? STOCKS.find(s => s.id === params.stockId)
     : undefined;
   const initialMeta  = initialStock ? getStockMetadata(initialStock.id) : undefined;
+  const initialMarket: Mkt =
+    (initialStock?.market === "KOSPI" || initialStock?.market === "KOSDAQ" || initialStock?.market === "NASDAQ")
+      ? initialStock.market
+      : "NASDAQ";
+  const initialCurrency: Curr =
+    initialStock?.currency === "USD" ? "USD" : initialStock?.currency === "KRW" ? "KRW" :
+    (initialMarket === "NASDAQ" ? "USD" : "KRW");
 
   const [stockId,  setStockId]  = useState<string | undefined>(initialStock?.id);
   const [ticker,   setTicker]   = useState(initialStock?.ticker ?? "");
   const [name,     setName]     = useState(initialStock?.name ?? "");
+  const [market,   setMarket]   = useState<Mkt>(initialMarket);
+  const [currency, setCurrency] = useState<Curr>(initialCurrency);
   const [category, setCategory] = useState<Category>(initialMeta?.category ?? "B_EVENT");
   const [sectors,  setSectors]  = useState<Sector[]>(initialMeta?.sectors ?? []);
-  const [amount,   setAmount]   = useState("");
+  const [price,    setPrice]    = useState("");
+  const [quantity, setQuantity] = useState("");
   const [stopLoss, setStopLoss] = useState("");
   const [tpLevels, setTpLevels] = useState(DEFAULT_TP.join(", "));
   const [reason,   setReason]   = useState("");
   const [impulse,  setImpulse]  = useState<boolean[]>(new Array(7).fill(false));
   const [markImpulseAtBuy, setMarkImpulseAtBuy] = useState(false);
+
+  const fxRate = usdKrw && usdKrw > 100 ? usdKrw : settings.fxRateUSDKRW;
+  const liveQuote = ticker ? getQuote(ticker.toUpperCase(), market) : null;
+
+  const priceNum = Number(price.replace(/,/g, ""));
+  const qtyNum   = Number(quantity.replace(/,/g, ""));
+  const totalCost      = (Number.isFinite(priceNum) && Number.isFinite(qtyNum) && priceNum > 0 && qtyNum > 0)
+    ? priceNum * qtyNum : 0;
+  const totalCostKRW   = currency === "USD" ? totalCost * fxRate : totalCost;
+  const cashAvailable  = currency === "USD" ? settings.cashBalanceUSD : settings.cashBalanceKRW;
+  const cashAfter      = cashAvailable - totalCost;
 
   const stockOptions = useMemo(
     () => STOCKS.filter(s => {
@@ -71,6 +98,8 @@ export default function BuyScreen() {
     setName(s.name);
     setCategory(m.category);
     setSectors(m.sectors);
+    if (s.market === "KOSPI" || s.market === "KOSDAQ" || s.market === "NASDAQ") setMarket(s.market);
+    if (s.currency === "USD" || s.currency === "KRW") setCurrency(s.currency);
   };
 
   const toggleSector = (sec: Sector) => {
@@ -80,7 +109,6 @@ export default function BuyScreen() {
   };
 
   const handleValidate = async () => {
-    const amountNum   = Number(amount.replace(/,/g, ""));
     const stopLossNum = stopLoss ? Number(stopLoss.replace(/,/g, "")) : null;
     const tpArr = tpLevels.split(/[,\s]+/).map(s => Number(s.trim())).filter(n => !isNaN(n) && n > 0);
 
@@ -88,10 +116,15 @@ export default function BuyScreen() {
       Alert.alert("입력 누락", "종목 티커와 이름을 입력하세요.");
       return;
     }
-    if (!amountNum || amountNum <= 0) {
-      Alert.alert("입력 누락", "매수 금액을 입력하세요.");
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      Alert.alert("입력 누락", "매수 단가를 입력하세요.");
       return;
     }
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      Alert.alert("입력 누락", "매수 수량을 입력하세요.");
+      return;
+    }
+    const amountNum = totalCostKRW;
 
     const result = validateEntry(
       {
@@ -168,19 +201,17 @@ export default function BuyScreen() {
         {
           text: "즉시 보유 등록",
           onPress: async () => {
-            // 단가/수량은 임시로 amount 단위로 1주 가정 — 추후 보유 관리에서 수정
-            const avgPrice = amountNum;
-            await addPosition({
+            await executeBuy({
               ticker:           ticker.trim().toLowerCase(),
               name:             name.trim(),
-              market:           "KOSPI",
+              market,
               category, sectors,
-              avgPrice,
-              quantity:         1,
-              currency:         "KRW",
+              avgPrice:         priceNum,
+              quantity:         qtyNum,
+              currency,
               entryDate:        Date.now(),
               entryReason:      reason,
-              stopLoss:         stopLossNum ?? avgPrice * (1 + ABSOLUTE_LIMITS.STOP_LOSS_DEFAULT / 100),
+              stopLoss:         stopLossNum ?? priceNum * (1 + ABSOLUTE_LIMITS.STOP_LOSS_DEFAULT / 100),
               takeProfitLevels: tpArr,
               executedTakeProfits: [],
               isImpulseBuy:     markImpulseAtBuy,
@@ -295,16 +326,81 @@ export default function BuyScreen() {
           </View>
         </Section>
 
-        {/* 금액 */}
-        <Section title="매수 금액 (원)" c={c}>
-          <TextInput
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="예: 1,000,000"
-            placeholderTextColor={c.textTertiary}
-            keyboardType="numeric"
-            style={[styles.input, { color: c.text, borderColor: c.separator }]}
-          />
+        {/* 시장 */}
+        <Section title="시장" c={c}>
+          <View style={styles.chipRow}>
+            {ALL_MARKETS.map(m => {
+              const active = market === m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => {
+                    setMarket(m);
+                    setCurrency(m === "NASDAQ" ? "USD" : "KRW");
+                  }}
+                  style={[styles.chip, {
+                    backgroundColor: active ? c.tint : "transparent",
+                    borderColor:     active ? c.tint : c.separator,
+                  }]}
+                >
+                  <Text style={[styles.chipText, { color: active ? "#fff" : c.text }]}>{m}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Section>
+
+        {/* 단가 + 수량 */}
+        <Section title={`매수 단가 + 수량 (${currency === "USD" ? "$" : "₩"})`} c={c}>
+          {liveQuote && liveQuote.ok && (
+            <TouchableOpacity
+              onPress={() => setPrice(String(liveQuote.price))}
+              style={[styles.livePriceBtn, { borderColor: c.separator }]}
+            >
+              <Ionicons name="pulse" size={14} color={c.tint} />
+              <Text style={[styles.livePriceText, { color: c.text }]}>
+                현물가 {currency === "USD" ? `$${liveQuote.price.toFixed(2)}` : `${Math.round(liveQuote.price).toLocaleString()}원`}
+                {" "}({liveQuote.changePercent >= 0 ? "+" : ""}{liveQuote.changePercent.toFixed(2)}%)
+              </Text>
+              <Text style={[styles.livePriceTap, { color: c.tint }]}>탭하여 입력</Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.row2}>
+            <TextInput
+              value={price}
+              onChangeText={setPrice}
+              placeholder={currency === "USD" ? "단가 ($)" : "단가 (원)"}
+              placeholderTextColor={c.textTertiary}
+              keyboardType="numeric"
+              style={[styles.input, styles.flex1, { color: c.text, borderColor: c.separator }]}
+            />
+            <TextInput
+              value={quantity}
+              onChangeText={setQuantity}
+              placeholder="수량"
+              placeholderTextColor={c.textTertiary}
+              keyboardType="numeric"
+              style={[styles.input, styles.flexHalf, { color: c.text, borderColor: c.separator }]}
+            />
+          </View>
+          {totalCost > 0 && (
+            <View style={[styles.summary, { borderColor: c.separator }]}>
+              <Text style={[styles.summaryLine, { color: c.text }]}>
+                총 매수금액: {currency === "USD"
+                  ? `$${totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} (≈ ${Math.round(totalCostKRW).toLocaleString()}원)`
+                  : `${totalCost.toLocaleString()}원`}
+              </Text>
+              <Text style={[styles.summaryLine, {
+                color: cashAfter < 0 ? "#FF3B30" : c.textSecondary,
+              }]}>
+                {currency === "USD" ? "달러" : "원화"} 잔고:
+                {" "}{cashAvailable.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                {" → "}
+                {cashAfter.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                {cashAfter < 0 && " ⚠️ 부족"}
+              </Text>
+            </View>
+          )}
           <Text style={[styles.hint, { color: c.textTertiary }]}>
             평균 사이즈 {avgPositionSize > 0 ? `${avgPositionSize.toLocaleString()}원` : "데이터 없음"} ·
             {" "}1.5배 초과 시 48시간 쿨다운
@@ -429,6 +525,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipSmText:   { fontSize: 12, fontFamily: "Inter_500Medium" },
+
+  row2:         { flexDirection: "row", gap: 8 },
+  flex1:        { flex: 2 },
+  flexHalf:     { flex: 1 },
+  livePriceBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderRadius: 8, marginBottom: 4,
+  },
+  livePriceText:{ fontSize: 12, fontFamily: "Inter_600SemiBold", flex: 1 },
+  livePriceTap: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  summary:      {
+    borderWidth: 1, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 8, gap: 4, marginTop: 4,
+  },
+  summaryLine:  { fontSize: 12, fontFamily: "Inter_500Medium" },
 
   toggleRow:    {
     flexDirection: "row", alignItems: "center", padding: 14,

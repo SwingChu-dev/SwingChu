@@ -140,7 +140,7 @@ export default function WeeklyReportScreen() {
             <View style={styles.coachLoading}>
               <ActivityIndicator size="small" color={c.tint} />
               <Text style={[styles.coachLoadingText, { color: c.textSecondary }]}>
-                Gemini가 이번 주를 분석 중...
+                Claude가 이번 주를 분석 중...
               </Text>
             </View>
           )}

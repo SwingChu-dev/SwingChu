@@ -29,11 +29,13 @@ const MONTH_START_KEY   = "@portfolio_month_start_v1";
 
 interface PortfolioSettings {
   cashBalanceKRW: number;
+  cashBalanceUSD: number;
   fxRateUSDKRW:   number;
 }
 
 const DEFAULT_SETTINGS: PortfolioSettings = {
   cashBalanceKRW: 0,
+  cashBalanceUSD: 0,
   fxRateUSDKRW:   1400,
 };
 
@@ -53,7 +55,10 @@ interface PortfolioContextValue {
   markImpulse:      (id: string, isImpulse: boolean) => Promise<void>;
 
   setCashBalance:   (krw: number) => Promise<void>;
+  setCashBalanceUSD:(usd: number) => Promise<void>;
   setFxRate:        (rate: number) => Promise<void>;
+  /** 매수 체결: 보유 등록 + 현금 자동 차감 (해당 통화에서) */
+  executeBuy:       (p: Omit<Position, "id">) => Promise<Position>;
 
   /** 외부(StockPriceContext)에서 현재가를 주입해 손절/익절 알림 발사 */
   checkPositionAlerts: (priceMap: Record<string, { priceKRW: number }>) => void;
@@ -130,7 +135,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const portfolio = useMemo<Portfolio>(() => {
     const fx = settings.fxRateUSDKRW;
     const positionsValue = positions.reduce((s, p) => s + positionValueKRW(p, fx), 0);
-    const totalValue     = positionsValue + settings.cashBalanceKRW;
+    const totalValue     = positionsValue + settings.cashBalanceKRW + settings.cashBalanceUSD * fx;
 
     const categoryAllocation: Record<Category, number> = {
       A_CORE: 0, B_EVENT: 0, C_CONTRARIAN: 0, D_SPECULATIVE: 0,
@@ -229,8 +234,21 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const setCashBalance = useCallback(async (krw: number) => {
     setSettings(s => ({ ...s, cashBalanceKRW: Math.max(0, krw) }));
   }, []);
+  const setCashBalanceUSD = useCallback(async (usd: number) => {
+    setSettings(s => ({ ...s, cashBalanceUSD: Math.max(0, usd) }));
+  }, []);
   const setFxRate = useCallback(async (rate: number) => {
     setSettings(s => ({ ...s, fxRateUSDKRW: Math.max(1, rate) }));
+  }, []);
+
+  const executeBuy = useCallback(async (p: Omit<Position, "id">) => {
+    const newPos: Position = { ...p, id: genId() };
+    const cost = p.avgPrice * p.quantity;
+    setPositions(prev => [newPos, ...prev]);
+    setSettings(s => p.currency === "USD"
+      ? { ...s, cashBalanceUSD: Math.max(0, s.cashBalanceUSD - cost) }
+      : { ...s, cashBalanceKRW: Math.max(0, s.cashBalanceKRW - cost) });
+    return newPos;
   }, []);
 
   const addPendingEntry = useCallback(async (
@@ -342,7 +360,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     removePosition,
     markImpulse,
     setCashBalance,
+    setCashBalanceUSD,
     setFxRate,
+    executeBuy,
     addPendingEntry,
     cancelPendingEntry,
     executePendingEntry,
