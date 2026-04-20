@@ -46,6 +46,16 @@ export const IMEC_MAP: Record<string, ImecStock> = {
     exposure: "중립",
     reason:   "그린란드 중희토류 광산은 미·EU 탈중국 공급망 핵심이나 IMEC 물류 루트와는 직접 연계 약함. 서방 핵심광물 정책에 더 민감",
   },
+  NVA: {
+    ticker:   "NVA",
+    exposure: "중립",
+    reason:   "알래스카 안티몬·금 광산은 미국 국방 비축 정책 수혜이나 IMEC 인도-중동 회랑과 직접 연계 약함. 미·중 무역갈등에 더 민감",
+  },
+  GLND: {
+    ticker:   "GLND",
+    exposure: "중립",
+    reason:   "그린란드 자원 개발은 북극·서방 핵심광물 정책 수혜이나 IMEC 물류 루트와 직접 연계 없음. 미국·EU 그린란드 전략에 더 민감",
+  },
   BNAI: {
     ticker:   "BNAI",
     exposure: "중립",

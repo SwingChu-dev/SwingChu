@@ -59,6 +59,16 @@ export const STOCK_METADATA: Record<string, StockMetadata> = {
     sectors: ["ENERGY", "MICROCAP"],
     actionLabel: "정책 모멘텀 추적 · -25% 손절 필수",
   },
+  nva: {
+    category: "C_CONTRARIAN",
+    sectors: ["ENERGY", "MICROCAP"],
+    actionLabel: "안티몬 정책 추적 · -25% 손절 필수",
+  },
+  glnd: {
+    category: "C_CONTRARIAN",
+    sectors: ["ENERGY", "MICROCAP"],
+    actionLabel: "그린란드 정책 추적 · 포트 2% 이내",
+  },
 
   // ── 카테고리 D: 투기 테마 ──
   ionq:   { category: "D_SPECULATIVE", sectors: ["QUANTUM"] },
