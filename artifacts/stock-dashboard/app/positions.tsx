@@ -76,9 +76,14 @@ export default function PositionsScreen() {
           <Ionicons name="chevron-back" size={24} color={c.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: c.text }]}>보유 관리</Text>
-        <TouchableOpacity onPress={() => router.push("/buy")}>
-          <Ionicons name="add" size={26} color={c.tint} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+          <TouchableOpacity onPress={() => router.push("/add-holding")}>
+            <Ionicons name="albums-outline" size={22} color={c.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/buy")}>
+            <Ionicons name="add" size={26} color={c.tint} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
