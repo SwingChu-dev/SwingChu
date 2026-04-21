@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import stocksRouter from "./stocks";
 import signalRouter from "./signalAnalysis";
 import marketRiskRouter from "./marketRisk";
+import marketIntelRouter from "./marketIntel";
 import weeklyCoachRouter from "./weeklyCoach";
 
 const router: IRouter = Router();
@@ -11,6 +12,7 @@ router.use(healthRouter);
 router.use(stocksRouter);
 router.use(signalRouter);
 router.use(marketRiskRouter);
+router.use(marketIntelRouter);
 router.use(weeklyCoachRouter);
 
 export default router;

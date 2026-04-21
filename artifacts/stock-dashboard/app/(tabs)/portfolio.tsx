@@ -97,6 +97,13 @@ export default function PortfolioScreen() {
         <View style={{ flexDirection: "row", gap: 8 }}>
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: isDark ? "#2A2A2C" : "#E5E5EA" }]}
+            onPress={() => router.push("/market-cycle")}
+          >
+            <Ionicons name="pulse-outline" size={16} color={c.text} />
+            <Text style={[styles.addBtnText, { color: c.text }]}>사이클</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: isDark ? "#2A2A2C" : "#E5E5EA" }]}
             onPress={() => router.push("/stats")}
           >
             <Ionicons name="bar-chart-outline" size={16} color={c.text} />
