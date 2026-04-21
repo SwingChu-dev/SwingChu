@@ -161,10 +161,6 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
-          name="geopolitical-risk"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
           name="market-cycle"
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
