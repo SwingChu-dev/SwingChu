@@ -121,7 +121,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(MONTH_START_KEY),
           AsyncStorage.getItem(CLOSED_KEY),
         ]);
-        if (rawPos)    setPositions(JSON.parse(rawPos));
+        if (rawPos) {
+          // 마이그레이션: 시장과 통화 불일치 자동 보정
+          // (NASDAQ → USD, KOSPI/KOSDAQ → KRW)
+          const parsed: Position[] = JSON.parse(rawPos);
+          const fixed = parsed.map(p => {
+            const correct = p.market === "NASDAQ" ? "USD" : "KRW";
+            return p.currency === correct ? p : { ...p, currency: correct as Position["currency"] };
+          });
+          setPositions(fixed);
+        }
         if (rawPend)   setPending(JSON.parse(rawPend));
         if (rawSav)    setSaves(JSON.parse(rawSav));
         if (rawSet)    setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(rawSet) });

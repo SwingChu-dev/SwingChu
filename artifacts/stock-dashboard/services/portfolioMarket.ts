@@ -55,10 +55,13 @@ export function computeMarket(
     const live  = q && q.ok && q.price > 0;
     const cur   = live ? q!.price : p.avgPrice;
     const mv    = cur * p.quantity;
-    const mvKRW = p.currency === "USD" ? mv * fxRate : mv;
+    // 시장 기준으로 실효 통화 강제: NASDAQ=USD, KOSPI/KOSDAQ=KRW.
+    // 저장된 currency 가 어긋나도 평가는 정확하게 환산.
+    const effCur: "USD" | "KRW" = p.market === "NASDAQ" ? "USD" : "KRW";
+    const mvKRW = effCur === "USD" ? mv * fxRate : mv;
     const cost  = p.avgPrice * p.quantity;
     const pnl   = mv - cost;
-    const pnlKRW= p.currency === "USD" ? pnl * fxRate : pnl;
+    const pnlKRW= effCur === "USD" ? pnl * fxRate : pnl;
     const pct   = cost > 0 ? (pnl / cost) * 100 : 0;
     return {
       position:        p,
@@ -76,8 +79,9 @@ export function computeMarket(
   const positionsValueKRW = items.reduce((s, x) => s + x.marketValueKRW, 0);
   const totalPnLKRW       = items.reduce((s, x) => s + x.unrealizedPnLKRW, 0);
   const totalCostKRW      = items.reduce((s, x) => {
-    const cost = x.position.avgPrice * x.position.quantity;
-    return s + (x.position.currency === "USD" ? cost * fxRate : cost);
+    const cost   = x.position.avgPrice * x.position.quantity;
+    const effCur = x.position.market === "NASDAQ" ? "USD" : "KRW";
+    return s + (effCur === "USD" ? cost * fxRate : cost);
   }, 0);
   const totalPnLPercent   = totalCostKRW > 0 ? (totalPnLKRW / totalCostKRW) * 100 : 0;
   const cashUSDinKRW      = cashUSD * fxRate;
