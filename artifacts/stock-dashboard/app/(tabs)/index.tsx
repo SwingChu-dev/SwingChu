@@ -229,7 +229,7 @@ export default function HomeScreen() {
             <View style={styles.toolsRow}>
               {[
 
-                { icon: "globe-outline"      as const, label: "지경학\n리스크",  color: "#FF6B00", path: "/geopolitical-risk" },
+                { icon: "eye-outline"        as const, label: "폭풍의\n눈",      color: "#D4A855", path: "/market-cycle" },
 
               ].map((t) => (
                 <TouchableOpacity

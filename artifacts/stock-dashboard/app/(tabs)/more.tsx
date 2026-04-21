@@ -99,11 +99,11 @@ export default function MoreScreen() {
         <SectionHeader title="글로벌 리스크" />
         <View style={styles.section}>
           <MenuItem
-            icon="globe-outline"
-            iconColor="#FF6B00"
-            title="지경학적 리스크"
-            description="유가·금·달러 기반 복합 위험도 + IMEC 수혜/소외 분류"
-            onPress={() => router.push("/geopolitical-risk" as any)}
+            icon="eye-outline"
+            iconColor="#D4A855"
+            title="폭풍의 눈 — 시장 인텔리전스"
+            description="심리 사이클 · F&G 지수 · 자동 리스크 트리거"
+            onPress={() => router.push("/market-cycle" as any)}
           />
         </View>
 
