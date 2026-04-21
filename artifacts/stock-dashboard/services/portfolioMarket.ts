@@ -53,16 +53,24 @@ export function computeMarket(
     const key   = `${p.ticker.toUpperCase()}:${p.market}`;
     const q     = quotes[key] ?? null;
     const live  = q && q.ok && q.price > 0;
-    const cur   = live ? q!.price : p.avgPrice;
+    // 시세는 항상 시장 통화: NASDAQ → USD, KOSPI/KOSDAQ → KRW.
+    const mktCur: "USD" | "KRW" = p.market === "NASDAQ" ? "USD" : "KRW";
+    // 시세 없으면 평단을 시세로 대신하되, 평단 단위(stored currency)에서
+    // 시장 통화로 변환: avgPrice 가 KRW 인데 NASDAQ 이면 ÷FX.
+    const fallbackCurInMkt = p.currency === mktCur
+      ? p.avgPrice
+      : (mktCur === "USD" ? p.avgPrice / fxRate : p.avgPrice * fxRate);
+    const cur   = live ? q!.price : fallbackCurInMkt;
     const mv    = cur * p.quantity;
-    // 시장 기준으로 실효 통화 강제: NASDAQ=USD, KOSPI/KOSDAQ=KRW.
-    // 저장된 currency 가 어긋나도 평가는 정확하게 환산.
-    const effCur: "USD" | "KRW" = p.market === "NASDAQ" ? "USD" : "KRW";
-    const mvKRW = effCur === "USD" ? mv * fxRate : mv;
-    const cost  = p.avgPrice * p.quantity;
-    const pnl   = mv - cost;
-    const pnlKRW= effCur === "USD" ? pnl * fxRate : pnl;
-    const pct   = cost > 0 ? (pnl / cost) * 100 : 0;
+    const mvKRW = mktCur === "USD" ? mv * fxRate : mv;
+    // 원금은 저장된 통화 그대로 해석.
+    const cost    = p.avgPrice * p.quantity;
+    const costKRW = p.currency === "USD" ? cost * fxRate : cost;
+    // 손익은 KRW 기준으로 비교 (단위 혼합 방지).
+    const pnlKRW  = mvKRW - costKRW;
+    // 손익(시장 통화) — 보조용
+    const pnl     = mktCur === "USD" ? pnlKRW / fxRate : pnlKRW;
+    const pct     = costKRW > 0 ? (pnlKRW / costKRW) * 100 : 0;
     return {
       position:        p,
       quote:           q,
@@ -79,9 +87,8 @@ export function computeMarket(
   const positionsValueKRW = items.reduce((s, x) => s + x.marketValueKRW, 0);
   const totalPnLKRW       = items.reduce((s, x) => s + x.unrealizedPnLKRW, 0);
   const totalCostKRW      = items.reduce((s, x) => {
-    const cost   = x.position.avgPrice * x.position.quantity;
-    const effCur = x.position.market === "NASDAQ" ? "USD" : "KRW";
-    return s + (effCur === "USD" ? cost * fxRate : cost);
+    const cost = x.position.avgPrice * x.position.quantity;
+    return s + (x.position.currency === "USD" ? cost * fxRate : cost);
   }, 0);
   const totalPnLPercent   = totalCostKRW > 0 ? (totalPnLKRW / totalCostKRW) * 100 : 0;
   const cashUSDinKRW      = cashUSD * fxRate;
