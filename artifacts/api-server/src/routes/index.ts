@@ -5,6 +5,7 @@ import signalRouter from "./signalAnalysis";
 import marketIntelRouter from "./marketIntel";
 import weeklyCoachRouter from "./weeklyCoach";
 import portfolioImportRouter from "./portfolioImport";
+import earningsRouter from "./earnings";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(signalRouter);
 router.use(marketIntelRouter);
 router.use(weeklyCoachRouter);
 router.use(portfolioImportRouter);
+router.use(earningsRouter);
 
 export default router;

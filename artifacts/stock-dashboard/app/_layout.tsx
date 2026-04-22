@@ -20,6 +20,7 @@ import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
 import { PortfolioProvider, usePortfolio } from "@/context/PortfolioContext";
+import { TargetTiersProvider, useTargetTiers } from "@/context/TargetTiersContext";
 import AlertBanner from "@/components/AlertBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setupNotifications } from "@/utils/notifications";
@@ -114,6 +115,7 @@ function AlertChecker() {
   const { quotes } = useStockPrice();
   const { checkPrices } = useAlerts();
   const { checkPositionAlerts } = usePortfolio();
+  const { checkPricesForTiers } = useTargetTiers();
   React.useEffect(() => {
     const map: Record<string, { priceKRW: number }> = {};
     Object.entries(quotes).forEach(([key, q]) => {
@@ -122,6 +124,7 @@ function AlertChecker() {
     if (Object.keys(map).length > 0) {
       checkPrices(map);
       checkPositionAlerts(map);
+      checkPricesForTiers(map);
     }
   }, [quotes]);
   return null;
@@ -252,7 +255,9 @@ export default function RootLayout() {
                     <AISignalBridge>
                       <PriceBridge>
                         <AlertProvider>
-                          <RootLayoutNav />
+                          <TargetTiersProvider>
+                            <RootLayoutNav />
+                          </TargetTiersProvider>
                         </AlertProvider>
                       </PriceBridge>
                     </AISignalBridge>

@@ -28,6 +28,8 @@ import NewsSection from "@/components/detail/NewsSection";
 import BacktestSection from "@/components/detail/BacktestSection";
 import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
 import IsraelSection from "@/components/detail/IsraelSection";
+import TargetTiersSection from "@/components/detail/TargetTiersSection";
+import EarningsBadge from "@/components/detail/EarningsBadge";
 import ShortSellSection from "@/components/detail/ShortSellSection";
 import OverheatSection from "@/components/detail/OverheatSection";
 import { calcBoxPosition } from "@/utils/boxPosition";
@@ -407,6 +409,7 @@ export default function StockDetailScreen() {
                   </View>
                 ))}
               </View>
+              <EarningsBadge ticker={stock.ticker} market={stock.market} />
             </>
           )}
 
@@ -420,7 +423,17 @@ export default function StockDetailScreen() {
             </View>
           )}
 
-          {activeTab === "진입"   && <SplitEntrySection  stock={stock} livePrice={displayPrice} overheatScore={tradingStatus?.score} />}
+          {activeTab === "진입"   && (
+            <>
+              <TargetTiersSection
+                ticker={stock.ticker}
+                market={stock.market}
+                name={stock.name}
+                currentPriceKRW={displayPrice}
+              />
+              <SplitEntrySection stock={stock} livePrice={displayPrice} overheatScore={tradingStatus?.score} />
+            </>
+          )}
           {activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
           {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
 
