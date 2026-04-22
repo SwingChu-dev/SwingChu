@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { USD_KRW_RATE } from "@/constants/stockData";
+import { enrichTierContext } from "@/utils/tierContextEnrichment";
 
 export type TierKey = "tier1" | "tier2" | "tier3";
 
@@ -69,12 +70,23 @@ async function fireTierNotification(
       ? `$${(currentPriceKRW / USD_KRW_RATE).toFixed(2)}`
       : `₩${Math.round(currentPriceKRW).toLocaleString()}`;
 
+    // 컨텍스트 합성 (실적·FOMC·애널리스트). 실패해도 기본 알림은 발송.
+    let contextBlock = "";
+    let severity: "clear" | "caution" | "warn" = "clear";
+    try {
+      const ctx = await enrichTierContext({ ticker: set.ticker, market: set.market, currentPriceKRW });
+      severity = ctx.severity;
+      contextBlock = "\n" + ctx.flags.join(" · ") + "\n" + ctx.recommendation;
+    } catch {}
+
+    const sevEmoji = severity === "warn" ? "🛑" : severity === "caution" ? "⚠️" : meta.emoji;
+
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `${meta.emoji} ${meta.label} 도달 — ${set.name}`,
-        body:  `${set.ticker} 현재가 ${curStr} · 타겟 ${tierStr} · 분할 매수 실행 검토`,
+        title: `${sevEmoji} ${meta.label} 도달 — ${set.name}`,
+        body:  `${set.ticker} 현재가 ${curStr} · 타겟 ${tierStr}${contextBlock}`,
         sound: true,
-        data:  { type: "tier_trigger", ticker: set.ticker, market: set.market, tier },
+        data:  { type: "tier_trigger", ticker: set.ticker, market: set.market, tier, severity },
       },
       trigger: Platform.OS === "android"
         ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1, channelId: "price-alerts" } as Notifications.TimeIntervalTriggerInput
