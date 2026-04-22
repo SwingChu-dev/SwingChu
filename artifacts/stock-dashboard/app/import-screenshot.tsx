@@ -106,6 +106,7 @@ export default function ImportScreenshot() {
   const includedCount = rows.filter(r => r.include).length;
 
   const handleRegister = async () => {
+    if (saving) return; // 중복 탭 가드
     const valid = rows.filter(r => r.include && r.matched && r.ticker && r.market && r.currency);
     if (valid.length === 0) {
       showAlert("등록 불가", "체크된 종목 중 매칭된 항목이 없습니다.");
@@ -142,6 +143,12 @@ export default function ImportScreenshot() {
         await addPosition(newPos);
         added++;
       }
+      // 등록된 행은 목록에서 제거해 재등록 방지
+      const validKeys = new Set(valid.map(v => `${v.ticker}-${v.market}`));
+      setRows(prev => prev.filter(r => {
+        const key = `${r.ticker}-${r.market}`;
+        return !(r.include && r.matched && validKeys.has(key));
+      }));
       Alert.alert(
         "등록 완료",
         `${added}건의 보유 종목이 추가되었습니다. 보유 관리에서 평단·손절을 확인하세요.`,
