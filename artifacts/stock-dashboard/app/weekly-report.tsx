@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { usePortfolio } from "@/context/PortfolioContext";
-import { buildWeeklyReport, fetchWeeklyCoach, type CoachComment, type ClaudeTier } from "@/services/weeklyReport";
+import { buildWeeklyReport, fetchWeeklyCoach, type CoachComment } from "@/services/weeklyReport";
 import { CATEGORY_COLOR, CATEGORY_LABEL, SECTOR_LABEL } from "@/types/portfolio";
 import { analyzePortfolio } from "@/services/portfolioAnalyzer";
 
@@ -43,13 +43,12 @@ export default function WeeklyReportScreen() {
   const [coach,        setCoach]        = useState<CoachComment | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError,   setCoachError]   = useState<string | null>(null);
-  const [tier,         setTier]         = useState<ClaudeTier>("haiku");
 
-  const loadCoach = async (selected: ClaudeTier = tier) => {
+  const loadCoach = async () => {
     setCoachLoading(true);
     setCoachError(null);
     try {
-      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore, selected);
+      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore, "haiku");
       setCoach(result);
     } catch (e: any) {
       setCoachError(e?.message ?? "AI 코치 호출 실패");
@@ -58,14 +57,8 @@ export default function WeeklyReportScreen() {
     }
   };
 
-  const handleSelectTier = (next: ClaudeTier) => {
-    if (next === tier) return;
-    setTier(next);
-    loadCoach(next);
-  };
-
   useEffect(() => {
-    loadCoach("haiku");
+    loadCoach();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,46 +87,13 @@ export default function WeeklyReportScreen() {
           <View style={styles.coachHeader}>
             <Ionicons name="sparkles" size={16} color={c.tint} />
             <Text style={[styles.coachTitle, { color: c.text }]}>
-              AI 코치 · Claude {tier === "haiku" ? "Haiku" : tier === "sonnet" ? "Sonnet" : "Opus"}
+              AI 코치 · Claude Haiku
             </Text>
             {!coachLoading && (
               <TouchableOpacity onPress={() => loadCoach()} style={{ marginLeft: "auto" }}>
                 <Ionicons name="refresh" size={16} color={c.textSecondary} />
               </TouchableOpacity>
             )}
-          </View>
-
-          <View style={styles.tierRow}>
-            {(["haiku", "sonnet", "opus"] as ClaudeTier[]).map(t => {
-              const selected = t === tier;
-              const meta = t === "haiku"
-                ? { label: "Haiku",  hint: "빠름·저렴" }
-                : t === "sonnet"
-                ? { label: "Sonnet", hint: "균형" }
-                : { label: "Opus",   hint: "최강·고비용" };
-              return (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => handleSelectTier(t)}
-                  disabled={coachLoading}
-                  style={[
-                    styles.tierChip,
-                    {
-                      backgroundColor: selected ? c.tint : "transparent",
-                      borderColor:     selected ? c.tint : c.separator,
-                      opacity:         coachLoading && !selected ? 0.4 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.tierLabel, { color: selected ? "#fff" : c.text }]}>
-                    {meta.label}
-                  </Text>
-                  <Text style={[styles.tierHint, { color: selected ? "#ffffffcc" : c.textTertiary }]}>
-                    {meta.hint}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
           </View>
 
           {coachLoading && (
@@ -392,11 +352,4 @@ const styles = StyleSheet.create({
   coachLabel:       { fontSize: 11, fontFamily: "Inter_700Bold", marginBottom: 4 },
   coachText:        { fontSize: 13, lineHeight: 19 },
 
-  tierRow:          { flexDirection: "row", gap: 6 },
-  tierChip:         {
-    flex: 1, borderWidth: 1, borderRadius: 10,
-    paddingVertical: 8, paddingHorizontal: 10, alignItems: "center", gap: 2,
-  },
-  tierLabel:        { fontSize: 12, fontFamily: "Inter_700Bold" },
-  tierHint:         { fontSize: 10 },
 });

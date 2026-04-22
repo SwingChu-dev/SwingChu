@@ -4,7 +4,14 @@
  * 미설정 시 isAvailable() → false, 모든 fetch 함수는 null 반환 → Yahoo Finance 폴백.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+
 const KIS_URL = "https://openapi.koreainvestment.com:9443";
+
+// 토큰 영속화 파일: 서버 재시작 시에도 살아남아 KIS SMS 재발송을 막음
+const TOKEN_FILE = path.join(os.tmpdir(), "kis-token-cache.json");
 
 // ── 종목별 거래소 코드 매핑 (NYSE 상장 종목 명시, 나머지 NASDAQ) ───────────
 const NYSE_TICKERS = new Set([
@@ -22,9 +29,41 @@ let _token:        string | null = null;
 let _tokenExpiry   = 0;
 let _tokenPromise: Promise<string | null> | null = null; // 동시 요청 중복 방지
 let _retryAfter    = 0; // 실패 후 재시도 금지 시각
+let _diskLoaded    = false;
 
 export function isAvailable(): boolean {
   return !!(process.env.KIS_APPKEY && process.env.KIS_APPSECRET);
+}
+
+function loadTokenFromDisk(): void {
+  if (_diskLoaded) return;
+  _diskLoaded = true;
+  try {
+    if (!fs.existsSync(TOKEN_FILE)) return;
+    const raw = fs.readFileSync(TOKEN_FILE, "utf8");
+    const json = JSON.parse(raw) as { token?: string; expiry?: number; appkey?: string };
+    // 다른 appkey로 발급된 토큰은 무효
+    if (json.appkey && json.appkey !== process.env.KIS_APPKEY) return;
+    if (typeof json.token === "string" && typeof json.expiry === "number" && Date.now() < json.expiry) {
+      _token       = json.token;
+      _tokenExpiry = json.expiry;
+      console.log(`[KIS] 디스크에서 토큰 복원 (만료까지 ${Math.round((json.expiry - Date.now()) / 3600_000)}시간)`);
+    }
+  } catch (e) {
+    // 손상된 캐시는 무시
+  }
+}
+
+function saveTokenToDisk(): void {
+  try {
+    fs.writeFileSync(
+      TOKEN_FILE,
+      JSON.stringify({ token: _token, expiry: _tokenExpiry, appkey: process.env.KIS_APPKEY }),
+      { mode: 0o600 },
+    );
+  } catch (e) {
+    console.warn("[KIS] 토큰 디스크 저장 실패:", e);
+  }
 }
 
 async function fetchNewToken(): Promise<string | null> {
@@ -49,9 +88,12 @@ async function fetchNewToken(): Promise<string | null> {
       return null;
     }
     _token       = json.access_token;
-    _tokenExpiry = Date.now() + 23 * 60 * 60 * 1000; // 23시간 캐시
+    // KIS 응답의 expires_in(초)이 있으면 사용, 없으면 23시간
+    const ttlMs  = typeof json.expires_in === "number" ? json.expires_in * 1000 : 23 * 60 * 60 * 1000;
+    _tokenExpiry = Date.now() + ttlMs - 5 * 60 * 1000; // 만료 5분 전 갱신
     _retryAfter  = 0;
-    console.log("[KIS] 액세스 토큰 발급 성공");
+    saveTokenToDisk();
+    console.log(`[KIS] 액세스 토큰 발급 성공 (TTL ${Math.round(ttlMs / 3600_000)}시간) — 디스크 저장 완료`);
     return _token;
   } catch (e) {
     _retryAfter = Date.now() + 30_000;
@@ -62,6 +104,9 @@ async function fetchNewToken(): Promise<string | null> {
 
 async function getToken(): Promise<string | null> {
   if (!isAvailable()) return null;
+
+  // 첫 호출 시 디스크 캐시 확인 (재시작 후 SMS 폭탄 방지)
+  loadTokenFromDisk();
 
   // 유효한 토큰 있으면 즉시 반환
   if (_token && Date.now() < _tokenExpiry) return _token;
