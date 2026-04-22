@@ -77,6 +77,9 @@ export default function PositionsScreen() {
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: c.text }]}>보유 관리</Text>
         <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+          <TouchableOpacity onPress={() => router.push("/import-screenshot")}>
+            <Ionicons name="camera-outline" size={22} color={c.text} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/add-holding")}>
             <Ionicons name="albums-outline" size={22} color={c.text} />
           </TouchableOpacity>
