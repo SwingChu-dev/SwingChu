@@ -185,7 +185,7 @@ interface PCProps {
 }
 
 function PositionCard({ data, c, onDelete, onToggleImpulse, onSavePrice, onSell }: PCProps) {
-  const { position: p, currentPrice, marketValueKRW, unrealizedPnLKRW, pnlPercent, hasLivePrice } = data;
+  const { position: p, currentPrice, marketValueKRW, unrealizedPnLKRW, pnlPercent, hasLivePrice, marketCurrency } = data;
   const [editing, setEditing]     = useState(false);
   const [priceStr, setPriceStr]   = useState(String(p.avgPrice));
   const [qtyStr, setQtyStr]       = useState(String(p.quantity));
@@ -253,7 +253,7 @@ function PositionCard({ data, c, onDelete, onToggleImpulse, onSavePrice, onSell 
 
       <View style={styles.priceRow}>
         <Text style={[styles.priceLine, { color: c.textSecondary }]}>
-          현재 {hasLivePrice ? fmtPrice(currentPrice, p.currency) : "—"}
+          현재 {hasLivePrice ? fmtPrice(currentPrice, marketCurrency) : "—"}
           {"  /  "}평단 {fmtPrice(p.avgPrice, p.currency)} × {p.quantity}주
         </Text>
       </View>

@@ -18,6 +18,8 @@ export interface PositionMarket {
   pnlPercent:      number;
   /** 시세 데이터 사용 가능 여부 */
   hasLivePrice:    boolean;
+  /** 시장 통화 (시세·현재가의 단위) — NASDAQ→USD, KOSPI/KOSDAQ→KRW */
+  marketCurrency:  "USD" | "KRW";
 }
 
 export interface MarketSnapshot {
@@ -81,6 +83,7 @@ export function computeMarket(
       unrealizedPnLKRW:pnlKRW,
       pnlPercent:      pct,
       hasLivePrice:    !!live,
+      marketCurrency:  mktCur,
     };
   });
 
