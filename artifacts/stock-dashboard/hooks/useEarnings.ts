@@ -6,9 +6,13 @@ export interface EarningsInfo {
   market: string;
   nextEarningsDate: string | null;
   daysUntilEarnings: number | null;
+  earningsTimeOfDay: "BMO" | "AMC" | "DMH" | null;
+  epsEstimate: number | null;
+  revenueEstimate: number | null;
   exDividendDate: string | null;
   dividendDate: string | null;
   daysUntilExDividend: number | null;
+  source: "finnhub" | "yahoo";
   asOf: string;
 }
 

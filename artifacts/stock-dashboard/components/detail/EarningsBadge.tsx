@@ -52,7 +52,10 @@ export default function EarningsBadge({ ticker, market }: Props) {
       <View style={{ flex: 1 }}>
         <Text style={[styles.title, { color: c.text }]}>다가오는 실적</Text>
         <Text style={[styles.subtitle, { color: c.textSecondary }]}>
-          {formatDate(data.nextEarningsDate)}{data.nextEarningsDate ? ` · ${t.label}` : ""}
+          {formatDate(data.nextEarningsDate)}
+          {data.earningsTimeOfDay === "BMO" ? " 장전" : data.earningsTimeOfDay === "AMC" ? " 장후" : ""}
+          {data.nextEarningsDate ? ` · ${t.label}` : ""}
+          {data.epsEstimate != null ? ` · EPS 컨센 ${data.epsEstimate.toFixed(2)}` : ""}
         </Text>
       </View>
       {exDays != null && exDays >= 0 && exDays <= 30 && (
