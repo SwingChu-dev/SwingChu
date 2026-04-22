@@ -30,6 +30,8 @@ import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
 import IsraelSection from "@/components/detail/IsraelSection";
 import TargetTiersSection from "@/components/detail/TargetTiersSection";
 import EarningsBadge from "@/components/detail/EarningsBadge";
+import FomcBadge from "@/components/detail/FomcBadge";
+import AnalystSection from "@/components/detail/AnalystSection";
 import ShortSellSection from "@/components/detail/ShortSellSection";
 import OverheatSection from "@/components/detail/OverheatSection";
 import { calcBoxPosition } from "@/utils/boxPosition";
@@ -410,6 +412,7 @@ export default function StockDetailScreen() {
                 ))}
               </View>
               <EarningsBadge ticker={stock.ticker} market={stock.market} />
+              <FomcBadge market={stock.market} />
             </>
           )}
 
@@ -429,6 +432,11 @@ export default function StockDetailScreen() {
                 ticker={stock.ticker}
                 market={stock.market}
                 name={stock.name}
+                currentPriceKRW={displayPrice}
+              />
+              <AnalystSection
+                ticker={stock.ticker}
+                market={stock.market}
                 currentPriceKRW={displayPrice}
               />
               <SplitEntrySection stock={stock} livePrice={displayPrice} overheatScore={tradingStatus?.score} />

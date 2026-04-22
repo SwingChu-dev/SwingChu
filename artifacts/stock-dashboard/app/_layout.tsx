@@ -22,6 +22,7 @@ import { AISignalProvider } from "@/context/AISignalContext";
 import { PortfolioProvider, usePortfolio } from "@/context/PortfolioContext";
 import { TargetTiersProvider, useTargetTiers } from "@/context/TargetTiersContext";
 import AlertBanner from "@/components/AlertBanner";
+import EarningsAlertScheduler from "@/components/EarningsAlertScheduler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setupNotifications } from "@/utils/notifications";
 import { registerBackgroundPriceTask } from "@/utils/backgroundPriceFetch";
@@ -138,6 +139,7 @@ function RootLayoutNav() {
   return (
     <>
       <AlertChecker />
+      <EarningsAlertScheduler />
       <AlertBanner />
       <Stack
         screenOptions={{
