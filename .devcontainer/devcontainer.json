@@ -1,0 +1,38 @@
+{
+  "name": "SwingChu (Express + Expo monorepo)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@latest --activate && pnpm install && npm install -g @anthropic-ai/claude-code",
+  "forwardPorts": [3000, 8080, 8081, 19000, 19006, 5173],
+  "portsAttributes": {
+    "3000": { "label": "API server", "onAutoForward": "notify" },
+    "8080": { "label": "API server (alt)", "onAutoForward": "silent" },
+    "8081": { "label": "Expo Metro", "onAutoForward": "notify" },
+    "19000": { "label": "Expo Dev", "onAutoForward": "silent" },
+    "19006": { "label": "Expo Web", "onAutoForward": "openPreview" },
+    "5173": { "label": "Vite sandbox", "onAutoForward": "silent" }
+  },
+  "remoteEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "16gb"
+  }
+}
