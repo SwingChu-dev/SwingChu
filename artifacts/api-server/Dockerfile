@@ -13,7 +13,8 @@ COPY lib/db ./lib/db
 COPY artifacts/api-server ./artifacts/api-server
 RUN pnpm --filter @workspace/api-server build
 # Produce a hoisted, deployable node_modules with only production deps.
-RUN pnpm deploy --filter=@workspace/api-server --prod /out
+# --legacy: pnpm v10+ requires this unless inject-workspace-packages=true.
+RUN pnpm deploy --legacy --filter=@workspace/api-server --prod /out
 
 FROM base AS runtime
 WORKDIR /app
