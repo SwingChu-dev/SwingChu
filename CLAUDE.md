@@ -77,6 +77,23 @@ pnpm dlx eas-cli update --branch preview --message "<요약>"
 pnpm dlx eas-cli secret:create --scope project --name EXPO_PUBLIC_API_URL --value https://swingchu-api.fly.dev
 ```
 
+### 웹 앱 — Vercel
+`stock-dashboard`의 React Native Web 빌드를 Vercel이 호스팅. 레포 루트의 `vercel.json`이 monorepo 구조를 알려줌:
+
+- **Install**: `pnpm install --frozen-lockfile`
+- **Build**: `pnpm --filter @workspace/stock-dashboard build:web` → `expo export --platform web --output-dir dist`
+- **Output**: `artifacts/stock-dashboard/dist`
+
+Vercel **프로젝트 설정에서 직접 손봐야 하는 부분** (코드로는 못 바꿈):
+
+1. **Settings → Git → Production Branch = `master`** (기본값 `main`이라 production 배포가 안 잡혔던 원인)
+2. **Settings → General → Root Directory = `./`** (vercel.json이 루트에 있으므로 비워두거나 루트로)
+3. **Settings → Environment Variables**:
+   - `EXPO_PUBLIC_API_URL = https://swingchu-api.fly.dev` (Production + Preview 둘 다)
+4. Vercel이 자동으로 pnpm을 감지함 (`packageManager` 필드 없어도 `pnpm-lock.yaml`로 판별).
+
+연결 자체가 꼬였으면 Vercel 프로젝트를 일단 disconnect → reconnect 후 위 4개 설정만 다시 잡으면 됨.
+
 ## Workspace layout
 
 ```

@@ -8,6 +8,7 @@
     "start:tunnel": "expo start --tunnel",
     "dev": "expo start",
     "build": "node scripts/build.js",
+    "build:web": "expo export --platform web --output-dir dist",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
