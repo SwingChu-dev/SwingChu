@@ -124,6 +124,18 @@ git push -u origin fix/<name>
 gh pr create --base master --head fix/<name> --title "..." --body "..."
 ```
 
+## PR / merge policy
+
+이 레포의 PR은 **Claude가 자동 머지**한다. 별도 확인 없이:
+
+- 작업 완료 후 PR 만들고 CI/리뷰 코멘트 비어있으면 즉시 `merge` 메서드로 머지
+- 단, 다음 경우엔 머지 전에 사용자에게 한 번 짚는다:
+  - 시크릿 노출·키 회전 같은 보안 영향 PR
+  - 데이터 마이그레이션·DB 스키마 파괴적 변경
+  - 외부 서비스 청구·요금에 영향이 큰 변경 (예: 더 비싼 인스턴스 타입)
+
+워크플로 실패 시엔 머지하지 않고 원인 디버깅 우선.
+
 ## Secrets / environment
 
 Never commit `.env`. 키 목록은 위 "GitHub Codespaces" 섹션 참조.
