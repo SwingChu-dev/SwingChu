@@ -84,15 +84,15 @@ pnpm dlx eas-cli secret:create --scope project --name EXPO_PUBLIC_API_URL --valu
 - **Build**: `pnpm --filter @workspace/stock-dashboard build:web` → `expo export --platform web --output-dir dist`
 - **Output**: `artifacts/stock-dashboard/dist`
 
-Vercel **프로젝트 설정에서 직접 손봐야 하는 부분** (코드로는 못 바꿈):
+Vercel **프로젝트 설정에서 직접 손봐야 하는 부분** (코드로는 못 바꿈, 루트의 `vercel.json`은 root directory 안쪽일 때만 읽힘):
 
-1. **Settings → Git → Production Branch = `master`** (기본값 `main`이라 production 배포가 안 잡혔던 원인)
-2. **Settings → General → Root Directory = `./`** (vercel.json이 루트에 있으므로 비워두거나 루트로)
+1. **Settings → General → Root Directory** = 비워둠(루트). 한때 `artifacts/api-server`로 잘못 잡혀 있었음 — API는 Fly로 가는데 Vercel이 그걸 빌드하려다 실패함. 절대 api-server로 두지 말 것.
+2. **Settings → Git → Production Branch = `master`** (기본값 `main`이라 production 배포가 안 잡혔던 원인)
 3. **Settings → Environment Variables**:
    - `EXPO_PUBLIC_API_URL = https://swingchu-api.fly.dev` (Production + Preview 둘 다)
 4. Vercel이 자동으로 pnpm을 감지함 (`packageManager` 필드 없어도 `pnpm-lock.yaml`로 판별).
 
-연결 자체가 꼬였으면 Vercel 프로젝트를 일단 disconnect → reconnect 후 위 4개 설정만 다시 잡으면 됨.
+연결 자체가 꼬였으면 Vercel 프로젝트를 일단 disconnect → reconnect 후 위 설정만 다시 잡으면 됨.
 
 ## Workspace layout
 
