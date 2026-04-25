@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @workspace/stock-dashboard build:web",
+  "outputDirectory": "artifacts/stock-dashboard/dist",
+  "framework": null
+}
