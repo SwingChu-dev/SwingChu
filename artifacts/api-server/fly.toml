@@ -1,0 +1,29 @@
+# Fly.io app config — `flyctl deploy` from artifacts/api-server/
+# Run `flyctl launch --no-deploy` once to create the app and pick a region,
+# then set secrets with `flyctl secrets set ANTHROPIC_API_KEY=... KIS_APPKEY=... etc.`
+
+app = "swingchu-api"
+primary_region = "nrt"  # Tokyo — closest to KR for KIS/Yahoo latency
+
+[build]
+  dockerfile = "Dockerfile"
+  # The Docker build context must be the workspace root because the Dockerfile
+  # references `lib/` and `pnpm-workspace.yaml`. flyctl picks this up via the
+  # `dockerfile-context` flag passed at deploy time, e.g.:
+  #   flyctl deploy --config artifacts/api-server/fly.toml --dockerfile artifacts/api-server/Dockerfile .
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

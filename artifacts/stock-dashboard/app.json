@@ -8,6 +8,12 @@
     "scheme": "stock-dashboard",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/REPLACE_WITH_PROJECT_ID"
+    },
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -18,17 +24,19 @@
       "bundleIdentifier": "com.swingjeongseok.app",
       "buildNumber": "1"
     },
-    "android": {},
+    "android": {
+      "package": "com.swingjeongseok.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_PROJECT_ID"
+      }
+    },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
+      "expo-router",
       "expo-font",
       "expo-web-browser",
       [
