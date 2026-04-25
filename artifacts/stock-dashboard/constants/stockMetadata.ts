@@ -78,17 +78,6 @@ export const STOCK_METADATA: Record<string, StockMetadata> = {
     sectors: ["MICROCAP"],
     actionLabel: "투자 X · 관찰만",
   },
-
-  // ── 기존 더미 종목 (매핑만 유지, 추후 정리) ──
-  samsung:       { category: "A_CORE",        sectors: ["SEMICONDUCTOR"] },
-  hyundai:       { category: "B_EVENT",       sectors: ["AUTO"] },
-  woritech:      { category: "D_SPECULATIVE", sectors: ["MICROCAP", "NUCLEAR"] },
-  xel:           { category: "A_CORE",        sectors: ["ENERGY", "POWER_INFRA"] },
-  gev:           { category: "B_EVENT",       sectors: ["ENERGY", "NUCLEAR"] },
-  hanwhaocean:   { category: "A_CORE",        sectors: ["SHIPBUILDING", "DEFENSE"] },
-  samsunghi:     { category: "A_CORE",        sectors: ["SHIPBUILDING"] },
-  samsungsdi:    { category: "B_EVENT",       sectors: ["BATTERY"] },
-  hyundaimarine: { category: "C_CONTRARIAN",  sectors: ["INSURANCE"] },
 };
 
 export function getStockMetadata(stockId: string): StockMetadata {

@@ -365,7 +365,7 @@ export default function StockDetailScreen() {
       </ScrollView>
 
       {/* stub 종목: AI 분석 중 전체 로딩 화면 */}
-      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "공매도" && activeTab !== "과열진단" ? (
+      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#F59E0B" />
           <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
@@ -375,7 +375,7 @@ export default function StockDetailScreen() {
             분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
           </Text>
         </View>
-      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "공매도" && activeTab !== "과열진단" ? (
+      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={c.tint} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>
@@ -389,7 +389,7 @@ export default function StockDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
         >
-          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "공매도" && activeTab !== "과열진단" && (
+          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && (
             <>
               <View style={styles.descriptionBox}>
                 <Text style={[styles.description, { color: c.textSecondary }]}>
