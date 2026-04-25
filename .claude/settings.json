@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm build)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm --filter *:typecheck)",
+      "Bash(pnpm --filter *:build)",
+      "Bash(pnpm --filter *:lint)",
+      "Bash(pnpm --filter *:test)",
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git diff)",
+      "Bash(git diff:*)",
+      "Bash(git log)",
+      "Bash(git log:*)",
+      "Bash(git branch)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull --ff-only:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh repo view:*)",
+      "Bash(node --version)",
+      "Bash(pnpm --version)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)"
+    ]
+  }
+}
