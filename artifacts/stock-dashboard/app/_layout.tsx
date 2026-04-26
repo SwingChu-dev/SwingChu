@@ -21,6 +21,7 @@ import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
 import { PortfolioProvider, usePortfolio } from "@/context/PortfolioContext";
 import { TargetTiersProvider, useTargetTiers } from "@/context/TargetTiersContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import AlertBanner from "@/components/AlertBanner";
 import EarningsAlertScheduler from "@/components/EarningsAlertScheduler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -170,6 +171,10 @@ function RootLayoutNav() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
+          name="settings"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
           name="import-screenshot"
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
@@ -248,27 +253,29 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
-            <KeyboardProvider>
-              <WatchlistProvider>
-                <PortfolioProvider>
-                  <EnrichmentProvider>
-                    <AISignalBridge>
-                      <PriceBridge>
-                        <AlertProvider>
-                          <TargetTiersProvider>
-                            <RootLayoutNav />
-                          </TargetTiersProvider>
-                        </AlertProvider>
-                      </PriceBridge>
-                    </AISignalBridge>
-                  </EnrichmentProvider>
-                </PortfolioProvider>
-              </WatchlistProvider>
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
+        <ThemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView>
+              <KeyboardProvider>
+                <WatchlistProvider>
+                  <PortfolioProvider>
+                    <EnrichmentProvider>
+                      <AISignalBridge>
+                        <PriceBridge>
+                          <AlertProvider>
+                            <TargetTiersProvider>
+                              <RootLayoutNav />
+                            </TargetTiersProvider>
+                          </AlertProvider>
+                        </PriceBridge>
+                      </AISignalBridge>
+                    </EnrichmentProvider>
+                  </PortfolioProvider>
+                </WatchlistProvider>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </QueryClientProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
