@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl,
@@ -10,7 +10,7 @@ import Svg, {
   Path, Circle, Line, Text as SvgText, Defs, LinearGradient, Stop, G,
 } from "react-native-svg";
 
-import { useMarketIntel, CyclePhase, FgLevel, Severity } from "@/hooks/useMarketIntel";
+import { useMarketIntel, CyclePhase, FgLevel, Severity, Market } from "@/hooks/useMarketIntel";
 
 // ── 디자인 토큰 (HTML 시안의 색상) ─────────────────────────────────────────
 const T = {
@@ -197,7 +197,8 @@ function FgGauge({ score, level }: { score: number; level: FgLevel }) {
 export default function MarketCycleScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data, loading, error, refresh } = useMarketIntel();
+  const [market, setMarket] = useState<Market>("us");
+  const { data, loading, error, refresh } = useMarketIntel(market);
 
   const dateStr = useMemo(() => {
     const d = data?.asOf ? new Date(data.asOf) : new Date();
@@ -219,6 +220,27 @@ export default function MarketCycleScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* 시장 토글 */}
+      <View style={s.tabRow}>
+        {([
+          { id: "us" as Market, label: "미장",   sub: "S&P 500 · VIX" },
+          { id: "kr" as Market, label: "국장",   sub: "KOSPI · 변동성" },
+        ]).map((t) => {
+          const active = market === t.id;
+          return (
+            <TouchableOpacity
+              key={t.id}
+              style={[s.tab, active && s.tabActive]}
+              onPress={() => setMarket(t.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={[s.tabLabel, active && s.tabLabelActive]}>{t.label}</Text>
+              <Text style={[s.tabSub, active && s.tabSubActive]}>{t.sub}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={T.gold}/>}
@@ -233,8 +255,8 @@ export default function MarketCycleScreen() {
           </Text>
           <View style={s.metaRow}>
             <Text style={s.meta}>{dateStr}</Text>
-            {data && <Text style={s.meta}>S&P 500 · {data.spx.price.toLocaleString()}</Text>}
-            {data && <Text style={s.meta}>VIX · {data.vix.price.toFixed(1)}</Text>}
+            {data && <Text style={s.meta}>{data.index.name} · {data.index.price.toLocaleString()}</Text>}
+            {data && <Text style={s.meta}>{data.volIndex.name} · {data.volIndex.price.toFixed(1)}</Text>}
           </View>
         </View>
 
@@ -393,6 +415,21 @@ const s = StyleSheet.create({
   },
   backBtn:     { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
   headerTitle: { color: T.gold, fontSize: 14, fontFamily: "Inter_700Bold", letterSpacing: 2 },
+
+  tabRow:      {
+    flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: T.lineStr,
+  },
+  tab:         {
+    flex: 1, paddingVertical: 10, paddingHorizontal: 12,
+    borderWidth: 1, borderColor: T.line, backgroundColor: T.bgInset,
+    borderRadius: 2, alignItems: "center", gap: 2,
+  },
+  tabActive:   { borderColor: T.amber, backgroundColor: "rgba(212,168,85,0.08)" },
+  tabLabel:    { color: T.inkDim, fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  tabLabelActive: { color: T.amber },
+  tabSub:      { color: T.inkMuted, fontSize: 9, letterSpacing: 0.8 },
+  tabSubActive: { color: T.gold },
 
   heroWrap:    { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: T.lineStr },
   eyebrowRow:  { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
