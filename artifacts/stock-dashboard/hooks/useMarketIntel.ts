@@ -7,8 +7,12 @@ export type CyclePhase =
 
 export type FgLevel = "EXTREME_FEAR" | "FEAR" | "NEUTRAL" | "GREED" | "EXTREME_GREED";
 export type Severity = "HIGH" | "MEDIUM" | "LOW";
+export type Market = "us" | "kr";
 
 export interface MarketIntel {
+  market: Market;
+  index:    { name: string; symbol: string; price: number; changePercent: number };
+  volIndex: { name: string; symbol: string; price: number; changePercent: number };
   cycle: {
     phase: CyclePhase;
     phaseKr: string;
@@ -38,26 +42,28 @@ export interface MarketIntel {
     metric: string;
     description: string;
   }>;
-  spx: { price: number; changePercent: number };
-  vix: { price: number; changePercent: number };
   asOf: string;
 }
 
 const CACHE_TTL = 15 * 60 * 1000;
-let _cache: { data: MarketIntel; ts: number } | null = null;
+const _cache: Partial<Record<Market, { data: MarketIntel; ts: number }>> = {};
 
-export function useMarketIntel() {
-  const [data,    setData]    = useState<MarketIntel | null>(_cache?.data ?? null);
+export function useMarketIntel(market: Market = "us") {
+  const [data,    setData]    = useState<MarketIntel | null>(_cache[market]?.data ?? null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
   const load = useCallback(async (force = false) => {
-    if (!force && _cache && Date.now() - _cache.ts < CACHE_TTL) {
-      setData(_cache.data); return;
+    const hit = _cache[market];
+    if (!force && hit && Date.now() - hit.ts < CACHE_TTL) {
+      setData(hit.data); return;
     }
     setLoading(true);
     try {
-      const url  = `${API_BASE}/market/intel${force ? "?refresh=1" : ""}`;
+      const params = new URLSearchParams();
+      params.set("market", market);
+      if (force) params.set("refresh", "1");
+      const url  = `${API_BASE}/market/intel?${params.toString()}`;
       const res  = await fetch(url);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -68,7 +74,7 @@ export function useMarketIntel() {
       if (!json?.cycle?.phase || !json?.fearGreed || !Array.isArray(json?.risks)) {
         throw new Error("응답 형식 오류");
       }
-      _cache = { data: json, ts: Date.now() };
+      _cache[market] = { data: json, ts: Date.now() };
       setData(json);
       setError(null);
     } catch (e: any) {
@@ -76,9 +82,15 @@ export function useMarketIntel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [market]);
 
-  useEffect(() => { load(); }, [load]);
+  // market이 바뀌면 해당 캐시 hit이 있으면 즉시 표시, 없으면 fetch
+  useEffect(() => {
+    const hit = _cache[market];
+    setData(hit?.data ?? null);
+    setError(null);
+    load();
+  }, [market, load]);
 
   return { data, loading, error, refresh: () => load(true) };
 }
