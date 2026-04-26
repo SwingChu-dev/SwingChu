@@ -107,6 +107,18 @@ export default function MoreScreen() {
           />
         </View>
 
+        {/* 환경설정 */}
+        <SectionHeader title="환경설정" />
+        <View style={styles.section}>
+          <MenuItem
+            icon="contrast-outline"
+            iconColor="#0064FF"
+            title="테마"
+            description="시스템 / 라이트 / 다크 선택"
+            onPress={() => router.push("/settings" as any)}
+          />
+        </View>
+
         {/* 앱 정보 */}
         <SectionHeader title="앱 정보" />
         <View style={styles.section}>
