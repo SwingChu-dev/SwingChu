@@ -12,7 +12,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/REPLACE_WITH_PROJECT_ID"
+      "url": "https://u.expo.dev/aee91b67-b0e2-4588-b8c3-69f1c3852b2b"
     },
     "splash": {
       "image": "./assets/images/splash-icon.png",
@@ -36,7 +36,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_PROJECT_ID"
+        "projectId": "aee91b67-b0e2-4588-b8c3-69f1c3852b2b"
       }
     },
     "plugins": [
