@@ -51,6 +51,18 @@ export interface MarketIntel {
     metric: string;
     description: string;
   }>;
+  capitalRotation: {
+    phase:    "RECOVERY" | "EXPANSION" | "OVERHEAT" | "SLOWDOWN";
+    phaseKr:  string;
+    phaseEn:  string;
+    leader:   "bonds" | "stocks" | "commodities" | "none";
+    rationale: string;
+    assets: {
+      bonds:       { ticker: string; name: string; return1m: number; return3m: number };
+      stocks:      { ticker: string; name: string; return1m: number; return3m: number };
+      commodities: { ticker: string; name: string; return1m: number; return3m: number };
+    };
+  };
   asOf: string;
 }
 
@@ -164,6 +176,105 @@ function estimateCycle(args: {
   return "OPTIMISM";
 }
 
+// ── 자본순환 사이클 (Pring 인터마켓 4단계) ─────────────────────────────────
+// 입력: TLT(채권), 주식 지수, DBC(원자재) 의 1M/3M 수익률
+// 4단계 매핑:
+//  - RECOVERY  (회복):  채권↑ 주식 약세에서 반등 시작 — 금리 하락, 침체 통과 직전
+//  - EXPANSION (확장):  주식↑ 원자재 약~중 — 본격 강세, 인플레이션 아직 잠잠
+//  - OVERHEAT  (과열):  원자재↑ 채권↓ — 인플레이션 압력, 금리 상승
+//  - SLOWDOWN  (둔화):  주식·원자재 약세 — 침체 진입, 채권 회복 시작 가능
+function pctReturnFromHist(closes: number[], lookbackDays: number): number {
+  if (closes.length < lookbackDays + 1) return 0;
+  const past = closes[closes.length - 1 - lookbackDays];
+  const now  = closes[closes.length - 1];
+  return past > 0 ? ((now - past) / past) * 100 : 0;
+}
+
+function buildCapitalRotation(args: {
+  bondsCloses: number[];
+  stocksCloses: number[];
+  commCloses: number[];
+  bondsName: string;  bondsTicker: string;
+  stocksName: string; stocksTicker: string;
+  commName: string;   commTicker: string;
+}): MarketIntel["capitalRotation"] {
+  const bondsRet1m  = pctReturnFromHist(args.bondsCloses, 22);
+  const stocksRet1m = pctReturnFromHist(args.stocksCloses, 22);
+  const commRet1m   = pctReturnFromHist(args.commCloses, 22);
+  const bondsRet3m  = pctReturnFromHist(args.bondsCloses, 66);
+  const stocksRet3m = pctReturnFromHist(args.stocksCloses, 66);
+  const commRet3m   = pctReturnFromHist(args.commCloses, 66);
+
+  const { phase, leader } = classifyCapitalRotation({ bondsRet3m, stocksRet3m, commRet3m });
+  const phaseInfo = CAP_ROTATION_KR[phase];
+
+  const fmt = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+  const rationale = [
+    `${args.bondsName} 3M ${fmt(bondsRet3m)}`,
+    `${args.stocksName} 3M ${fmt(stocksRet3m)}`,
+    `${args.commName} 3M ${fmt(commRet3m)}`,
+  ].join(" · ");
+
+  return {
+    phase,
+    phaseKr: phaseInfo.kr,
+    phaseEn: phaseInfo.en,
+    leader,
+    rationale,
+    assets: {
+      bonds:       { ticker: args.bondsTicker,  name: args.bondsName,  return1m: Math.round(bondsRet1m  * 100) / 100, return3m: Math.round(bondsRet3m  * 100) / 100 },
+      stocks:      { ticker: args.stocksTicker, name: args.stocksName, return1m: Math.round(stocksRet1m * 100) / 100, return3m: Math.round(stocksRet3m * 100) / 100 },
+      commodities: { ticker: args.commTicker,   name: args.commName,   return1m: Math.round(commRet1m   * 100) / 100, return3m: Math.round(commRet3m   * 100) / 100 },
+    },
+  };
+}
+
+function classifyCapitalRotation(args: {
+  bondsRet3m:  number;
+  stocksRet3m: number;
+  commRet3m:   number;
+}): { phase: "RECOVERY" | "EXPANSION" | "OVERHEAT" | "SLOWDOWN"; leader: "bonds" | "stocks" | "commodities" | "none" } {
+  const { bondsRet3m, stocksRet3m, commRet3m } = args;
+  const positives = [
+    { key: "bonds"       as const, val: bondsRet3m  },
+    { key: "stocks"      as const, val: stocksRet3m },
+    { key: "commodities" as const, val: commRet3m   },
+  ].filter(a => a.val > 0).sort((a, b) => b.val - a.val);
+
+  // 모두 약세 → 둔화
+  if (positives.length === 0) {
+    return { phase: "SLOWDOWN", leader: "none" };
+  }
+
+  const leader = positives[0].key;
+
+  // 채권 단독 강세 또는 채권+주식 → 회복 (금리 사이클 turn)
+  if (leader === "bonds" && stocksRet3m < 0 && commRet3m < 0) {
+    return { phase: "RECOVERY", leader: "bonds" };
+  }
+  // 원자재가 채권보다 강세 → 과열
+  if (commRet3m > bondsRet3m && commRet3m > 0) {
+    return { phase: "OVERHEAT", leader: "commodities" };
+  }
+  // 주식 강세, 원자재 약 → 확장
+  if (leader === "stocks") {
+    return { phase: "EXPANSION", leader: "stocks" };
+  }
+  // 채권+주식 동반 강세 (둘 다 > 0) → 회복 후반/확장 초입
+  if (bondsRet3m > 0 && stocksRet3m > 0 && commRet3m <= 0) {
+    return { phase: "RECOVERY", leader };
+  }
+  // fallback
+  return { phase: "EXPANSION", leader };
+}
+
+const CAP_ROTATION_KR: Record<"RECOVERY" | "EXPANSION" | "OVERHEAT" | "SLOWDOWN", { kr: string; en: string }> = {
+  RECOVERY:  { kr: "회복",   en: "Recovery"   },
+  EXPANSION: { kr: "확장",   en: "Expansion"  },
+  OVERHEAT:  { kr: "과열",   en: "Overheat"   },
+  SLOWDOWN:  { kr: "둔화",   en: "Slowdown"   },
+};
+
 function nextRiskPhase(p: CyclePhase): CyclePhase {
   const order: CyclePhase[] = [
     "DISBELIEF", "HOPE", "OPTIMISM", "BELIEF", "THRILL", "EUPHORIA",
@@ -176,7 +287,7 @@ function nextRiskPhase(p: CyclePhase): CyclePhase {
 // ── 미국 시장 빌더 ─────────────────────────────────────────────────────────
 async function buildUsIntel(): Promise<MarketIntel | { error: string; message: string; detail: any; asOf: string; status: number }> {
   // 병렬 fetch
-  const [spxQ, vixQ, oilQ, goldQ, dxyQ, tnxQ, irxQ, hygQ, lqdQ, ndxQ, spxHist, ndxHist, vixHist, goldHist] = await Promise.all([
+  const [spxQ, vixQ, oilQ, goldQ, dxyQ, tnxQ, irxQ, hygQ, lqdQ, ndxQ, spxHist, ndxHist, vixHist, goldHist, tltHist, dbcHist] = await Promise.all([
     fetchQuote("^GSPC"),
     fetchQuote("^VIX"),
     fetchQuote("CL=F"),
@@ -191,6 +302,8 @@ async function buildUsIntel(): Promise<MarketIntel | { error: string; message: s
     fetchHistory("^IXIC", 30),
     fetchHistory("^VIX", 35),
     fetchHistory("GC=F", 30),
+    fetchHistory("TLT", 100),  // 20Y+ Treasury — 자본순환 채권 입력
+    fetchHistory("DBC", 100),  // 광범위 원자재 — 자본순환 원자재 입력
   ]);
 
   // ── 데이터 가용성 게이트 — 핵심 입력이 없으면 명시적 503 반환 ──────────
@@ -498,6 +611,14 @@ async function buildUsIntel(): Promise<MarketIntel | { error: string; message: s
       })),
     },
     risks,
+    capitalRotation: buildCapitalRotation({
+      bondsCloses:  tltHist.map(h => h.close),
+      stocksCloses: spxCloses,
+      commCloses:   dbcHist.map(h => h.close),
+      bondsName:    "장기국채(TLT)", bondsTicker:  "TLT",
+      stocksName:   "S&P 500",       stocksTicker: "^GSPC",
+      commName:     "원자재(DBC)",   commTicker:   "DBC",
+    }),
     asOf: new Date().toISOString(),
   };
 
@@ -521,7 +642,7 @@ function histVol20(closes: number[]): number {
 }
 
 async function buildKrIntel(): Promise<MarketIntel | { error: string; message: string; detail: any; asOf: string; status: number }> {
-  const [kospiQ, kosdaqQ, kospi200Q, krwQ, spxQ, oilQ, kospiHist, kosdaqHist, spxHist, krwHist] = await Promise.all([
+  const [kospiQ, kosdaqQ, kospi200Q, krwQ, spxQ, oilQ, kospiHist, kosdaqHist, spxHist, krwHist, tltHist, dbcHist] = await Promise.all([
     fetchQuote("^KS11"),     // KOSPI
     fetchQuote("^KQ11"),     // KOSDAQ
     fetchQuote("^KS200"),    // KOSPI 200
@@ -530,8 +651,10 @@ async function buildKrIntel(): Promise<MarketIntel | { error: string; message: s
     fetchQuote("CL=F"),      // 원유 (제조업 비중 큰 한국 영향)
     fetchHistory("^KS11", 220),
     fetchHistory("^KQ11", 60),
-    fetchHistory("^GSPC", 30),
+    fetchHistory("^GSPC", 100),
     fetchHistory("KRW=X", 30),
+    fetchHistory("TLT", 100),  // 자본순환 글로벌 채권
+    fetchHistory("DBC", 100),  // 자본순환 글로벌 원자재
   ]);
 
   if (!kospiQ.price || kospiHist.length < 50) {
@@ -804,6 +927,14 @@ async function buildKrIntel(): Promise<MarketIntel | { error: string; message: s
       })),
     },
     risks,
+    capitalRotation: buildCapitalRotation({
+      bondsCloses:  tltHist.map(h => h.close),
+      stocksCloses: spxCloses,
+      commCloses:   dbcHist.map(h => h.close),
+      bondsName:    "장기국채(TLT)", bondsTicker:  "TLT",
+      stocksName:   "S&P 500",       stocksTicker: "^GSPC",
+      commName:     "원자재(DBC)",   commTicker:   "DBC",
+    }),
     asOf: new Date().toISOString(),
   };
 

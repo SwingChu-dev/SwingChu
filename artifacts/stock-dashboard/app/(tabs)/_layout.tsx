@@ -77,7 +77,26 @@ export default function TabLayout() {
             ),
         }}
       />
-      <Tabs.Screen name="more" options={{ href: null }} />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: "설정",
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView
+                name={focused ? "gearshape.fill" : "gearshape"}
+                tintColor={color}
+                size={24}
+              />
+            ) : (
+              <Ionicons
+                name={focused ? "settings" : "settings-outline"}
+                size={22}
+                color={color}
+              />
+            ),
+        }}
+      />
 
     </Tabs>
   );

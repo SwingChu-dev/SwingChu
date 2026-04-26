@@ -396,6 +396,86 @@ export default function MarketCycleScreen() {
               </View>
             </View>
 
+            {/* SECTION 4: 자본순환 사이클 */}
+            <View style={s.section}>
+              <View style={s.sectionHead}>
+                <Text style={s.sectionNum}>04</Text>
+                <Text style={s.h2}>자본순환 사이클 — Pring 인터마켓</Text>
+              </View>
+              <Text style={s.sectionNote}>
+                채권·주식·원자재 3개월 상대강도로 본 글로벌 자본 순환 단계.{" "}
+                <Text style={{ color: T.amber, fontWeight: "700" }}>
+                  {data.capitalRotation.phaseKr}({data.capitalRotation.phaseEn})
+                </Text>{" "}
+                구간.
+              </Text>
+
+              <View style={s.card}>
+                {/* 4단계 사분면 */}
+                <View style={s.capGrid}>
+                  {([
+                    { key: "RECOVERY"  as const, label: "회복",   en: "Recovery",   sub: "채권↑ 주식 바닥" },
+                    { key: "EXPANSION" as const, label: "확장",   en: "Expansion",  sub: "주식↑ 인플레 잠잠" },
+                    { key: "OVERHEAT"  as const, label: "과열",   en: "Overheat",   sub: "원자재↑ 금리상승" },
+                    { key: "SLOWDOWN"  as const, label: "둔화",   en: "Slowdown",   sub: "주식·원자재 약세" },
+                  ]).map((p) => {
+                    const active = p.key === data.capitalRotation.phase;
+                    return (
+                      <View
+                        key={p.key}
+                        style={[
+                          s.capCell,
+                          active && { borderColor: T.amber, backgroundColor: "rgba(212,168,85,0.08)" },
+                        ]}
+                      >
+                        <Text style={[s.capLabel, active && { color: T.amber }]}>{p.label}</Text>
+                        <Text style={[s.capLabelEn, active && { color: T.gold }]}>{p.en}</Text>
+                        <Text style={s.capSub}>{p.sub}</Text>
+                        {active && <Text style={s.capCurrent}>▲ 현재</Text>}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* 자산별 1M/3M 수익률 */}
+                <View style={s.capAssets}>
+                  {([
+                    { key: "bonds"       as const, color: T.fear  },
+                    { key: "stocks"      as const, color: T.amber },
+                    { key: "commodities" as const, color: T.greed },
+                  ]).map(({ key, color }) => {
+                    const a = data.capitalRotation.assets[key];
+                    const isLeader = data.capitalRotation.leader === key;
+                    return (
+                      <View key={key} style={s.capAssetRow}>
+                        <View style={{ flex: 1.4, gap: 2 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <View style={[s.capDot, { backgroundColor: color }]}/>
+                            <Text style={s.capAssetName}>{a.name}</Text>
+                            {isLeader && <Text style={s.capLeaderTag}>LEADER</Text>}
+                          </View>
+                        </View>
+                        <View style={{ flex: 1, alignItems: "flex-end" }}>
+                          <Text style={s.capRetLabel}>1M</Text>
+                          <Text style={[s.capRetVal, { color: a.return1m >= 0 ? T.greed : T.fear }]}>
+                            {a.return1m >= 0 ? "+" : ""}{a.return1m.toFixed(1)}%
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, alignItems: "flex-end" }}>
+                          <Text style={s.capRetLabel}>3M</Text>
+                          <Text style={[s.capRetVal, { color: a.return3m >= 0 ? T.greed : T.fear }]}>
+                            {a.return3m >= 0 ? "+" : ""}{a.return3m.toFixed(1)}%
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <Text style={s.cycleRationale}>{data.capitalRotation.rationale}</Text>
+              </View>
+            </View>
+
             <Text style={s.footer}>
               데이터 · Yahoo Finance{"\n"}최종 업데이트 · {new Date(data.asOf).toLocaleString("ko-KR")}
             </Text>
@@ -498,6 +578,31 @@ const s = StyleSheet.create({
   sevTxt:      { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1 },
   riskMetric:  { color: T.gold, fontSize: 10, marginTop: 2, letterSpacing: 0.4 },
   riskDesc:    { color: T.inkDim, fontSize: 12, lineHeight: 18, marginTop: 2 },
+
+  capGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  capCell:     {
+    width: "48%", borderWidth: 1, borderColor: T.line, padding: 12, borderRadius: 4,
+    backgroundColor: T.bgInset, gap: 2,
+  },
+  capLabel:    { color: T.ink,      fontSize: 14, fontFamily: "Inter_700Bold" },
+  capLabelEn:  { color: T.inkMuted, fontSize: 10, fontStyle: "italic" },
+  capSub:      { color: T.inkDim,   fontSize: 10, marginTop: 4, lineHeight: 14 },
+  capCurrent:  { color: T.amber,    fontSize: 10, fontFamily: "Inter_700Bold", marginTop: 4 },
+
+  capAssets:   {
+    paddingTop: 14, marginTop: 8, gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: T.line,
+  },
+  capAssetRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  capDot:      { width: 8, height: 8, borderRadius: 4 },
+  capAssetName:{ color: T.ink, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  capLeaderTag:{
+    color: T.amber, fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 1,
+    paddingHorizontal: 5, paddingVertical: 1,
+    borderWidth: 1, borderColor: T.amber, borderRadius: 2, marginLeft: 4,
+  },
+  capRetLabel: { color: T.inkMuted, fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
+  capRetVal:   { fontSize: 13, fontFamily: "Inter_700Bold" },
 
   footer:      {
     color: T.inkMuted, fontStyle: "italic", textAlign: "center",
