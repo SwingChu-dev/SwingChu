@@ -176,13 +176,14 @@ function nextRiskPhase(p: CyclePhase): CyclePhase {
 // ── 미국 시장 빌더 ─────────────────────────────────────────────────────────
 async function buildUsIntel(): Promise<MarketIntel | { error: string; message: string; detail: any; asOf: string; status: number }> {
   // 병렬 fetch
-  const [spxQ, vixQ, oilQ, goldQ, dxyQ, tnxQ, hygQ, lqdQ, ndxQ, spxHist, ndxHist, vixHist, goldHist] = await Promise.all([
+  const [spxQ, vixQ, oilQ, goldQ, dxyQ, tnxQ, irxQ, hygQ, lqdQ, ndxQ, spxHist, ndxHist, vixHist, goldHist] = await Promise.all([
     fetchQuote("^GSPC"),
     fetchQuote("^VIX"),
     fetchQuote("CL=F"),
     fetchQuote("GC=F"),
     fetchQuote("DX-Y.NYB"),
     fetchQuote("^TNX"),       // 10Y yield (×10)
+    fetchQuote("^IRX"),       // 13W T-Bill (×100, KIS-style scaling differs — Yahoo returns rate ×1)
     fetchQuote("HYG"),
     fetchQuote("LQD"),
     fetchQuote("^IXIC"),
@@ -217,6 +218,11 @@ async function buildUsIntel(): Promise<MarketIntel | { error: string; message: s
   const spx52wHighDistPct = spxQ.high52w > 0 ? ((spxPrice - spxQ.high52w) / spxQ.high52w) * 100 : 0;
   const oneMoBack         = spxCloses.length >= 22 ? spxCloses[spxCloses.length - 22] : spxPrice;
   const oneMoReturn       = oneMoBack > 0 ? ((spxPrice - oneMoBack) / oneMoBack) * 100 : 0;
+
+  // Yahoo는 ^TNX/^IRX를 percent 단위로 직접 반환 (예: 4.31 = 4.31%)
+  const tnxYield   = tnxQ.price;
+  const irxYield   = irxQ.price;
+  const yieldCurve = tnxYield - irxYield;  // 10Y - 3M 스프레드. 음수 = 역전
 
   // ── F&G 컴포넌트 ────────────────────────────────────────────────────────
   // 1) 시장 모멘텀: SPX vs 125일선
@@ -279,20 +285,30 @@ async function buildUsIntel(): Promise<MarketIntel | { error: string; message: s
     spx52wHighDistPct >= -10  ? 32 :
     spx52wHighDistPct >= -20  ? 18 : 8;
 
+  // 8) 수익률 곡선 (10Y-3M): 가장 검증된 경기 사이클 선행 지표.
+  // 가파른 양 = 초중기 확장 = 탐욕, 평탄/역전 = 후기/침체 경고 = 공포
+  const yieldCurveScore =
+    yieldCurve >= 2.0  ? 80 :
+    yieldCurve >= 1.0  ? 65 :
+    yieldCurve >= 0.5  ? 50 :
+    yieldCurve >= 0.0  ? 35 :
+    yieldCurve >= -0.3 ? 22 : 10;
+
   const components = [
-    { key: "momentum", labelKr: "시장 모멘텀",   labelEn: "Market Momentum — S&P 500 vs 125일선", score: momentumScore, detail: `${spxVs125Pct >= 0 ? "+" : ""}${spxVs125Pct.toFixed(1)}%` },
-    { key: "putcall",  labelKr: "풋/콜 비율",     labelEn: "Put/Call Options",                     score: putCallScore,  detail: `VIX ${vixQ.price.toFixed(1)} 기반 추정` },
-    { key: "safe",     labelKr: "안전자산 수요",  labelEn: "Safe Haven Demand — 주식 vs 금 5일 수익률", score: safeHavenScore, detail: `S&P ${spx5dRet >= 0 ? "+" : ""}${spx5dRet.toFixed(1)}% vs 금 ${gold5dRet >= 0 ? "+" : ""}${gold5dRet.toFixed(1)}%` },
-    { key: "breadth",  labelKr: "상승종목 폭",    labelEn: "Stock Price Breadth",                  score: breadthScore,  detail: `1M ${oneMoReturn >= 0 ? "+" : ""}${oneMoReturn.toFixed(1)}%` },
-    { key: "vix",      labelKr: "시장 변동성 (VIX)", labelEn: "Market Volatility",                  score: vixScore,      detail: `VIX ${vixQ.price.toFixed(2)}` },
-    { key: "junk",     labelKr: "정크본드 수요",  labelEn: "Junk Bond Demand",                     score: junkScore,     detail: `HYG-LQD ${junkSpread >= 0 ? "+" : ""}${junkSpread.toFixed(2)}%` },
-    { key: "strength", labelKr: "주가 강도",      labelEn: "Stock Price Strength (신고가/신저가)", score: strengthScore, detail: `52w 고점 대비 ${spx52wHighDistPct.toFixed(1)}%` },
+    { key: "momentum",   labelKr: "시장 모멘텀",     labelEn: "Market Momentum — S&P 500 vs 125일선",       score: momentumScore,   detail: `${spxVs125Pct >= 0 ? "+" : ""}${spxVs125Pct.toFixed(1)}%` },
+    { key: "putcall",    labelKr: "풋/콜 비율",       labelEn: "Put/Call Options",                              score: putCallScore,    detail: `VIX ${vixQ.price.toFixed(1)} 기반 추정` },
+    { key: "safe",       labelKr: "안전자산 수요",    labelEn: "Safe Haven Demand — 주식 vs 금 5일 수익률",     score: safeHavenScore,  detail: `S&P ${spx5dRet >= 0 ? "+" : ""}${spx5dRet.toFixed(1)}% vs 금 ${gold5dRet >= 0 ? "+" : ""}${gold5dRet.toFixed(1)}%` },
+    { key: "breadth",    labelKr: "상승종목 폭",      labelEn: "Stock Price Breadth",                          score: breadthScore,    detail: `1M ${oneMoReturn >= 0 ? "+" : ""}${oneMoReturn.toFixed(1)}%` },
+    { key: "vix",        labelKr: "시장 변동성 (VIX)", labelEn: "Market Volatility",                            score: vixScore,        detail: `VIX ${vixQ.price.toFixed(2)}` },
+    { key: "junk",       labelKr: "정크본드 수요",    labelEn: "Junk Bond Demand",                             score: junkScore,       detail: `HYG-LQD ${junkSpread >= 0 ? "+" : ""}${junkSpread.toFixed(2)}%` },
+    { key: "strength",   labelKr: "주가 강도",        labelEn: "Stock Price Strength (신고가/신저가)",         score: strengthScore,   detail: `52w 고점 대비 ${spx52wHighDistPct.toFixed(1)}%` },
+    { key: "yieldcurve", labelKr: "수익률 곡선",      labelEn: "Yield Curve 10Y-3M (경기 사이클 선행 지표)",   score: yieldCurveScore, detail: `10Y ${tnxYield.toFixed(2)}% − 3M ${irxYield.toFixed(2)}% = ${yieldCurve >= 0 ? "+" : ""}${yieldCurve.toFixed(2)}%${yieldCurve < 0 ? " (역전)" : ""}` },
   ];
 
   const fgScore = Math.round(
-    (momentumScore * 0.20) + (putCallScore * 0.15) + (safeHavenScore * 0.10) +
-    (breadthScore  * 0.15) + (vixScore     * 0.20) + (junkScore     * 0.10) +
-    (strengthScore * 0.10)
+    (momentumScore   * 0.18) + (putCallScore    * 0.13) + (safeHavenScore  * 0.09) +
+    (breadthScore    * 0.14) + (vixScore        * 0.18) + (junkScore       * 0.08) +
+    (strengthScore   * 0.08) + (yieldCurveScore * 0.12)
   );
   const fg = classifyFG(fgScore);
 
@@ -359,23 +375,30 @@ async function buildUsIntel(): Promise<MarketIntel | { error: string; message: s
     });
   }
 
-  // 3) 10년물 금리
-  const tnxYield = tnxQ.price / 10; // ^TNX 는 ×10 표기
-  if (tnxYield >= 4.5) {
+  // 3) 수익률 곡선 (10Y-3M) — 가장 검증된 경기 사이클 선행 지표
+  if (yieldCurve < -0.3) {
+    risks.push({
+      severity:   "HIGH",
+      category:   "매크로 · Yield Curve",
+      title:      "수익률 곡선 깊은 역전 — 침체 경고",
+      metric:     `10Y ${tnxYield.toFixed(2)}% − 3M ${irxYield.toFixed(2)}% = ${yieldCurve.toFixed(2)}%`,
+      description:"10Y-3M 스프레드 -0.3% 이하 깊은 역전은 통상 12~24개월 내 경기침체 선행. 1980년대 이후 이 신호는 7회 중 6회 침체로 이어졌음.",
+    });
+  } else if (yieldCurve < 0) {
     risks.push({
       severity:   "MEDIUM",
-      category:   "매크로 · Rates",
-      title:      "10년물 금리 4.5% 임계선 돌파",
-      metric:     `US 10Y ${tnxYield.toFixed(2)}% / 임계 4.5%`,
-      description:"10년물이 4.5% 위로 지속 돌파 시 주식·채권 모두에 추가 압력. 60/40 분산이 작동하지 않는 구간이 길어지는 중.",
+      category:   "매크로 · Yield Curve",
+      title:      "수익률 곡선 역전",
+      metric:     `10Y ${tnxYield.toFixed(2)}% − 3M ${irxYield.toFixed(2)}% = ${yieldCurve.toFixed(2)}%`,
+      description:"10Y가 3M 아래로 떨어진 상태. 연준의 단기 긴축이 장기 성장 기대를 짓누르는 후기 사이클 신호.",
     });
-  } else if (tnxYield >= 4.0) {
+  } else if (yieldCurve < 0.3 && tnxYield >= 4.0) {
     risks.push({
       severity:   "LOW",
-      category:   "매크로 · Rates",
-      title:      "10년물 금리 4% 상회",
-      metric:     `US 10Y ${tnxYield.toFixed(2)}%`,
-      description:"4.5% 임계선 접근 중. 금리 추가 상승 시 그로스 주식 밸류에이션 압박.",
+      category:   "매크로 · Yield Curve",
+      title:      "곡선 평탄화 + 고금리",
+      metric:     `스프레드 +${yieldCurve.toFixed(2)}% / 10Y ${tnxYield.toFixed(2)}%`,
+      description:"역전은 아니지만 곡선이 평탄하고 절대 금리도 높음. 그로스 주식 밸류에이션 압박이 누적되는 후기 확장 구간.",
     });
   }
 
