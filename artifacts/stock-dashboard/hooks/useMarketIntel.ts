@@ -42,6 +42,18 @@ export interface MarketIntel {
     metric: string;
     description: string;
   }>;
+  capitalRotation: {
+    phase:    "RECOVERY" | "EXPANSION" | "OVERHEAT" | "SLOWDOWN";
+    phaseKr:  string;
+    phaseEn:  string;
+    leader:   "bonds" | "stocks" | "commodities" | "none";
+    rationale: string;
+    assets: {
+      bonds:       { ticker: string; name: string; return1m: number; return3m: number };
+      stocks:      { ticker: string; name: string; return1m: number; return3m: number };
+      commodities: { ticker: string; name: string; return1m: number; return3m: number };
+    };
+  };
   asOf: string;
 }
 
