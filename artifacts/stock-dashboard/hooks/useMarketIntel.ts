@@ -54,6 +54,19 @@ export interface MarketIntel {
       commodities: { ticker: string; name: string; return1m: number; return3m: number };
     };
   };
+  sectorRotation: {
+    phaseHint:    "EARLY" | "MID" | "LATE" | "DEFENSIVE" | "MIXED";
+    phaseHintKr:  string;
+    rationale:    string;
+    sectors: Array<{
+      ticker:     string;
+      name:       string;
+      group:      "growth" | "cyclical" | "energy_mat" | "defensive" | "financial";
+      return1m:   number;
+      return3m:   number;
+      relStr3m:   number;
+    }>;
+  };
   asOf: string;
 }
 

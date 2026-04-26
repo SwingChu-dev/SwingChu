@@ -63,6 +63,19 @@ export interface MarketIntel {
       commodities: { ticker: string; name: string; return1m: number; return3m: number };
     };
   };
+  sectorRotation: {
+    phaseHint:    "EARLY" | "MID" | "LATE" | "DEFENSIVE" | "MIXED";
+    phaseHintKr:  string;
+    rationale:    string;
+    sectors: Array<{
+      ticker:     string;
+      name:       string;
+      group:      "growth" | "cyclical" | "energy_mat" | "defensive" | "financial";
+      return1m:   number;
+      return3m:   number;
+      relStr3m:   number;   // sector 3M return - benchmark 3M return (%p)
+    }>;
+  };
   asOf: string;
 }
 
@@ -183,6 +196,82 @@ function estimateCycle(args: {
 //  - EXPANSION (확장):  주식↑ 원자재 약~중 — 본격 강세, 인플레이션 아직 잠잠
 //  - OVERHEAT  (과열):  원자재↑ 채권↓ — 인플레이션 압력, 금리 상승
 //  - SLOWDOWN  (둔화):  주식·원자재 약세 — 침체 진입, 채권 회복 시작 가능
+// ── 섹터 자본순환 (Stovall 모델 기반) ───────────────────────────────────
+// 12개 섹터 ETF: 11개 GICS + SOXX(반도체) 별도
+const SECTOR_ETFS: Array<{
+  ticker: string;
+  name:   string;
+  group:  "growth" | "cyclical" | "energy_mat" | "defensive" | "financial";
+}> = [
+  { ticker: "XLK",  name: "테크놀로지",       group: "growth"     },
+  { ticker: "SOXX", name: "반도체(SOX)",       group: "growth"     },
+  { ticker: "XLC",  name: "커뮤니케이션",      group: "growth"     },
+  { ticker: "XLY",  name: "경기소비재",        group: "cyclical"   },
+  { ticker: "XLI",  name: "산업재",            group: "cyclical"   },
+  { ticker: "XLB",  name: "소재",              group: "energy_mat" },
+  { ticker: "XLE",  name: "에너지",            group: "energy_mat" },
+  { ticker: "XLF",  name: "금융",              group: "financial"  },
+  { ticker: "XLRE", name: "리츠",              group: "financial"  },
+  { ticker: "XLV",  name: "헬스케어",          group: "defensive"  },
+  { ticker: "XLP",  name: "필수소비재",        group: "defensive"  },
+  { ticker: "XLU",  name: "유틸리티",          group: "defensive"  },
+];
+
+async function buildSectorRotation(benchmarkCloses: number[]): Promise<MarketIntel["sectorRotation"]> {
+  const benchRet3m = pctReturnFromHist(benchmarkCloses, 66);
+
+  const sectors = await Promise.all(
+    SECTOR_ETFS.map(async (s) => {
+      const hist = await fetchHistory(s.ticker, 100);
+      const closes = hist.map(h => h.close);
+      const r1m = pctReturnFromHist(closes, 22);
+      const r3m = pctReturnFromHist(closes, 66);
+      return {
+        ticker:   s.ticker,
+        name:     s.name,
+        group:    s.group,
+        return1m: Math.round(r1m * 100) / 100,
+        return3m: Math.round(r3m * 100) / 100,
+        relStr3m: Math.round((r3m - benchRet3m) * 100) / 100,
+      };
+    })
+  );
+
+  // 상대강도 내림차순 정렬
+  sectors.sort((a, b) => b.relStr3m - a.relStr3m);
+
+  // 단계 추정: 상위 3개 섹터의 group 분포로 사이클 단계 힌트
+  const top3 = sectors.slice(0, 3).map(s => s.group);
+  const has = (g: typeof top3[number]) => top3.includes(g);
+
+  let phaseHint: "EARLY" | "MID" | "LATE" | "DEFENSIVE" | "MIXED";
+  if (top3.filter(g => g === "defensive").length >= 2) {
+    phaseHint = "DEFENSIVE"; // 침체 임박/진행
+  } else if (has("financial") && (has("cyclical") || has("growth"))) {
+    phaseHint = "EARLY"; // 회복 초기
+  } else if (has("energy_mat") && top3.filter(g => g === "energy_mat").length >= 2) {
+    phaseHint = "LATE"; // 후기 확장 / 인플레
+  } else if (has("growth") && has("cyclical")) {
+    phaseHint = "MID"; // 본격 확장
+  } else {
+    phaseHint = "MIXED";
+  }
+
+  const phaseHintKr: Record<typeof phaseHint, string> = {
+    EARLY:     "회복 초기 — 금융+경기민감 리딩",
+    MID:       "확장 본격 — 성장+경기민감 리딩",
+    LATE:      "후기 확장 — 에너지/소재 리딩 (인플레)",
+    DEFENSIVE: "방어주 우세 — 후기 사이클/침체 임박",
+    MIXED:     "혼조 — 명확한 리더십 부재",
+  } as const;
+
+  const top = sectors.slice(0, 3).map(s => s.name).join(", ");
+  const bot = sectors.slice(-3).map(s => s.name).join(", ");
+  const rationale = `리더: ${top} · 약세: ${bot}`;
+
+  return { phaseHint, phaseHintKr: phaseHintKr[phaseHint], rationale, sectors };
+}
+
 function pctReturnFromHist(closes: number[], lookbackDays: number): number {
   if (closes.length < lookbackDays + 1) return 0;
   const past = closes[closes.length - 1 - lookbackDays];
@@ -619,6 +708,7 @@ async function buildUsIntel(): Promise<MarketIntel | { error: string; message: s
       stocksName:   "S&P 500",       stocksTicker: "^GSPC",
       commName:     "원자재(DBC)",   commTicker:   "DBC",
     }),
+    sectorRotation: await buildSectorRotation(spxCloses),
     asOf: new Date().toISOString(),
   };
 
@@ -935,6 +1025,7 @@ async function buildKrIntel(): Promise<MarketIntel | { error: string; message: s
       stocksName:   "S&P 500",       stocksTicker: "^GSPC",
       commName:     "원자재(DBC)",   commTicker:   "DBC",
     }),
+    sectorRotation: await buildSectorRotation(spxCloses),
     asOf: new Date().toISOString(),
   };
 
