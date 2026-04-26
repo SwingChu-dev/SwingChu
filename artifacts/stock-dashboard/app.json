@@ -22,7 +22,11 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.swingjeongseok.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch"],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.swingjeongseok.app"
