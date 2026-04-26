@@ -476,6 +476,81 @@ export default function MarketCycleScreen() {
               </View>
             </View>
 
+            {/* SECTION 5: 섹터 자본순환 */}
+            <View style={s.section}>
+              <View style={s.sectionHead}>
+                <Text style={s.sectionNum}>05</Text>
+                <Text style={s.h2}>섹터 자본순환 — 상대강도 순위</Text>
+              </View>
+              <Text style={s.sectionNote}>
+                12개 미국 섹터 ETF의 S&P 500 대비 3M 상대강도.{" "}
+                <Text style={{ color: T.amber, fontWeight: "700" }}>
+                  {data.sectorRotation.phaseHintKr}
+                </Text>
+              </Text>
+
+              <View style={s.card}>
+                {(() => {
+                  const maxAbs = Math.max(
+                    ...data.sectorRotation.sectors.map(x => Math.abs(x.relStr3m)),
+                    1,
+                  );
+                  return data.sectorRotation.sectors.map((sec, i) => {
+                    const isTop3 = i < 3;
+                    const isBot3 = i >= data.sectorRotation.sectors.length - 3;
+                    const barWidth = (Math.abs(sec.relStr3m) / maxAbs) * 100;
+                    const positive = sec.relStr3m >= 0;
+                    const color = positive ? T.greed : T.fear;
+                    const groupColor: Record<typeof sec.group, string> = {
+                      growth:     "#a877d4",
+                      cyclical:   T.amber,
+                      energy_mat: T.warning,
+                      defensive:  "#7896b0",
+                      financial:  T.gold,
+                    };
+                    return (
+                      <View key={sec.ticker} style={s.sectorRow}>
+                        <View style={[s.sectorGroupDot, { backgroundColor: groupColor[sec.group] }]}/>
+                        <View style={{ flex: 1.6 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                            <Text style={[s.sectorName, isTop3 && { color: T.amber, fontFamily: "Inter_700Bold" }]}>
+                              {sec.name}
+                            </Text>
+                            {isTop3 && i === 0 && (
+                              <Text style={s.sectorTopTag}>TOP</Text>
+                            )}
+                            {isBot3 && i === data.sectorRotation.sectors.length - 1 && (
+                              <Text style={s.sectorBotTag}>BOT</Text>
+                            )}
+                          </View>
+                          <Text style={s.sectorTicker}>{sec.ticker}</Text>
+                        </View>
+                        <View style={{ flex: 2.2, alignItems: "flex-start", gap: 2 }}>
+                          <View style={s.sectorBarWrap}>
+                            <View style={[
+                              s.sectorBar,
+                              { width: `${barWidth}%`, backgroundColor: color + "55", borderColor: color + "AA" },
+                            ]}/>
+                          </View>
+                          <Text style={[s.sectorRelVal, { color }]}>
+                            상대강도 {sec.relStr3m >= 0 ? "+" : ""}{sec.relStr3m.toFixed(1)}%p
+                          </Text>
+                        </View>
+                        <View style={{ flex: 0.9, alignItems: "flex-end" }}>
+                          <Text style={s.sectorRetLabel}>3M</Text>
+                          <Text style={[s.sectorRetVal, { color: sec.return3m >= 0 ? T.greed : T.fear }]}>
+                            {sec.return3m >= 0 ? "+" : ""}{sec.return3m.toFixed(1)}%
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+
+                <Text style={s.cycleRationale}>{data.sectorRotation.rationale}</Text>
+              </View>
+            </View>
+
             <Text style={s.footer}>
               데이터 · Yahoo Finance{"\n"}최종 업데이트 · {new Date(data.asOf).toLocaleString("ko-KR")}
             </Text>
@@ -603,6 +678,28 @@ const s = StyleSheet.create({
   },
   capRetLabel: { color: T.inkMuted, fontSize: 9, letterSpacing: 1, textTransform: "uppercase" },
   capRetVal:   { fontSize: 13, fontFamily: "Inter_700Bold" },
+
+  sectorRow:        { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
+  sectorGroupDot:   { width: 6, height: 36, borderRadius: 1 },
+  sectorName:       { color: T.ink, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  sectorTicker:     { color: T.inkMuted, fontSize: 10, fontStyle: "italic" },
+  sectorTopTag:     {
+    color: T.amber, fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 1,
+    paddingHorizontal: 4, paddingVertical: 1,
+    borderWidth: 1, borderColor: T.amber, borderRadius: 2,
+  },
+  sectorBotTag:     {
+    color: T.fear, fontSize: 8, fontFamily: "Inter_700Bold", letterSpacing: 1,
+    paddingHorizontal: 4, paddingVertical: 1,
+    borderWidth: 1, borderColor: T.fear, borderRadius: 2,
+  },
+  sectorBarWrap:    {
+    width: "100%", height: 8, backgroundColor: T.bgInset, borderRadius: 1, overflow: "hidden",
+  },
+  sectorBar:        { height: "100%", borderRadius: 1, borderWidth: 1 },
+  sectorRelVal:     { fontSize: 9, fontFamily: "Inter_500Medium" },
+  sectorRetLabel:   { color: T.inkMuted, fontSize: 8, letterSpacing: 1, textTransform: "uppercase" },
+  sectorRetVal:     { fontSize: 12, fontFamily: "Inter_700Bold" },
 
   footer:      {
     color: T.inkMuted, fontStyle: "italic", textAlign: "center",
