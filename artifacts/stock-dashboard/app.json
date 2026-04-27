@@ -22,7 +22,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.swingjeongseok.app",
-      "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": ["fetch"],
         "ITSAppUsesNonExemptEncryption": false
