@@ -6,7 +6,6 @@ import type { PriceAlert } from "@/context/AlertContext";
 export async function setupNotifications(): Promise<void> {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
       shouldShowBanner: true,

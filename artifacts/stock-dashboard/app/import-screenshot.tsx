@@ -65,10 +65,10 @@ export default function ImportScreenshot() {
       }
       const result = source === "camera"
         ? await ImagePicker.launchCameraAsync({
-            quality: 0.6, base64: true, mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.6, base64: true, mediaTypes: ["images"],
           })
         : await ImagePicker.launchImageLibraryAsync({
-            quality: 0.6, base64: true, mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.6, base64: true, mediaTypes: ["images"],
           });
       if (result.canceled || !result.assets?.[0]?.base64) return;
 
