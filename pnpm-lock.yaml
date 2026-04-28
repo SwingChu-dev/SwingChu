@@ -436,9 +436,6 @@ importers:
       '@react-native-async-storage/async-storage':
         specifier: 2.2.0
         version: 2.2.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
-      '@stardazed/streams-text-encoding':
-        specifier: ^1.0.2
-        version: 1.0.2
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.90.21(react@19.1.0)
@@ -448,9 +445,6 @@ importers:
       '@types/react-dom':
         specifier: ~19.1.7
         version: 19.1.11(@types/react@19.1.17)
-      '@ungap/structured-clone':
-        specifier: ^1.3.0
-        version: 1.3.0
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
@@ -487,9 +481,6 @@ importers:
       expo-linking:
         specifier: ~8.0.10
         version: 8.0.11(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
-      expo-location:
-        specifier: ~19.0.8
-        version: 19.0.8(expo@54.0.33)
       expo-router:
         specifier: ~6.0.17
         version: 6.0.23(@types/react-dom@19.1.11(@types/react@19.1.17))(@types/react@19.1.17)(expo-constants@18.0.13)(expo-linking@8.0.11)(expo@54.0.33)(react-dom@19.1.0(react@19.1.0))(react-native-gesture-handler@2.28.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-reanimated@4.1.6(@babel/core@7.29.0)(react-native-worklets@0.5.1(@babel/core@7.29.0)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-safe-area-context@5.6.2(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-screens@4.16.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -2273,9 +2264,6 @@ packages:
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
 
-  '@stardazed/streams-text-encoding@1.0.2':
-    resolution: {integrity: sha512-f2Z15BId3t44a/u21yYSGXFAkCyKocmAyduoAy7swnZ4xIfbaZlOWsgly/jDNNOuj6hYQN72UaBRe3Z/tOHfqg==}
-
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
@@ -3431,11 +3419,6 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
-
-  expo-location@19.0.8:
-    resolution: {integrity: sha512-H/FI75VuJ1coodJbbMu82pf+Zjess8X8Xkiv9Bv58ZgPKS/2ztjC1YO1/XMcGz7+s9DrbLuMIw22dFuP4HqneA==}
-    peerDependencies:
-      expo: '*'
 
   expo-manifests@55.0.16:
     resolution: {integrity: sha512-BR9BPcNsSnCKlQ/d7ECywr+2T54+bTSr26HjRjSua949o4mO/iPIrLjK0lOAa1oIczju6a6oUFckZD2OljxP0g==}
@@ -8226,8 +8209,6 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
-  '@stardazed/streams-text-encoding@1.0.2': {}
-
   '@szmarczak/http-timer@4.0.6':
     dependencies:
       defer-to-connect: 2.0.1
@@ -9361,10 +9342,6 @@ snapshots:
     transitivePeerDependencies:
       - expo
       - supports-color
-
-  expo-location@19.0.8(expo@54.0.33):
-    dependencies:
-      expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
 
   expo-manifests@55.0.16(expo@54.0.33):
     dependencies:
