@@ -1,5 +1,11 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Text, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useEffect } from "react";
+import { Text, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAlerts } from "@/context/AlertContext";
@@ -7,17 +13,21 @@ import { useAlerts } from "@/context/AlertContext";
 export default function AlertBanner() {
   const { triggeredAlert, dismissTriggered } = useAlerts();
   const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(-120)).current;
+  const translateY = useSharedValue(-120);
 
   useEffect(() => {
     if (!triggeredAlert) {
-      Animated.timing(slideAnim, { toValue: -120, duration: 300, useNativeDriver: true }).start();
+      translateY.value = withTiming(-120, { duration: 280 });
       return;
     }
-    Animated.spring(slideAnim, { toValue: insets.top + 8, friction: 8, useNativeDriver: true }).start();
+    translateY.value = withSpring(insets.top + 8, { damping: 18, stiffness: 180 });
     const t = setTimeout(dismissTriggered, 6000);
     return () => clearTimeout(t);
   }, [triggeredAlert]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   if (!triggeredAlert) return null;
 
@@ -38,10 +48,7 @@ export default function AlertBanner() {
 
   return (
     <Animated.View
-      style={[
-        styles.banner,
-        { transform: [{ translateY: slideAnim }], top: 0, backgroundColor: bannerBg },
-      ]}
+      style={[styles.banner, { top: 0, backgroundColor: bannerBg }, animatedStyle]}
     >
       <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
         <Ionicons name={isProfitTake ? "trophy" : isUp ? "arrow-up" : "arrow-down"} size={16} color="#fff" />

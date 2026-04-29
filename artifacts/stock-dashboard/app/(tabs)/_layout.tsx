@@ -1,4 +1,5 @@
 import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
@@ -6,6 +7,12 @@ import React from "react";
 import { Platform, StyleSheet, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+
+const tabHaptic = () => {
+  if (Platform.OS === "ios" || Platform.OS === "android") {
+    Haptics.selectionAsync().catch(() => {});
+  }
+};
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -17,6 +24,9 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      screenListeners={{
+        tabPress: tabHaptic,
+      }}
       screenOptions={{
         tabBarActiveTintColor: c.tint,
         tabBarInactiveTintColor: c.tabIconDefault,
