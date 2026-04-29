@@ -31,7 +31,7 @@
       "package": "com.swingjeongseok.app"
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/caricature-favicon.png"
     },
     "extra": {
       "eas": {
