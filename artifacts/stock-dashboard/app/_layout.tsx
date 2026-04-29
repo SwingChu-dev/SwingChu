@@ -90,6 +90,7 @@ const disclaimerStyles = StyleSheet.create({
   logoSub:   { fontSize: 13, color: "#64748B" },
   card: {
     width: "100%",
+    maxWidth: 520,
     backgroundColor: "#141B2D",
     borderRadius: 20,
     padding: 24,

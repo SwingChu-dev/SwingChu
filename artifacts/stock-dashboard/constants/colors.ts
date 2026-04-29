@@ -1,3 +1,7 @@
+// 토스증권 톤. iPhone 16 디스플레이는 P3 wide-color를 지원하지만, RN 0.81/Expo 54에는
+// 커스텀 hex를 P3 색공간으로 태깅하는 first-class API가 없음 (sRGB로 해석됨). 시스템
+// 색상은 PlatformColor / DynamicColorIOS로 P3를 받을 수 있지만 브랜드 hex는 안 됨.
+// 향후 react-native-extended-color 같은 네이티브 모듈 도입 시 P3 전환 검토.
 const TOSS_BLUE = "#0064FF";
 const TOSS_RED = "#F04452";
 const TOSS_GREEN = "#05C072";
