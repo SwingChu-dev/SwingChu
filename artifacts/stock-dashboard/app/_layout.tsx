@@ -8,6 +8,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -25,6 +26,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import AlertBanner from "@/components/AlertBanner";
 import EarningsAlertScheduler from "@/components/EarningsAlertScheduler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import FoxLogo from "@/components/FoxLogo";
 import { setupNotifications } from "@/utils/notifications";
 import { registerBackgroundPriceTask } from "@/utils/backgroundPriceFetch";
 
@@ -36,8 +38,9 @@ function DisclaimerScreen() {
   const insets = useSafeAreaInsets();
   return (
     <View style={[disclaimerStyles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+      <StatusBar style="light" />
       <View style={disclaimerStyles.logoWrap}>
-        <Text style={disclaimerStyles.logoIcon}>📈</Text>
+        <FoxLogo size={108} />
         <Text style={disclaimerStyles.logoTitle}>스윙의 정석</Text>
         <Text style={disclaimerStyles.logoSub}>스윙 트레이딩 전략 대시보드</Text>
       </View>
@@ -68,14 +71,13 @@ function DisclaimerScreen() {
 const disclaimerStyles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0A0E1A",
+    backgroundColor: "#0A1628",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
   },
-  logoWrap:  { alignItems: "center", gap: 8, marginTop: 40 },
-  logoIcon:  { fontSize: 48 },
-  logoTitle: { fontSize: 26, fontWeight: "700", color: "#FFFFFF", letterSpacing: -0.5 },
+  logoWrap:  { alignItems: "center", gap: 10, marginTop: 32 },
+  logoTitle: { fontSize: 26, fontWeight: "700", color: "#FFFFFF", letterSpacing: -0.5, marginTop: 4 },
   logoSub:   { fontSize: 13, color: "#64748B" },
   card: {
     width: "100%",
@@ -139,6 +141,7 @@ function RootLayoutNav() {
 
   return (
     <>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <AlertChecker />
       <EarningsAlertScheduler />
       <AlertBanner />
