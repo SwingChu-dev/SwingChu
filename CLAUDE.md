@@ -156,3 +156,66 @@ gh pr create --base master --head fix/<name> --title "..." --body "..."
 ## Secrets / environment
 
 Never commit `.env`. 키 목록은 위 "GitHub Codespaces" 섹션 참조.
+
+## Coding behavior — Karpathy guidelines
+
+> Behavioral guidelines to reduce common LLM coding mistakes. 출처: [forrestchang/andrej-karpathy-skills](https://github.com/forrestchang/andrej-karpathy-skills) / [Andrej의 원본 트윗](https://x.com/karpathy/status/2015883857489522876).
+>
+> **Tradeoff:** 속도보다 신중함을 택함. 사소한 작업엔 판단껏.
+
+### 1. Think Before Coding
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+구현 전에:
+- 가정은 명시적으로. 불확실하면 묻는다.
+- 해석이 여러 가지면 모두 제시. 혼자 고르지 말 것.
+- 더 단순한 접근이 있으면 말한다. 필요하면 push back.
+- 불분명한 게 있으면 멈추고 무엇이 헷갈리는지 명명한 뒤 묻는다.
+
+### 2. Simplicity First
+**Minimum code that solves the problem. Nothing speculative.**
+
+- 요청 안 한 기능 금지.
+- 단발성 코드에 추상화 금지.
+- 요청 안 한 "유연성" / "설정 가능성" 금지.
+- 일어날 수 없는 시나리오용 에러 핸들링 금지.
+- 200줄 짠 게 50줄로 가능하면 다시 쓴다.
+
+자문: "시니어 엔지니어가 이거 보면 과설계라고 할까?" 그렇다면 단순화.
+
+### 3. Surgical Changes
+**Touch only what you must. Clean up only your own mess.**
+
+기존 코드 편집 시:
+- 인접 코드·주석·포매팅을 "개선"하지 말 것.
+- 안 깨진 거 리팩터하지 말 것.
+- 본인 스타일과 달라도 기존 스타일에 맞춘다.
+- 무관한 dead code 발견하면 언급만, 삭제는 금지.
+
+본인 변경이 만든 고아:
+- 본인 변경이 만든 미사용 import·변수·함수만 제거.
+- 사전 존재 dead code는 요청 없으면 손대지 말 것.
+
+테스트: 변경된 모든 줄이 사용자 요청까지 직접 추적되어야 함.
+
+### 4. Goal-Driven Execution
+**Define success criteria. Loop until verified.**
+
+작업을 검증 가능한 목표로 변환:
+- "검증 추가" → "잘못된 입력에 대한 테스트를 쓴 뒤 통과시킨다"
+- "버그 고쳐" → "재현 테스트를 먼저 쓴 뒤 통과시킨다"
+- "X 리팩터" → "전후로 테스트 통과를 보장한다"
+
+다단계 작업은 짧은 계획을 명시:
+```
+1. [단계] → verify: [확인]
+2. [단계] → verify: [확인]
+3. [단계] → verify: [확인]
+```
+
+강한 성공 기준이 있어야 독립적으로 루프 가능. 약한 기준("동작하게 해")은 매번 추가 확인이 필요.
+
+---
+
+**가이드라인이 작동하고 있다는 신호:** diff에 불필요한 변경이 줄고, 과설계로 인한 재작성이 줄고, 명확화 질문이 구현 *후* 실수가 아니라 구현 *전* 에 나온다.
+
