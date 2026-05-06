@@ -129,6 +129,14 @@ export default function MoreScreen() {
             description="포지션·관심종목·청산기록 JSON으로 내보내기/복원"
             onPress={() => router.push("/backup" as any)}
           />
+          <View style={[styles.divider, { backgroundColor: c.separator }]} />
+          <MenuItem
+            icon="receipt-outline"
+            iconColor="#FF6B00"
+            title="양도소득세 계산"
+            description="해외주식 22% + 250만원 공제 자동 계산"
+            onPress={() => router.push("/tax" as any)}
+          />
         </View>
 
         {/* 앱 정보 */}
