@@ -119,6 +119,18 @@ export default function MoreScreen() {
           />
         </View>
 
+        {/* 데이터 */}
+        <SectionHeader title="데이터" />
+        <View style={styles.section}>
+          <MenuItem
+            icon="cloud-outline"
+            iconColor="#05C072"
+            title="백업·복원"
+            description="포지션·관심종목·청산기록 JSON으로 내보내기/복원"
+            onPress={() => router.push("/backup" as any)}
+          />
+        </View>
+
         {/* 앱 정보 */}
         <SectionHeader title="앱 정보" />
         <View style={styles.section}>
