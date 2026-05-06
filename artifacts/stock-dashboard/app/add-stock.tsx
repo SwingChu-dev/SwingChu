@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   SectionList,
   useColorScheme,
@@ -28,17 +29,29 @@ const MARKET_LABELS: Record<string, string> = {
 
 type StockItem = (typeof STOCKS)[number];
 
-const sections = [
-  { market: "NASDAQ", data: STOCKS.filter((s) => s.market === "NASDAQ") },
-  { market: "KOSPI",  data: STOCKS.filter((s) => s.market === "KOSPI")  },
-  { market: "KOSDAQ", data: STOCKS.filter((s) => s.market === "KOSDAQ") },
-].filter((s) => s.data.length > 0);
-
 export default function AddStockSheet() {
   const isDark  = useColorScheme() === "dark";
   const c       = isDark ? Colors.dark : Colors.light;
   const insets  = useSafeAreaInsets();
   const { addStock, removeStock, isInWatchlist } = useWatchlist();
+  const [query, setQuery] = useState("");
+
+  const sections = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const matches = (s: StockItem) =>
+      !q ||
+      s.ticker.toLowerCase().includes(q) ||
+      s.name.toLowerCase().includes(q) ||
+      s.id.toLowerCase().includes(q) ||
+      s.themes?.some((t) => t.toLowerCase().includes(q));
+    return [
+      { market: "NASDAQ", data: STOCKS.filter((s) => s.market === "NASDAQ" && matches(s)) },
+      { market: "KOSPI",  data: STOCKS.filter((s) => s.market === "KOSPI"  && matches(s)) },
+      { market: "KOSDAQ", data: STOCKS.filter((s) => s.market === "KOSDAQ" && matches(s)) },
+    ].filter((sec) => sec.data.length > 0);
+  }, [query]);
+
+  const totalShown = sections.reduce((s, sec) => s + sec.data.length, 0);
 
   const handleToggle = (item: StockItem) => {
     if (isInWatchlist(item.id)) removeStock(item.id);
@@ -120,16 +133,47 @@ export default function AddStockSheet() {
         </TouchableOpacity>
       </View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
-        SectionSeparatorComponent={() => <View style={{ height: 8 }} />}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* 검색바 */}
+      <View style={[styles.searchWrap, { backgroundColor: c.backgroundSecondary, borderColor: c.separator }]}>
+        <Ionicons name="search" size={16} color={c.textTertiary} />
+        <TextInput
+          style={[styles.searchInput, { color: c.text }]}
+          placeholder="이름·티커·테마로 검색 (예: 엔비디아, NVDA, AI)"
+          placeholderTextColor={c.textTertiary}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {query.length > 0 && (
+          <TouchableOpacity onPress={() => setQuery("")} hitSlop={10}>
+            <Ionicons name="close-circle" size={16} color={c.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {totalShown === 0 ? (
+        <View style={styles.emptyWrap}>
+          <Ionicons name="search-outline" size={28} color={c.textTertiary} />
+          <Text style={[styles.emptyTitle, { color: c.text }]}>일치하는 종목 없음</Text>
+          <Text style={[styles.emptyDesc, { color: c.textSecondary }]}>
+            카탈로그에 없는 종목은 곧 Yahoo Finance 검색으로 추가 가능 예정.
+          </Text>
+        </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          stickySectionHeadersEnabled={false}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
+          SectionSeparatorComponent={() => <View style={{ height: 8 }} />}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
     </View>
   );
 }
@@ -149,6 +193,24 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, fontSize: 17, fontFamily: "Inter_700Bold", marginLeft: 2 },
   doneBtn:     { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20 },
   doneBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    padding: 0,
+  },
 
   list: { paddingHorizontal: 16, paddingTop: 12 },
 
@@ -190,4 +252,14 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 16 },
+
+  emptyWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+    gap: 10,
+  },
+  emptyTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  emptyDesc:  { fontSize: 12, lineHeight: 18, textAlign: "center" },
 });
