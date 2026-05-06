@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { API_BASE } from "@/utils/apiBase";
+import { useAiQuota } from "@/hooks/useAiQuota";
 
 interface StockContext {
   ticker:        string;
@@ -59,6 +60,7 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const quota = useAiQuota("chat");
 
   useEffect(() => {
     if (!visible) {
@@ -71,6 +73,16 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
   const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
+    const allowed = await quota.consume();
+    if (!allowed) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: trimmed },
+        { role: "assistant", content: `⚠️ 오늘 ${quota.label} ${quota.limit}건 한도에 도달했습니다. 자정에 자동 리셋됩니다.` },
+      ]);
+      setInput("");
+      return;
+    }
     const next = [...messages, { role: "user" as const, content: trimmed }];
     setMessages(next);
     setInput("");
@@ -120,7 +132,7 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
                 {context.name ?? context.ticker}에 대해 묻기
               </Text>
               <Text style={[styles.sub, { color: c.textSecondary }]}>
-                Claude Haiku · 참고용 응답
+                Claude Haiku · 오늘 {quota.remaining}/{quota.limit}건 남음
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={10}>

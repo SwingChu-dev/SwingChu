@@ -1,5 +1,6 @@
 import { Router } from "express";
 import NodeCache from "node-cache";
+import { rateLimit } from "../lib/rateLimit";
 
 const router = Router();
 const cache  = new NodeCache({ stdTTL: 30 * 60 });
@@ -79,7 +80,7 @@ interface CoachOutput {
   tier:       ClaudeTier;
 }
 
-router.post("/weekly-coach", async (req, res) => {
+router.post("/weekly-coach", rateLimit("weekly-coach", 15), async (req, res) => {
   try {
     const input = req.body as CoachInput & { tier?: ClaudeTier };
     if (!input || typeof input !== "object") {

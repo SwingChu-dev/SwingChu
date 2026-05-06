@@ -1,5 +1,6 @@
 import { Router } from "express";
 import NodeCache from "node-cache";
+import { rateLimit } from "../lib/rateLimit";
 
 import YahooFinanceClass from "yahoo-finance2";
 interface Bar { date: string; open: number; high: number; low: number; close: number; volume: number }
@@ -296,7 +297,7 @@ function fallbackSignal(
 
 // ─── /stocks/signals 엔드포인트 ──────────────────────────────────────────────
 
-router.get("/stocks/signals", async (req, res) => {
+router.get("/stocks/signals", rateLimit("stocks-signals", 200), async (req, res) => {
   const raw   = (req.query.items as string) ?? "";
   const items = raw.split(",").map(s => s.trim()).filter(Boolean);
   if (items.length === 0) return res.json([]);
