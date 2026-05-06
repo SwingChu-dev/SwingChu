@@ -27,6 +27,7 @@ import DayFeaturesSection from "@/components/detail/DayFeaturesSection";
 import NewsSection from "@/components/detail/NewsSection";
 import BacktestSection from "@/components/detail/BacktestSection";
 import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
+import StockChatSheet from "@/components/StockChatSheet";
 import IsraelSection from "@/components/detail/IsraelSection";
 import TargetTiersSection from "@/components/detail/TargetTiersSection";
 import EarningsBadge from "@/components/detail/EarningsBadge";
@@ -56,6 +57,7 @@ export default function StockDetailScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("진입");
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const { allKnownStocks } = useWatchlist();
   const { priceKRW: liveKRW, changePct: liveChangePct, getQuote } = useStockPrice();
   const { getEnriched, isEnriching, hasFailed, reEnrichStock, buildStockInfo } = useEnrichment();
@@ -487,6 +489,31 @@ export default function StockDetailScreen() {
         name={stock.name}
         currentPrice={displayPrice}
       />
+
+      <TouchableOpacity
+        style={[styles.chatFab, { backgroundColor: c.tint }]}
+        onPress={() => setShowChat(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="sparkles" size={20} color="#fff" />
+      </TouchableOpacity>
+
+      <StockChatSheet
+        visible={showChat}
+        onClose={() => setShowChat(false)}
+        context={{
+          ticker: stock.ticker,
+          market: stock.market,
+          name:   stock.name,
+          currentPrice: displayPrice,
+          changePct:    typeof rawChangePct === "number" ? rawChangePct : undefined,
+          rsi14:  technicalSummary?.rsi14 ?? undefined,
+          ma20:   technicalSummary?.ma20  ?? undefined,
+          ma60:   technicalSummary?.ma60  ?? undefined,
+          high52w: liveQuote?.high52w,
+          low52w:  liveQuote?.low52w,
+        }}
+      />
     </View>
   );
 }
@@ -605,6 +632,21 @@ const styles = StyleSheet.create({
   techAnalyzeBtn:   {
     flexDirection: "row", alignItems: "center", gap: 6,
     marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20,
+  },
+  chatFab: {
+    position: "absolute",
+    right: 18,
+    bottom: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   techAnalyzeBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
