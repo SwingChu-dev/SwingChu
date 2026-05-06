@@ -31,6 +31,12 @@ let _tokenPromise: Promise<string | null> | null = null; // 동시 요청 중복
 let _retryAfter    = 0; // 실패 후 재시도 금지 시각
 let _diskLoaded    = false;
 
+// ── 엔드포인트별 rate-limit 백오프 ─────────────────────────────────────────
+// KIS는 trId 단위로 1초·1분 제한이 다름. 429에 해당하는 EGW00201을 받으면
+// 해당 trId만 일정 시간 차단해 thundering herd 방지.
+const _endpointBackoff = new Map<string, number>();
+const RATE_LIMIT_COOLDOWN_MS = 30_000;
+
 export function isAvailable(): boolean {
   return !!(process.env.KIS_APPKEY && process.env.KIS_APPSECRET);
 }
@@ -123,6 +129,10 @@ async function kisGet(path: string, trId: string, params: Record<string, string>
   const token = await getToken();
   if (!token) return null;
 
+  // 엔드포인트가 rate-limit 쿨다운 중이면 즉시 null → Yahoo 폴백
+  const backoffUntil = _endpointBackoff.get(trId) ?? 0;
+  if (Date.now() < backoffUntil) return null;
+
   const url = new URL(`${KIS_URL}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
@@ -139,6 +149,12 @@ async function kisGet(path: string, trId: string, params: Record<string, string>
     const json = await res.json() as any;
     // rt_cd === "0" 은 정상
     if (json.rt_cd !== "0") {
+      // 요청건수 초과 — 해당 endpoint 쿨다운
+      if (json.msg_cd === "EGW00201") {
+        _endpointBackoff.set(trId, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+        console.warn(`[KIS] rate-limit hit on ${trId}, ${RATE_LIMIT_COOLDOWN_MS / 1000}s cooldown`);
+        return null;
+      }
       // 토큰 만료 시 재시도 1회
       if (json.msg_cd === "EGW00123" || json.msg_cd === "EGW00121") {
         _token = null; _tokenExpiry = 0;
@@ -146,6 +162,8 @@ async function kisGet(path: string, trId: string, params: Record<string, string>
       }
       return null;
     }
+    // 성공 시 백오프 해제
+    _endpointBackoff.delete(trId);
     return json;
   } catch (e) {
     return null;
@@ -229,19 +247,20 @@ export async function fetchKisUsQuote(ticker: string): Promise<KisUsQuote | null
   };
 }
 
-// ── 국내 복수 종목 병렬 조회 (동시 최대 5개, 100ms 속도 제한) ──────────────
+// ── 국내 복수 종목 병렬 조회 (KIS 시세조회 1초당 20건 제한) ────────────────
+// 동시 3건 + 청크 사이 200ms 갭 → 초당 약 15건. 안전 마진 둠.
 export async function fetchKisKrBatch(
   tickers: string[]
 ): Promise<Record<string, KisKrQuote>> {
   const result: Record<string, KisKrQuote> = {};
-  const BATCH = 5;
+  const BATCH = 3;
   for (let i = 0; i < tickers.length; i += BATCH) {
     const chunk = tickers.slice(i, i + BATCH);
     await Promise.allSettled(chunk.map(async t => {
       const q = await fetchKisKrQuote(t);
       if (q) result[t] = q;
     }));
-    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 100));
+    if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 200));
   }
   return result;
 }
