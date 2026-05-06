@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/utils/apiBase";
 
+export interface LastEarnings {
+  date:               string;
+  epsActual:          number | null;
+  epsEstimate:        number | null;
+  epsSurprisePct:     number | null;
+  revenueActual:      number | null;
+  revenueEstimate:    number | null;
+  revenueSurprisePct: number | null;
+}
+
 export interface EarningsInfo {
   ticker: string;
   market: string;
@@ -9,6 +19,7 @@ export interface EarningsInfo {
   earningsTimeOfDay: "BMO" | "AMC" | "DMH" | null;
   epsEstimate: number | null;
   revenueEstimate: number | null;
+  lastEarnings: LastEarnings | null;
   exDividendDate: string | null;
   dividendDate: string | null;
   daysUntilExDividend: number | null;

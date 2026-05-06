@@ -10,6 +10,16 @@ interface CacheEntry { data: EarningsResponse; expiresAt: number }
 const cache = new Map<string, CacheEntry>();
 const TTL_MS = 6 * 60 * 60 * 1000;
 
+interface LastEarnings {
+  date:               string;
+  epsActual:          number | null;
+  epsEstimate:        number | null;
+  epsSurprisePct:     number | null;
+  revenueActual:      number | null;
+  revenueEstimate:    number | null;
+  revenueSurprisePct: number | null;
+}
+
 interface EarningsResponse {
   ticker: string;
   market: string;
@@ -18,6 +28,7 @@ interface EarningsResponse {
   earningsTimeOfDay: "BMO" | "AMC" | "DMH" | null;
   epsEstimate: number | null;
   revenueEstimate: number | null;
+  lastEarnings: LastEarnings | null;
   exDividendDate: string | null;
   dividendDate: string | null;
   daysUntilExDividend: number | null;
@@ -57,11 +68,18 @@ interface FinnhubEarning {
   year: number;
 }
 
+function pctSurprise(actual: number | null, estimate: number | null): number | null {
+  if (actual == null || estimate == null) return null;
+  if (estimate === 0) return null;
+  return ((actual - estimate) / Math.abs(estimate)) * 100;
+}
+
 async function fetchFinnhubEarnings(ticker: string): Promise<{
   nextEarningsDate: string | null;
   earningsTimeOfDay: "BMO" | "AMC" | "DMH" | null;
   epsEstimate: number | null;
   revenueEstimate: number | null;
+  lastEarnings: LastEarnings | null;
 } | null> {
   if (!FINNHUB_KEY) return null;
   try {
@@ -81,11 +99,27 @@ async function fetchFinnhubEarnings(ticker: string): Promise<{
     const tod: "BMO" | "AMC" | "DMH" | null =
       hour === "bmo" ? "BMO" : hour === "amc" ? "AMC" : hour === "dmh" ? "DMH" : null;
 
+    // 가장 최근의 발표 완료 분기 (epsActual !== null) — 컨센 vs 실제 비교용
+    const past = list.filter((e) => e.epsActual != null && new Date(e.date) <= now);
+    const lastReported = past[past.length - 1] ?? null;
+    const lastEarnings: LastEarnings | null = lastReported
+      ? {
+          date:               lastReported.date,
+          epsActual:          lastReported.epsActual,
+          epsEstimate:        lastReported.epsEstimate,
+          epsSurprisePct:     pctSurprise(lastReported.epsActual, lastReported.epsEstimate),
+          revenueActual:      lastReported.revenueActual,
+          revenueEstimate:    lastReported.revenueEstimate,
+          revenueSurprisePct: pctSurprise(lastReported.revenueActual, lastReported.revenueEstimate),
+        }
+      : null;
+
     return {
       nextEarningsDate: new Date(target.date + "T00:00:00.000Z").toISOString(),
       earningsTimeOfDay: tod,
       epsEstimate: target.epsEstimate ?? null,
       revenueEstimate: target.revenueEstimate ?? null,
+      lastEarnings,
     };
   } catch {
     return null;
@@ -96,10 +130,13 @@ async function fetchYahooData(ticker: string, market: string): Promise<{
   nextEarningsDate: string | null;
   exDividendDate:   string | null;
   dividendDate:     string | null;
+  lastEarnings:     LastEarnings | null;
 }> {
   try {
     const symbol = toYahooSymbol(ticker, market);
-    const summary = await yahooFinance.quoteSummary(symbol, { modules: ["calendarEvents"] });
+    const summary = await yahooFinance.quoteSummary(symbol, {
+      modules: ["calendarEvents", "earningsHistory"],
+    });
     const calendar = summary?.calendarEvents;
     const earnings = calendar?.earnings;
 
@@ -110,13 +147,39 @@ async function fetchYahooData(ticker: string, market: string): Promise<{
       if (isNaN(nextEarningsDate.getTime())) nextEarningsDate = null;
     }
 
+    // earningsHistory: history[] 가장 마지막 항목이 가장 최근 발표 분기
+    let lastEarnings: LastEarnings | null = null;
+    const history = (summary as any)?.earningsHistory?.history;
+    if (Array.isArray(history) && history.length > 0) {
+      const last = history[history.length - 1];
+      const dt = last.quarter instanceof Date ? last.quarter : new Date(last.quarter);
+      const dateIso = !isNaN(dt.getTime()) ? dt.toISOString().slice(0, 10) : null;
+      const epsActual = typeof last.epsActual?.raw === "number" ? last.epsActual.raw : (typeof last.epsActual === "number" ? last.epsActual : null);
+      const epsEstimate = typeof last.epsEstimate?.raw === "number" ? last.epsEstimate.raw : (typeof last.epsEstimate === "number" ? last.epsEstimate : null);
+      const surprisePct = typeof last.surprisePercent?.raw === "number"
+        ? last.surprisePercent.raw * 100
+        : (typeof last.surprisePercent === "number" ? last.surprisePercent * 100 : pctSurprise(epsActual, epsEstimate));
+      if (dateIso && (epsActual != null || epsEstimate != null)) {
+        lastEarnings = {
+          date:               dateIso,
+          epsActual,
+          epsEstimate,
+          epsSurprisePct:     surprisePct,
+          revenueActual:      null,
+          revenueEstimate:    null,
+          revenueSurprisePct: null,
+        };
+      }
+    }
+
     return {
       nextEarningsDate: nextEarningsDate ? nextEarningsDate.toISOString() : null,
       exDividendDate:   calendar?.exDividendDate ? new Date(calendar.exDividendDate).toISOString() : null,
       dividendDate:     calendar?.dividendDate   ? new Date(calendar.dividendDate).toISOString()   : null,
+      lastEarnings,
     };
   } catch {
-    return { nextEarningsDate: null, exDividendDate: null, dividendDate: null };
+    return { nextEarningsDate: null, exDividendDate: null, dividendDate: null, lastEarnings: null };
   }
 }
 
@@ -145,6 +208,7 @@ router.get("/earnings", async (req, res) => {
     earningsTimeOfDay: finnhub?.earningsTimeOfDay ?? null,
     epsEstimate:       finnhub?.epsEstimate ?? null,
     revenueEstimate:   finnhub?.revenueEstimate ?? null,
+    lastEarnings:      finnhub?.lastEarnings ?? yahoo.lastEarnings,
     exDividendDate:    yahoo.exDividendDate,
     dividendDate:      yahoo.dividendDate,
     daysUntilExDividend: diffDays(yahoo.exDividendDate),

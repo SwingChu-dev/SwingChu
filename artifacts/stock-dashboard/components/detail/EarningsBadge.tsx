@@ -44,6 +44,15 @@ export default function EarningsBadge({ ticker, market }: Props) {
   const t = tone(days);
   const exDays = data.daysUntilExDividend;
 
+  const last = data.lastEarnings;
+  const surprise = last?.epsSurprisePct;
+  const surpriseColor = surprise == null
+    ? c.textTertiary
+    : surprise >= 0 ? "#F04452" : "#1B63E8";
+  const surpriseLabel = surprise == null
+    ? null
+    : `${surprise >= 0 ? "+" : ""}${surprise.toFixed(1)}%`;
+
   return (
     <View style={[styles.card, { backgroundColor: c.card }]}>
       <View style={[styles.iconWrap, { backgroundColor: t.color + "20" }]}>
@@ -57,6 +66,12 @@ export default function EarningsBadge({ ticker, market }: Props) {
           {data.nextEarningsDate ? ` · ${t.label}` : ""}
           {data.epsEstimate != null ? ` · EPS 컨센 ${data.epsEstimate.toFixed(2)}` : ""}
         </Text>
+        {last && surpriseLabel && (
+          <Text style={[styles.lastLine, { color: c.textTertiary }]}>
+            직전 분기: 실제 {last.epsActual?.toFixed(2) ?? "—"} vs 컨센 {last.epsEstimate?.toFixed(2) ?? "—"} ·{" "}
+            <Text style={{ color: surpriseColor, fontFamily: "Inter_700Bold" }}>{surpriseLabel}</Text>
+          </Text>
+        )}
       </View>
       {exDays != null && exDays >= 0 && exDays <= 30 && (
         <View style={[styles.divBadge, { backgroundColor: c.backgroundTertiary }]}>
@@ -73,6 +88,7 @@ const styles = StyleSheet.create({
   iconWrap:{ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   title:   { fontSize: 12, fontFamily: "Inter_500Medium", marginBottom: 2 },
   subtitle:{ fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  lastLine:{ fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 3 },
   label:   { fontSize: 12, fontFamily: "Inter_400Regular" },
   divBadge:{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, alignItems: "center" },
   divLabel:{ fontSize: 9, fontFamily: "Inter_500Medium", marginBottom: 1 },
