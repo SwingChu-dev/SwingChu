@@ -13,6 +13,7 @@ import { LiveQuote } from "@/context/StockPriceContext";
 import { AISmartMoneySignal } from "@/context/AISignalContext";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { ISRAEL_DATA, IsraelLevel } from "@/constants/israelData";
+import { getMarketStatus, type MarketKey } from "@/utils/marketHolidays";
 
 // ── 스캘핑 박스 컴포넌트 ─────────────────────────────────────
 const ISRAEL_DOT: Record<IsraelLevel, string> = {
@@ -233,6 +234,15 @@ function StockCardInner({
                 {israelDotColor && (
                   <View style={[styles.israelDot, { backgroundColor: israelDotColor }]} />
                 )}
+                {(() => {
+                  const status = getMarketStatus(stock.market as MarketKey);
+                  if (!status.closed) return null;
+                  return (
+                    <View style={styles.holidayBadge}>
+                      <Text style={styles.holidayText}>휴장 · {status.reason}</Text>
+                    </View>
+                  );
+                })()}
               </View>
             </View>
 
@@ -335,6 +345,13 @@ const styles = StyleSheet.create({
   name:      { fontSize: 15, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
   tickerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   israelDot: { width: 6, height: 6, borderRadius: 3 },
+  holidayBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "rgba(245,158,11,0.15)",
+  },
+  holidayText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#F59E0B" },
   entryMark: {
     flexDirection: "row",
     alignItems: "center",
