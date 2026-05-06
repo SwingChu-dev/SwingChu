@@ -1,6 +1,6 @@
 import {
   Position, CooldownSave, Portfolio, Category, Sector,
-  CATEGORY_LABEL, SECTOR_LABEL,
+  CATEGORY_LABEL, SECTOR_LABEL, ClosedTrade,
 } from "@/types/portfolio";
 import { API_BASE } from "@/utils/apiBase";
 
@@ -15,11 +15,44 @@ export interface CoachComment {
   tier?:    ClaudeTier;
 }
 
+export type RegimeKey = "BULL_EARLY" | "BULL_HOT" | "SIDEWAYS" | "BEAR";
+
+export interface RegimeStat {
+  regime:     RegimeKey;
+  count:      number;
+  winRate:    number;
+  avgPnLPct:  number;
+}
+
+export function regimeStatsFromClosed(closed: ClosedTrade[]): RegimeStat[] {
+  const map = new Map<RegimeKey, { count: number; wins: number; pnlPctSum: number }>();
+  for (const t of closed) {
+    const r = t.entryRegime;
+    if (!r) continue;
+    const cur = map.get(r) ?? { count: 0, wins: 0, pnlPctSum: 0 };
+    cur.count += 1;
+    if (t.realizedPnLKRW > 0) cur.wins += 1;
+    cur.pnlPctSum += t.pnlPercent;
+    map.set(r, cur);
+  }
+  const out: RegimeStat[] = [];
+  for (const [regime, v] of map.entries()) {
+    out.push({
+      regime,
+      count:     v.count,
+      winRate:   v.wins / v.count,
+      avgPnLPct: v.pnlPctSum / v.count,
+    });
+  }
+  return out;
+}
+
 export async function fetchWeeklyCoach(
   report: WeeklyReport,
   portfolio: Portfolio,
   healthScore: number,
   tier: ClaudeTier = "haiku",
+  extras?: { currentRegime?: RegimeKey; regimeHistory?: RegimeStat[] },
 ): Promise<CoachComment> {
   const body = {
     newPositions:         report.newPositions.length,
@@ -33,6 +66,8 @@ export async function fetchWeeklyCoach(
     topCategories:        report.topCategories.map(c => ({ label: c.label, pct: c.pct })),
     topSectors:           report.topSectors.map(s => ({ label: s.label, pct: s.pct })),
     recentTickers:        report.newPositions.map(p => p.ticker.toUpperCase()),
+    currentRegime:        extras?.currentRegime,
+    regimeHistory:        extras?.regimeHistory,
     tier,
   };
   const resp = await fetch(`${API_BASE}/weekly-coach`, {

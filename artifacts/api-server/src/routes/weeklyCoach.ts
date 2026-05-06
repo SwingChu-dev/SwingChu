@@ -38,6 +38,15 @@ async function callClaude(prompt: string, tier: ClaudeTier): Promise<string> {
   return blocks.map((b: any) => b?.text ?? "").join("");
 }
 
+type RegimeKey = "BULL_EARLY" | "BULL_HOT" | "SIDEWAYS" | "BEAR";
+
+interface RegimeStat {
+  regime:    RegimeKey;
+  count:     number;
+  winRate:   number;   // 0..1
+  avgPnLPct: number;
+}
+
 interface CoachInput {
   newPositions:         number;
   cooldownSaves:        number;
@@ -50,7 +59,16 @@ interface CoachInput {
   topCategories:        Array<{ label: string; pct: number }>;
   topSectors:           Array<{ label: string; pct: number }>;
   recentTickers:        string[];
+  currentRegime?:       RegimeKey;
+  regimeHistory?:       RegimeStat[];
 }
+
+const REGIME_LABEL: Record<RegimeKey, string> = {
+  BULL_EARLY: "회복·불장 초입",
+  BULL_HOT:   "과열·불장 후반",
+  SIDEWAYS:   "횡보·정체",
+  BEAR:       "하락·공포",
+};
 
 interface CoachOutput {
   praise:     string;
@@ -74,6 +92,23 @@ router.post("/weekly-coach", async (req, res) => {
     const cached   = cache.get<CoachOutput>(cacheKey);
     if (cached) return res.json(cached);
 
+    const regimeBlock = (() => {
+      const lines: string[] = [];
+      if (input.currentRegime) {
+        lines.push(`- 현재 시장 국면: ${REGIME_LABEL[input.currentRegime]}`);
+      }
+      if (input.regimeHistory && input.regimeHistory.length > 0) {
+        const rows = input.regimeHistory
+          .filter((s) => s.count > 0)
+          .map((s) => `  · ${REGIME_LABEL[s.regime]}: ${s.count}건 / 승률 ${(s.winRate * 100).toFixed(0)}% / 평균 ${s.avgPnLPct >= 0 ? "+" : ""}${s.avgPnLPct.toFixed(1)}%`);
+        if (rows.length > 0) {
+          lines.push("- 본인 국면별 청산 패턴:");
+          lines.push(...rows);
+        }
+      }
+      return lines.length > 0 ? "\n## 시장 국면 + 본인 패턴\n" + lines.join("\n") : "";
+    })();
+
     const prompt = `당신은 한국 개인 스윙 트레이더의 "뇌동매매 방지 코치"입니다. 아래 주간 데이터를 보고 진심 어린 코멘트를 JSON으로 작성하세요.
 
 ## 주간 데이터
@@ -86,7 +121,7 @@ router.post("/weekly-coach", async (req, res) => {
 - 헬스 스코어: ${input.healthScore}/100
 - 카테고리 비중: ${input.topCategories.map(c => `${c.label} ${c.pct.toFixed(0)}%`).join(", ")}
 - 섹터 집중: ${input.topSectors.map(s => `${s.label} ${s.pct.toFixed(0)}%`).join(", ")}
-- 최근 진입: ${input.recentTickers.slice(0, 5).join(", ") || "없음"}
+- 최근 진입: ${input.recentTickers.slice(0, 5).join(", ") || "없음"}${regimeBlock}
 
 ## 응답 형식 (JSON만)
 {
@@ -98,6 +133,7 @@ router.post("/weekly-coach", async (req, res) => {
 ## 톤
 - 한국어, 솔직하고 담백, 과장 금지
 - 구체적 수치 인용 (예: "이달 -8% 손실 중", "뇌동 차단 3건")
+- 국면 정보가 있으면 "현재 ${input.currentRegime ? REGIME_LABEL[input.currentRegime] : "(국면 미상)"} 진입 시 본인 평균 승률 X%" 형식으로 직접 인용
 - 격려보다 사실 우선
 - 비속어/이모지 금지`;
 
