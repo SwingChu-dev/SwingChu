@@ -117,4 +117,110 @@ ${catalogTxt}
   }
 });
 
+// ── 단일 체결 화면 파싱 (토스증권 체결 완료 화면 등) ───────────────────────
+interface ParsedTrade {
+  side:           "BUY" | "SELL";
+  nameKrShown:    string;
+  ticker:         string | null;
+  market:         "KOSPI" | "KOSDAQ" | "NASDAQ" | null;
+  currency:       "KRW" | "USD" | null;
+  quantity:       number;
+  price:          number;        // 1주당 체결가 (포지션 통화)
+  totalKRW:       number | null; // 총 체결금액 (KRW)
+  executedAt:     string | null; // ISO
+  matched:        boolean;
+}
+
+router.post("/portfolio/parse-trade", async (req, res) => {
+  try {
+    const { image, mimeType, catalog } = req.body as {
+      image?:    string;
+      mimeType?: string;
+      catalog?:  CatalogItem[];
+    };
+    if (!image || typeof image !== "string") {
+      return res.status(400).json({ error: "image (base64) required" });
+    }
+    const mt = mimeType ?? "image/jpeg";
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(mt)) {
+      return res.status(400).json({ error: "unsupported mimeType" });
+    }
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: "ANTHROPIC_API_KEY not configured" });
+
+    const catalogTxt = (catalog ?? []).slice(0, 100).map(c =>
+      `${c.ticker} (${c.market}/${c.currency}): ${c.nameKr}`
+    ).join("\n");
+
+    const prompt = `한국 증권사 앱(특히 토스증권)의 **단일 거래 체결 완료 화면** 스크린샷이다.
+다음을 추출하라:
+- side: 매수면 "BUY", 매도면 "SELL"
+- nameKrShown: 화면에 표시된 종목 한글 이름 그대로
+- quantity: 체결 수량 (주). 정수.
+- price: 1주당 체결가 (포지션 통화 기준 — 미국주식이면 USD, 한국주식이면 KRW)
+- totalKRW: 총 체결금액(원 환산). 화면에 표시된 값 우선, 없으면 null.
+- executedAt: 체결 시각 (있으면 ISO 형식 "2026-05-06T15:30:00", 없으면 null)
+
+가능하면 카탈로그에서 ticker/market/currency를 매칭하라. 정확히 매칭되지 않으면 모두 null + matched=false.
+
+== 카탈로그 ==
+${catalogTxt}
+
+응답은 반드시 아래 JSON 한 객체만, 코드블록·설명 없이:
+{"trade":{"side":"BUY","nameKrShown":"엔비디아","ticker":"NVDA","market":"NASDAQ","currency":"USD","quantity":2,"price":140.5,"totalKRW":405000,"executedAt":null,"matched":true}}
+
+체결 화면이 아니거나 추출 불가능하면: {"trade":null}`;
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method:  "POST",
+      headers: {
+        "content-type":      "application/json",
+        "x-api-key":         apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model:       CLAUDE_MODEL,
+        max_tokens:  600,
+        temperature: 0.1,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: mt, data: image } },
+            { type: "text",  text: prompt },
+          ],
+        }],
+      }),
+    });
+
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => "");
+      return res.status(502).json({ error: `Claude ${resp.status}`, detail: errBody.slice(0, 500) });
+    }
+    const data: any = await resp.json();
+    const text = (data?.content ?? []).map((b: any) => b.text ?? "").join("").trim();
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return res.status(502).json({ error: "Claude 응답 파싱 실패", raw: text.slice(0, 500) });
+    }
+
+    let parsed: { trade?: ParsedTrade | null };
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      return res.status(502).json({ error: "Claude JSON 파싱 실패", raw: text.slice(0, 500) });
+    }
+
+    const t = parsed.trade;
+    if (!t || (t.side !== "BUY" && t.side !== "SELL") || !Number.isFinite(t.quantity) || t.quantity <= 0 || !Number.isFinite(t.price) || t.price <= 0) {
+      return res.json({ trade: null, asOf: Date.now() });
+    }
+
+    return res.json({ trade: t, asOf: Date.now() });
+  } catch (e: any) {
+    console.error("[portfolio/parse-trade]", e);
+    return res.status(500).json({ error: e?.message ?? "unknown" });
+  }
+});
+
 export default router;
