@@ -315,6 +315,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       deviationNote:  req.deviationNote,
       nextChange:     req.nextChange,
       isImpulseEntry: pos.isImpulseBuy,
+      entryRegime:    pos.entryRegime,
     };
 
     // 보유 차감 / 전량 청산 시 삭제

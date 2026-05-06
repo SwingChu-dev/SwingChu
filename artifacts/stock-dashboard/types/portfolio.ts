@@ -61,6 +61,8 @@ export interface Position {
   isImpulseBuy:        boolean;
   isInLiquidationMode: boolean;
   notes:               string[];
+  /** 진입 시점 시장 국면 (BULL_EARLY / BULL_HOT / SIDEWAYS / BEAR) */
+  entryRegime?:        "BULL_EARLY" | "BULL_HOT" | "SIDEWAYS" | "BEAR";
   /** 손절 알림 발사 시각 (중복 방지) */
   firedStopLossAt?:    number;
   /** 알림 발사된 익절 레벨 (예: [3, 5]) */
@@ -204,6 +206,8 @@ export interface ClosedTrade {
   deviationNote:     string;
   nextChange:        string;
   isImpulseEntry:    boolean;
+  /** 진입 시점 시장 국면 (Position에서 복사) */
+  entryRegime?:      "BULL_EARLY" | "BULL_HOT" | "SIDEWAYS" | "BEAR";
 }
 
 export interface TradeStats {

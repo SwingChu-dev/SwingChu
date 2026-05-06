@@ -17,6 +17,8 @@ import {
 import { CATEGORY_LIMITS, ABSOLUTE_LIMITS } from "@/constants/rules";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { useStockPrice } from "@/context/StockPriceContext";
+import { useMarketIntel } from "@/hooks/useMarketIntel";
+import { regimeFromPhase } from "@/utils/regimePlaybook";
 import { validateEntry } from "@/services/entryValidator";
 import ImpulseChecklist from "@/components/ImpulseChecklist";
 
@@ -39,6 +41,8 @@ export default function BuyScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ stockId?: string }>();
   const { portfolio, settings, avgPositionSize, addPendingEntry, executeBuy } = usePortfolio();
+  const { data: marketIntel } = useMarketIntel("us");
+  const currentRegime = marketIntel ? regimeFromPhase(marketIntel.cycle.phase) : undefined;
   const { getQuote, usdKrw } = useStockPrice();
 
   const initialStock = params.stockId
@@ -218,6 +222,7 @@ export default function BuyScreen() {
               isImpulseBuy:     markImpulseAtBuy,
               isInLiquidationMode: false,
               notes:            [],
+              entryRegime:      currentRegime,
             });
             router.replace("/(tabs)/portfolio");
           },
