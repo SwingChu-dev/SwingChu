@@ -749,6 +749,79 @@ router.get("/stocks/screen", async (req, res) => {
   return res.json(output);
 });
 
+// ─── 종목 검색 (Yahoo Finance) ─────────────────────────────────────────────
+// 사용자가 카탈로그에 없는 종목을 추가할 수 있도록 Yahoo 검색 API를 프록시.
+const searchCache = new TtlCache<any>(10 * 60_000);
+
+interface SearchHit {
+  ticker:   string;
+  name:     string;
+  market:   "NASDAQ" | "KOSPI" | "KOSDAQ" | "NYSE" | "OTHER";
+  currency: "USD" | "KRW";
+  exchange: string;
+}
+
+function classifyExchange(symbol: string, exch: string): { market: SearchHit["market"]; currency: "USD" | "KRW"; ticker: string } {
+  // 한국 종목: 005930.KS, 035720.KQ
+  if (symbol.endsWith(".KS")) {
+    return { market: "KOSPI",  currency: "KRW", ticker: symbol.replace(".KS", "") };
+  }
+  if (symbol.endsWith(".KQ")) {
+    return { market: "KOSDAQ", currency: "KRW", ticker: symbol.replace(".KQ", "") };
+  }
+  // 미국: NYSE / NASDAQ
+  if (exch === "NMS" || exch === "NGM" || exch === "NCM" || exch === "NAS" || exch === "NASDAQ") {
+    return { market: "NASDAQ", currency: "USD", ticker: symbol };
+  }
+  if (exch === "NYQ" || exch === "NYSE") {
+    return { market: "NYSE",   currency: "USD", ticker: symbol };
+  }
+  return { market: "OTHER", currency: "USD", ticker: symbol };
+}
+
+router.get("/stocks/search", async (req, res) => {
+  const q = String(req.query.q ?? "").trim();
+  if (q.length < 1) return res.json({ hits: [] });
+  if (q.length > 50) return res.status(400).json({ error: "query too long" });
+
+  const cached = searchCache.get(q);
+  if (cached) return res.json(cached);
+
+  try {
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=10&newsCount=0`;
+    const resp = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0 (compatible; SwingChu/1.0)" },
+    });
+    if (!resp.ok) {
+      return res.status(502).json({ error: `yahoo search ${resp.status}` });
+    }
+    const data: any = await resp.json();
+    const quotes: any[] = Array.isArray(data?.quotes) ? data.quotes : [];
+
+    const hits: SearchHit[] = quotes
+      .filter((q) => q?.symbol && q?.quoteType === "EQUITY")
+      .map((q) => {
+        const cls = classifyExchange(q.symbol, q.exchange ?? "");
+        return {
+          ticker:   cls.ticker,
+          name:     q.shortname ?? q.longname ?? q.symbol,
+          market:   cls.market,
+          currency: cls.currency,
+          exchange: q.exchDisp ?? q.exchange ?? "",
+        };
+      })
+      .filter((h) => h.market !== "OTHER")  // 알 수 없는 거래소는 제외
+      .slice(0, 8);
+
+    const result = { hits };
+    searchCache.set(q, result);
+    return res.json(result);
+  } catch (e: any) {
+    console.error("[stocks/search]", e);
+    return res.status(500).json({ error: e?.message ?? "search failed" });
+  }
+});
+
 // ─── 종목 상세 재무/애널리스트 데이터 ─────────────────────────────────────────
 router.get("/stocks/detail", async (req, res) => {
   const ticker = (req.query.ticker as string) ?? "";
