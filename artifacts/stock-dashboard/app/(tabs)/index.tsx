@@ -238,32 +238,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* ─── 도구 바로가기 ─── */}
-        {!editMode && (
-          <View style={[styles.toolsCard, { backgroundColor: c.card }]}>
-            <Text style={[styles.toolsHeader, { color: c.textSecondary }]}>도구</Text>
-            <View style={styles.toolsRow}>
-              {[
-
-                { icon: "eye-outline"        as const, label: "폭풍의\n눈",      color: "#D4A855", path: "/market-cycle" },
-
-              ].map((t) => (
-                <TouchableOpacity
-                  key={t.path}
-                  style={styles.toolBtn}
-                  onPress={() => router.push(t.path as any)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.toolIcon, { backgroundColor: t.color + "18" }]}>
-                    <Ionicons name={t.icon} size={20} color={t.color} />
-                  </View>
-                  <Text style={[styles.toolLabel, { color: c.textSecondary }]}>{t.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
         <View style={{ height: 30 }} />
       </ScrollView>
     </View>
@@ -330,33 +304,4 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   addBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-
-  toolsCard: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
-  },
-  toolsHeader: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    marginBottom: 12,
-  },
-  toolsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  toolBtn: { alignItems: "center", gap: 6, flex: 1 },
-  toolIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  toolLabel: { fontSize: 10, fontFamily: "Inter_500Medium", textAlign: "center", lineHeight: 14 },
 });
