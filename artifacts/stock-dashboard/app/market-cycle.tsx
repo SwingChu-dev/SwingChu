@@ -11,6 +11,7 @@ import Svg, {
 } from "react-native-svg";
 
 import { useMarketIntel, CyclePhase, FgLevel, Severity, Market } from "@/hooks/useMarketIntel";
+import { playbookFor } from "@/utils/regimePlaybook";
 
 // ── 디자인 토큰 (HTML 시안의 색상) ─────────────────────────────────────────
 const T = {
@@ -307,6 +308,33 @@ export default function MarketCycleScreen() {
               </View>
             </View>
 
+            {/* SECTION 1.5: 행동 수칙 (현재 국면 기준) */}
+            {(() => {
+              const pb = playbookFor(data.cycle.phase);
+              return (
+                <View style={s.section}>
+                  <View style={s.sectionHead}>
+                    <Text style={s.sectionNum}>1.5</Text>
+                    <Text style={s.h2}>지금 해야 할 것 / 피해야 할 것</Text>
+                  </View>
+                  <View style={[s.card, { borderColor: pb.color + "55", borderWidth: 1 }]}>
+                    <View style={pbStyles.head}>
+                      <Text style={pbStyles.emoji}>{pb.emoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[pbStyles.label, { color: pb.color }]}>{pb.label}</Text>
+                        <Text style={pbStyles.summary}>{pb.summary}</Text>
+                      </View>
+                    </View>
+
+                    <PbBlock title="진입" items={pb.rules.entry} accent={pb.color} />
+                    <PbBlock title="익절·손절" items={pb.rules.exit} accent={pb.color} />
+                    <PbBlock title="사이즈" items={pb.rules.sizing} accent={pb.color} />
+                    <PbBlock title="피해야 할 행동" items={pb.rules.avoid} accent="#F04452" />
+                  </View>
+                </View>
+              );
+            })()}
+
             {/* SECTION 2: 공포 탐욕 */}
             <View style={s.section}>
               <View style={s.sectionHead}>
@@ -560,6 +588,32 @@ export default function MarketCycleScreen() {
     </View>
   );
 }
+
+function PbBlock({ title, items, accent }: { title: string; items: string[]; accent: string }) {
+  return (
+    <View style={pbStyles.block}>
+      <Text style={[pbStyles.blockTitle, { color: accent }]}>{title}</Text>
+      {items.map((it, i) => (
+        <View key={i} style={pbStyles.row}>
+          <Text style={[pbStyles.bullet, { color: accent }]}>•</Text>
+          <Text style={pbStyles.itemText}>{it}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const pbStyles = StyleSheet.create({
+  head:       { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  emoji:      { fontSize: 28 },
+  label:      { fontSize: 14, fontFamily: "Inter_700Bold" },
+  summary:    { fontSize: 12, color: T.inkDim, marginTop: 2, lineHeight: 18 },
+  block:      { gap: 4, marginTop: 10 },
+  blockTitle: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5, textTransform: "uppercase" },
+  row:        { flexDirection: "row", gap: 8, paddingLeft: 4 },
+  bullet:     { fontSize: 13, width: 10, fontFamily: "Inter_700Bold" },
+  itemText:   { flex: 1, fontSize: 13, color: T.ink, lineHeight: 19 },
+});
 
 const s = StyleSheet.create({
   root:        { flex: 1 },

@@ -19,6 +19,8 @@ import StockCard from "@/components/StockCard";
 import FilterChip from "@/components/FilterChip";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { useVix } from "@/hooks/useVix";
+import { useMarketIntel } from "@/hooks/useMarketIntel";
+import { playbookFor } from "@/utils/regimePlaybook";
 
 type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "고점권" | "세력진입";
 
@@ -76,6 +78,8 @@ export default function HomeScreen() {
   const { smartMoneySignals, refresh: refreshSignals } = useAISignals();
   const { getQuote, refresh } = useStockPrice();
   const vix = useVix();
+  const { data: marketIntel } = useMarketIntel("us");
+  const playbook = marketIntel ? playbookFor(marketIntel.cycle.phase) : null;
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
 
@@ -119,7 +123,19 @@ export default function HomeScreen() {
     <View style={[styles.root, { backgroundColor: c.background }]}>
       {/* ─── Header ─── */}
       <View style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: c.background }]}>
-        <Text style={[styles.headerTitle, { color: c.text }]}>관심종목</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: c.text }]}>관심종목</Text>
+          {playbook && (
+            <TouchableOpacity
+              style={[styles.regimePill, { backgroundColor: playbook.color + "22", borderColor: playbook.color + "55" }]}
+              onPress={() => router.push("/market-cycle" as any)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.regimeEmoji}>{playbook.emoji}</Text>
+              <Text style={[styles.regimeText, { color: playbook.color }]}>{playbook.label} · 행동 수칙 →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <TouchableOpacity
           style={[styles.editBtn, { backgroundColor: editMode ? c.tint + "18" : "transparent" }]}
           onPress={() => setEditMode((v) => !v)}
@@ -264,6 +280,19 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold" },
+  regimePill:   {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  regimeEmoji:  { fontSize: 12 },
+  regimeText:   { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   editBtn:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   editBtnText:  { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   summaryCard: {
