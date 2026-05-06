@@ -6,7 +6,8 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
@@ -143,6 +144,14 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const c = isDark ? Colors.dark : Colors.light;
+  const router = useRouter();
+
+  // 첫 실행이면 온보딩으로 라우팅 (한 번만)
+  React.useEffect(() => {
+    AsyncStorage.getItem("@swingchu/onboarded")
+      .then((v) => { if (!v) router.replace("/onboarding" as any); })
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -187,6 +196,14 @@ function RootLayoutNav() {
         <Stack.Screen
           name="tax"
           options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="legal"
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false, animation: "fade", gestureEnabled: false }}
         />
         <Stack.Screen
           name="import-screenshot"

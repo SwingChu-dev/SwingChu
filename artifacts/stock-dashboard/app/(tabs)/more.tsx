@@ -139,6 +139,18 @@ export default function MoreScreen() {
           />
         </View>
 
+        {/* 법적 정보 */}
+        <SectionHeader title="법적 정보" />
+        <View style={styles.section}>
+          <MenuItem
+            icon="shield-outline"
+            iconColor="#94A3B8"
+            title="투자 면책 / 개인정보 / 이용약관"
+            description="본 앱은 투자자문업이 아니며 모든 매매 결정은 본인 책임"
+            onPress={() => router.push("/legal" as any)}
+          />
+        </View>
+
         {/* 앱 정보 */}
         <SectionHeader title="앱 정보" />
         <View style={styles.section}>

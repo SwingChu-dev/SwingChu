@@ -221,7 +221,12 @@ export default function HomeScreen() {
 
           {displayed.length === 0 && (
             <View style={styles.emptyWrap}>
-              <Text style={[styles.emptyText, { color: c.textTertiary }]}>종목이 없습니다</Text>
+              <Ionicons name="sparkles-outline" size={28} color={c.textTertiary} />
+              <Text style={[styles.emptyTitle, { color: c.text }]}>관심종목 비었어요</Text>
+              <Text style={[styles.emptyDesc, { color: c.textSecondary }]}>
+                감정이 아닌 데이터로 매매하기 위한 첫 단계 — 분석할 종목을 추가해 보세요.
+                AI 신호·시장 국면·세력 흐름을 한눈에 봅니다.
+              </Text>
             </View>
           )}
         </View>
@@ -292,8 +297,10 @@ const styles = StyleSheet.create({
   },
   listCount:  { fontSize: 12, fontFamily: "Inter_500Medium" },
   editHint:   { fontSize: 11, fontFamily: "Inter_400Regular" },
-  emptyWrap:  { padding: 32, alignItems: "center" },
+  emptyWrap:  { padding: 32, alignItems: "center", gap: 10 },
   emptyText:  { fontSize: 14, fontFamily: "Inter_400Regular" },
+  emptyTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  emptyDesc:  { fontSize: 13, lineHeight: 19, textAlign: "center", paddingHorizontal: 8 },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
