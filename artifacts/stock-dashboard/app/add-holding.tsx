@@ -14,6 +14,8 @@ import {
   Category, Sector, CATEGORY_LABEL, CATEGORY_COLOR, SECTOR_LABEL, Position,
 } from "@/types/portfolio";
 import { usePortfolio } from "@/context/PortfolioContext";
+import { useMarketIntel } from "@/hooks/useMarketIntel";
+import { regimeFromPhase } from "@/utils/regimePlaybook";
 import { showAlert } from "@/utils/crossAlert";
 
 type Mkt  = Position["market"];
@@ -46,6 +48,8 @@ export default function AddHoldingScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const { addPosition } = usePortfolio();
+  const { data: marketIntel } = useMarketIntel("us");
+  const currentRegime = marketIntel ? regimeFromPhase(marketIntel.cycle.phase) : undefined;
 
   const [stockId,  setStockId]  = useState<string | undefined>();
   const [ticker,   setTicker]   = useState("");
@@ -139,6 +143,7 @@ export default function AddHoldingScreen() {
                 isImpulseBuy:        false,
                 isInLiquidationMode: false,
                 notes:               [],
+                entryRegime:         currentRegime,
               });
               router.back();
             } catch (e: any) {

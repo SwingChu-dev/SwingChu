@@ -17,6 +17,21 @@ import {
   computeStats, statsByCategory, exitTypeBreakdown,
   deviationBreakdown, filterByTime, TimeFilter,
 } from "@/services/tradeStats";
+import type { RegimeKey } from "@/utils/regimePlaybook";
+
+const REGIME_LABEL: Record<RegimeKey, string> = {
+  BULL_EARLY: "🌱 회복·불장 초입",
+  BULL_HOT:   "🔥 과열·불장 후반",
+  SIDEWAYS:   "↔️ 횡보·정체",
+  BEAR:       "🛡️ 하락·공포",
+};
+const REGIME_COLOR: Record<RegimeKey, string> = {
+  BULL_EARLY: "#22C55E",
+  BULL_HOT:   "#F04452",
+  SIDEWAYS:   "#F59E0B",
+  BEAR:       "#1B63E8",
+};
+const REGIME_ORDER: RegimeKey[] = ["BULL_EARLY", "BULL_HOT", "SIDEWAYS", "BEAR"];
 
 const FILTERS: { key: TimeFilter; label: string }[] = [
   { key: "WEEK",    label: "1주" },
@@ -46,6 +61,25 @@ export default function StatsScreen() {
   const byCat  = useMemo(() => statsByCategory(trades), [trades]);
   const byExit = useMemo(() => exitTypeBreakdown(trades), [trades]);
   const byDev  = useMemo(() => deviationBreakdown(trades), [trades]);
+
+  // 국면별 분석: entryRegime 태그된 청산만 집계
+  const regimeStats = useMemo(() => {
+    const map = new Map<RegimeKey, { count: number; wins: number; pnlKRW: number }>();
+    for (const t of trades) {
+      const r = t.entryRegime;
+      if (!r) continue;
+      const cur = map.get(r) ?? { count: 0, wins: 0, pnlKRW: 0 };
+      cur.count += 1;
+      if (t.realizedPnLKRW > 0) cur.wins += 1;
+      cur.pnlKRW += t.realizedPnLKRW;
+      map.set(r, cur);
+    }
+    return REGIME_ORDER
+      .map((r) => ({ regime: r, ...(map.get(r) ?? { count: 0, wins: 0, pnlKRW: 0 }) }))
+      .filter((x) => x.count > 0);
+  }, [trades]);
+  const taggedCount = regimeStats.reduce((s, x) => s + x.count, 0);
+  const untaggedCount = trades.length - taggedCount;
 
   const winColor  = "#FF3B30";  // 토스 빨강(수익)
   const lossColor = "#3478F6";  // 토스 파랑(손실)
@@ -176,6 +210,42 @@ export default function StatsScreen() {
                   </View>
                 );
               })}
+            </View>
+
+            {/* 국면별 매매 패턴 */}
+            <View style={[styles.card, { backgroundColor: c.card }]}>
+              <Text style={[styles.cardTitle, { color: c.text }]}>국면별 매매 패턴</Text>
+              {regimeStats.length === 0 ? (
+                <Text style={[styles.helperText, { color: c.textTertiary }]}>
+                  국면 태그된 청산이 없습니다. 이번 PR 이후 진입한 종목부터 자동 태깅됩니다.
+                </Text>
+              ) : (
+                <>
+                  {regimeStats.map((r) => {
+                    const winRate = r.wins / r.count;
+                    const color = r.pnlKRW > 0 ? winColor : r.pnlKRW < 0 ? lossColor : c.textSecondary;
+                    return (
+                      <View key={r.regime} style={[styles.catRow, { borderTopColor: c.separator }]}>
+                        <View style={[styles.catDot, { backgroundColor: REGIME_COLOR[r.regime] }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.catName, { color: c.text }]}>{REGIME_LABEL[r.regime]}</Text>
+                          <Text style={[styles.catSub, { color: c.textTertiary }]}>
+                            {r.count}건 · 승률 {(winRate * 100).toFixed(0)}%
+                          </Text>
+                        </View>
+                        <Text style={[styles.catPnl, { color }]}>
+                          {r.pnlKRW >= 0 ? "+" : ""}{fmtKRW(r.pnlKRW)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                  {untaggedCount > 0 && (
+                    <Text style={[styles.helperText, { color: c.textTertiary }]}>
+                      태그 없는 청산 {untaggedCount}건은 제외 (이전 진입분).
+                    </Text>
+                  )}
+                </>
+              )}
             </View>
 
             {/* 청산 타입별 */}
