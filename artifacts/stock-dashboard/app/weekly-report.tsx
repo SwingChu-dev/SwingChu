@@ -48,7 +48,7 @@ export default function WeeklyReportScreen() {
     setCoachLoading(true);
     setCoachError(null);
     try {
-      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore, "haiku");
+      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore, "sonnet");
       setCoach(result);
     } catch (e: any) {
       setCoachError(e?.message ?? "AI 코치 호출 실패");
@@ -87,7 +87,7 @@ export default function WeeklyReportScreen() {
           <View style={styles.coachHeader}>
             <Ionicons name="sparkles" size={16} color={c.tint} />
             <Text style={[styles.coachTitle, { color: c.text }]}>
-              AI 코치 · Claude Haiku
+              AI 코치 · {coach?.model?.includes("sonnet") ? "Claude Sonnet" : coach?.model?.includes("haiku") ? "Claude Haiku" : "Claude Sonnet"}
             </Text>
             {!coachLoading && (
               <TouchableOpacity onPress={() => loadCoach()} style={{ marginLeft: "auto" }}>
