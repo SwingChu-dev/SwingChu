@@ -4,6 +4,7 @@
  * 종목명·수량·평가금액을 OCR + 카탈로그 매칭하여 보유 등록을 도움.
  */
 import { Router } from "express";
+import { rateLimit } from "../lib/rateLimit";
 
 const router = Router();
 const CLAUDE_MODEL = "claude-haiku-4-5";
@@ -26,7 +27,7 @@ interface ParsedPosition {
   matched:        boolean;
 }
 
-router.post("/portfolio/parse-image", async (req, res) => {
+router.post("/portfolio/parse-image", rateLimit("portfolio-parse-image", 30), async (req, res) => {
   try {
     const { image, mimeType, catalog } = req.body as {
       image?:    string;
@@ -131,7 +132,7 @@ interface ParsedTrade {
   matched:        boolean;
 }
 
-router.post("/portfolio/parse-trade", async (req, res) => {
+router.post("/portfolio/parse-trade", rateLimit("portfolio-parse-trade", 50), async (req, res) => {
   try {
     const { image, mimeType, catalog } = req.body as {
       image?:    string;

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { buildWeeklyReport, fetchWeeklyCoach, regimeStatsFromClosed, type CoachComment } from "@/services/weeklyReport";
+import { useAiQuota } from "@/hooks/useAiQuota";
 import { CATEGORY_COLOR, CATEGORY_LABEL, SECTOR_LABEL } from "@/types/portfolio";
 import { analyzePortfolio } from "@/services/portfolioAnalyzer";
 import { useMarketIntel } from "@/hooks/useMarketIntel";
@@ -48,8 +49,16 @@ export default function WeeklyReportScreen() {
   const [coach,        setCoach]        = useState<CoachComment | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError,   setCoachError]   = useState<string | null>(null);
+  const quota = useAiQuota("weekly-coach");
 
-  const loadCoach = async () => {
+  const loadCoach = async (manual = false) => {
+    if (manual) {
+      const allowed = await quota.consume();
+      if (!allowed) {
+        setCoachError(`오늘 ${quota.label} ${quota.limit}회 한도에 도달했습니다. 자정에 자동 리셋.`);
+        return;
+      }
+    }
     setCoachLoading(true);
     setCoachError(null);
     try {
@@ -95,10 +104,10 @@ export default function WeeklyReportScreen() {
           <View style={styles.coachHeader}>
             <Ionicons name="sparkles" size={16} color={c.tint} />
             <Text style={[styles.coachTitle, { color: c.text }]}>
-              AI 코치 · {coach?.model?.includes("sonnet") ? "Claude Sonnet" : coach?.model?.includes("haiku") ? "Claude Haiku" : "Claude Sonnet"}
+              AI 코치 · {coach?.model?.includes("sonnet") ? "Claude Sonnet" : coach?.model?.includes("haiku") ? "Claude Haiku" : "Claude Sonnet"} · 오늘 {quota.remaining}/{quota.limit}회 남음
             </Text>
             {!coachLoading && (
-              <TouchableOpacity onPress={() => loadCoach()} style={{ marginLeft: "auto" }}>
+              <TouchableOpacity onPress={() => loadCoach(true)} style={{ marginLeft: "auto" }}>
                 <Ionicons name="refresh" size={16} color={c.textSecondary} />
               </TouchableOpacity>
             )}

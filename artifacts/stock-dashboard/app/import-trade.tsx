@@ -23,6 +23,7 @@ import { useMarketIntel } from "@/hooks/useMarketIntel";
 import { regimeFromPhase } from "@/utils/regimePlaybook";
 import { showAlert } from "@/utils/crossAlert";
 import { ABSOLUTE_LIMITS } from "@/constants/rules";
+import { useAiQuota } from "@/hooks/useAiQuota";
 
 const DEFAULT_TP = [3, 5, 8, 15];
 
@@ -34,6 +35,7 @@ export default function ImportTradeScreen() {
   const { executeBuy } = usePortfolio();
   const { data: marketIntel } = useMarketIntel("us");
   const currentRegime = marketIntel ? regimeFromPhase(marketIntel.cycle.phase) : undefined;
+  const quota = useAiQuota("trade-import");
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -59,6 +61,13 @@ export default function ImportTradeScreen() {
       const asset = result.assets[0];
       setImageUri(asset.uri);
       setTrade(null);
+
+      const allowed = await quota.consume();
+      if (!allowed) {
+        setError(`오늘 ${quota.label} ${quota.limit}건 한도에 도달했습니다. 자정에 자동 리셋됩니다.`);
+        return;
+      }
+
       setParsing(true);
       const parsed = await parseTradeImage(asset.base64!, asset.mimeType ?? "image/jpeg");
       if (!parsed) {
@@ -143,7 +152,7 @@ export default function ImportTradeScreen() {
           <Text style={[s.cardTitle, { color: c.text }]}>토스증권 체결 화면</Text>
           <Text style={[s.cardDesc, { color: c.textSecondary }]}>
             매수 직후 체결 완료 화면을 캡처하면 종목·수량·가격이 자동 추출됩니다.
-            매도는 추후 지원.
+            매도는 추후 지원. · 오늘 {quota.remaining}/{quota.limit}건 남음
           </Text>
           <View style={s.btnRow}>
             <TouchableOpacity

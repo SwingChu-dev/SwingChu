@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { rateLimit } from "../lib/rateLimit";
 
 const router = Router();
 
@@ -60,7 +61,7 @@ function buildSystemPrompt(ctx: StockContext): string {
   return lines.join("\n");
 }
 
-router.post("/stocks/chat", async (req, res) => {
+router.post("/stocks/chat", rateLimit("stocks-chat", 50), async (req, res) => {
   try {
     const body = req.body as ChatBody;
     if (!body?.context?.ticker || !Array.isArray(body.messages) || body.messages.length === 0) {
