@@ -230,6 +230,16 @@ export default function PortfolioScreen() {
           <Text style={styles.ctaText}>새 매수 플로우 시작</Text>
         </TouchableOpacity>
 
+        {/* 토스 체결 스크린샷 등록 */}
+        <TouchableOpacity
+          style={[styles.ctaSecondary, { borderColor: c.cardBorder, backgroundColor: c.card }]}
+          onPress={() => router.push("/import-trade" as any)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="camera" size={18} color={c.tint} />
+          <Text style={[styles.ctaSecondaryText, { color: c.tint }]}>체결 스크린샷으로 등록</Text>
+        </TouchableOpacity>
+
         {/* 쿨다운 진행 중 */}
         {activePending.length > 0 && (
           <View style={[styles.section, { backgroundColor: c.card }]}>
@@ -336,6 +346,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: 12,
   },
   ctaText:       { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  ctaSecondary:  {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    paddingVertical: 12, borderRadius: 12, marginTop: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  ctaSecondaryText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   section:       { borderRadius: 14, padding: 16, gap: 4 },
   sectionTitle:  { fontSize: 14, fontFamily: "Inter_700Bold", marginBottom: 8 },
