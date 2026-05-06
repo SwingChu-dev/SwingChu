@@ -37,6 +37,7 @@ import ShortSellSection from "@/components/detail/ShortSellSection";
 import OverheatSection from "@/components/detail/OverheatSection";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
+import { getMarketStatus, type MarketKey } from "@/utils/marketHolidays";
 
 type TabKey = "진입" | "익절" | "박스권" | "재무·전망" | "기술·진단" | "리스크" | "요일" | "뉴스" | "백테스트" | "지정학";
 
@@ -193,6 +194,15 @@ export default function StockDetailScreen() {
             <View style={[styles.marketBadge, { backgroundColor: marketColor + "22" }]}>
               <Text style={[styles.marketText, { color: marketColor }]}>{stock.market}</Text>
             </View>
+            {(() => {
+              const status = getMarketStatus(stock.market as MarketKey);
+              if (!status.closed) return null;
+              return (
+                <View style={styles.holidayBadge}>
+                  <Text style={styles.holidayBadgeText}>휴장 · {status.reason}</Text>
+                </View>
+              );
+            })()}
           </View>
           <View style={styles.headerPriceRow}>
             {stock.market === "NASDAQ" ? (
@@ -548,6 +558,13 @@ const styles = StyleSheet.create({
   headerName:    { fontSize: 20, fontFamily: "Inter_700Bold" },
   marketBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   marketText:    { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  holidayBadge:  {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "rgba(245,158,11,0.15)",
+  },
+  holidayBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#F59E0B" },
   headerPriceRow:{ flexDirection: "row", alignItems: "center", gap: 8 },
   headerPrice:   { fontSize: 18, fontFamily: "Inter_600SemiBold" },
   regionBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
