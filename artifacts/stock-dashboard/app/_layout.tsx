@@ -168,10 +168,8 @@ function RootLayoutNav() {
         <Stack.Screen
           name="add-stock"
           options={{
-            presentation: "formSheet",
-            sheetAllowedDetents: [0.75, 1],
-            sheetGrabberVisible: true,
             headerShown: false,
+            animation: "slide_from_right",
           }}
         />
         <Stack.Screen
