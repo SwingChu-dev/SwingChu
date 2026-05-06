@@ -13,7 +13,7 @@ import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useColorScheme, View, Text, StyleSheet, ActivityIndicator, Platform, Image } from "react-native";
+import { useColorScheme, View, Text, StyleSheet, ActivityIndicator, Image } from "react-native";
 import Colors from "@/constants/colors";
 import { WatchlistProvider, useWatchlist } from "@/context/WatchlistContext";
 import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
@@ -26,7 +26,6 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import AlertBanner from "@/components/AlertBanner";
 import EarningsAlertScheduler from "@/components/EarningsAlertScheduler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import FoxLogo from "@/components/FoxLogo";
 import { setupNotifications } from "@/utils/notifications";
 import { registerBackgroundPriceTask } from "@/utils/backgroundPriceFetch";
 
@@ -40,15 +39,11 @@ function DisclaimerScreen() {
     <View style={[disclaimerStyles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
       <StatusBar style="light" />
       <View style={disclaimerStyles.logoWrap}>
-        {Platform.OS === "web" ? (
-          <Image
-            source={require("@/assets/images/caricature.png")}
-            style={disclaimerStyles.caricature}
-            resizeMode="contain"
-          />
-        ) : (
-          <FoxLogo size={108} />
-        )}
+        <Image
+          source={require("@/assets/images/caricature.png")}
+          style={disclaimerStyles.caricature}
+          resizeMode="contain"
+        />
         <Text style={disclaimerStyles.logoTitle}>스윙의 정석</Text>
         <Text style={disclaimerStyles.logoSub}>스윙 트레이딩 전략 대시보드</Text>
       </View>
