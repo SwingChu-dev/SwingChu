@@ -9,9 +9,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { usePortfolio } from "@/context/PortfolioContext";
-import { buildWeeklyReport, fetchWeeklyCoach, type CoachComment } from "@/services/weeklyReport";
+import { buildWeeklyReport, fetchWeeklyCoach, regimeStatsFromClosed, type CoachComment } from "@/services/weeklyReport";
 import { CATEGORY_COLOR, CATEGORY_LABEL, SECTOR_LABEL } from "@/types/portfolio";
 import { analyzePortfolio } from "@/services/portfolioAnalyzer";
+import { useMarketIntel } from "@/hooks/useMarketIntel";
+import { regimeFromPhase } from "@/utils/regimePlaybook";
 
 function fmtDate(ts: number): string {
   const d = new Date(ts);
@@ -29,7 +31,8 @@ export default function WeeklyReportScreen() {
   const c = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { portfolio, cooldownSaves, settings } = usePortfolio();
+  const { portfolio, cooldownSaves, settings, closedTrades } = usePortfolio();
+  const { data: marketIntel } = useMarketIntel("us");
 
   const r = useMemo(
     () => buildWeeklyReport(portfolio, cooldownSaves),
@@ -39,6 +42,8 @@ export default function WeeklyReportScreen() {
     () => analyzePortfolio(portfolio, settings.fxRateUSDKRW),
     [portfolio, settings.fxRateUSDKRW],
   );
+  const regimeHistory = useMemo(() => regimeStatsFromClosed(closedTrades), [closedTrades]);
+  const currentRegime = marketIntel ? regimeFromPhase(marketIntel.cycle.phase) : undefined;
 
   const [coach,        setCoach]        = useState<CoachComment | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
@@ -48,7 +53,10 @@ export default function WeeklyReportScreen() {
     setCoachLoading(true);
     setCoachError(null);
     try {
-      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore, "sonnet");
+      const result = await fetchWeeklyCoach(r, portfolio, health.healthScore, "sonnet", {
+        currentRegime,
+        regimeHistory,
+      });
       setCoach(result);
     } catch (e: any) {
       setCoachError(e?.message ?? "AI 코치 호출 실패");
