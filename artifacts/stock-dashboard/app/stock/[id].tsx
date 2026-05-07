@@ -501,7 +501,7 @@ export default function StockDetailScreen() {
       />
 
       <TouchableOpacity
-        style={[styles.chatFab, { backgroundColor: c.tint }]}
+        style={[styles.chatFab, { backgroundColor: c.aiAccent, shadowColor: c.aiAccent }]}
         onPress={() => setShowChat(true)}
         activeOpacity={0.85}
       >

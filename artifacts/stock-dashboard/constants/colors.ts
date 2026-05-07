@@ -6,6 +6,10 @@ const TOSS_BLUE = "#0064FF";
 const TOSS_RED = "#F04452";
 const TOSS_GREEN = "#05C072";
 const TOSS_ORANGE = "#FF6B00";
+// AI 기능 전용 액센트 — 보라 톤. 채팅·AI 신호·인사이트 카드처럼 "AI가 만든 것"임을
+// 시각적으로 구별하기 위함.
+const AI_VIOLET       = "#A855F7";
+const AI_VIOLET_GLOW  = "rgba(168,85,247,0.18)";  // 카드 배경·border 톤
 
 export default {
   light: {
@@ -27,6 +31,8 @@ export default {
     warning: TOSS_ORANGE,
     separator: "#F2F4F6",
     headerBg: "#FFFFFF",
+    aiAccent: AI_VIOLET,
+    aiGlow:   AI_VIOLET_GLOW,
   },
   dark: {
     text: "#FFFFFF",
@@ -47,5 +53,7 @@ export default {
     warning: TOSS_ORANGE,
     separator: "#2C2C2E",
     headerBg: "#1C1C1E",
+    aiAccent: AI_VIOLET,
+    aiGlow:   AI_VIOLET_GLOW,
   },
 };

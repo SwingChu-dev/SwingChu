@@ -100,9 +100,9 @@ export default function WeeklyReportScreen() {
         </View>
 
         {/* AI 코치 코멘트 */}
-        <View style={[styles.coachCard, { backgroundColor: c.card, borderColor: c.tint + "44" }]}>
+        <View style={[styles.coachCard, { backgroundColor: c.card, borderColor: c.aiAccent + "55" }]}>
           <View style={styles.coachHeader}>
-            <Ionicons name="sparkles" size={16} color={c.tint} />
+            <Ionicons name="sparkles" size={16} color={c.aiAccent} />
             <Text style={[styles.coachTitle, { color: c.text }]}>
               AI 코치 · {coach?.model?.includes("sonnet") ? "Claude Sonnet" : coach?.model?.includes("haiku") ? "Claude Haiku" : "Claude Sonnet"} · 오늘 {quota.remaining}/{quota.limit}회 남음
             </Text>

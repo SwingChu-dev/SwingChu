@@ -20,7 +20,11 @@ import FilterChip from "@/components/FilterChip";
 import { calcBoxPosition } from "@/utils/boxPosition";
 import { useVix } from "@/hooks/useVix";
 import { useMarketIntel } from "@/hooks/useMarketIntel";
+import { useMacroEvents } from "@/hooks/useMacroEvents";
 import { playbookFor } from "@/utils/regimePlaybook";
+import { usePortfolio } from "@/context/PortfolioContext";
+import { regimeStatsFromClosed } from "@/services/weeklyReport";
+import { buildDailyInsight } from "@/services/dailyInsight";
 
 type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "고점권" | "세력진입";
 
@@ -79,7 +83,14 @@ export default function HomeScreen() {
   const { getQuote, refresh } = useStockPrice();
   const vix = useVix();
   const { data: marketIntel } = useMarketIntel("us");
+  const { events: macroEvents } = useMacroEvents(30);
+  const { closedTrades } = usePortfolio();
   const playbook = marketIntel ? playbookFor(marketIntel.cycle.phase) : null;
+  const regimeHistory = useMemo(() => regimeStatsFromClosed(closedTrades), [closedTrades]);
+  const insight = useMemo(
+    () => buildDailyInsight(marketIntel?.cycle.phase ?? null, regimeHistory, macroEvents),
+    [marketIntel, regimeHistory, macroEvents],
+  );
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
 
@@ -152,6 +163,28 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.tint} />
         }
       >
+        {/* ─── 오늘의 AI 인사이트 ─── */}
+        <View
+          style={[
+            styles.insightCard,
+            {
+              backgroundColor: c.aiGlow,
+              borderColor: insight.intensity === "high" ? c.aiAccent : c.aiAccent + "55",
+            },
+          ]}
+        >
+          <View style={styles.insightHeader}>
+            <Ionicons name="sparkles" size={14} color={c.aiAccent} />
+            <Text style={[styles.insightLabel, { color: c.aiAccent }]}>오늘의 AI 인사이트</Text>
+          </View>
+          <Text style={[styles.insightHeadline, { color: c.text }]}>{insight.headline}</Text>
+          {insight.detail && (
+            <Text style={[styles.insightDetail, { color: c.textSecondary }]}>
+              {insight.detail}
+            </Text>
+          )}
+        </View>
+
         {/* ─── Summary Row ─── */}
         <View style={[styles.summaryCard, { backgroundColor: c.card }]}>
           <TouchableOpacity style={styles.summaryItem} onPress={() => setFilter("저점권")}>
@@ -274,6 +307,19 @@ const styles = StyleSheet.create({
   regimeText:   { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   editBtn:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100 },
   editBtnText:  { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  insightCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    gap: 6,
+  },
+  insightHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  insightLabel:  { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  insightHeadline: { fontSize: 14, fontFamily: "Inter_700Bold", lineHeight: 20 },
+  insightDetail: { fontSize: 12, lineHeight: 18 },
+
   summaryCard: {
     marginHorizontal: 16,
     marginBottom: 12,
