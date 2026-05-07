@@ -33,7 +33,6 @@
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-image-picker": "~17.0.9",
-    "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.10",
     "expo-router": "~6.0.17",
     "expo-splash-screen": "~31.0.12",
@@ -63,7 +62,6 @@
     "expo-notifications": "~0.32.16",
     "expo-task-manager": "^14.0.9",
     "expo-updates": "~55.0.21",
-    "react-native-chart-kit": "^6.12.0",
-    "react-native-linear-gradient": "^2.8.3"
+    "react-native-chart-kit": "^6.12.0"
   }
 }
