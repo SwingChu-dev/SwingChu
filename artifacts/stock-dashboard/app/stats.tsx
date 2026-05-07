@@ -15,7 +15,8 @@ import {
 } from "@/types/portfolio";
 import {
   computeStats, statsByCategory, exitTypeBreakdown,
-  deviationBreakdown, filterByTime, TimeFilter,
+  deviationBreakdown, filterByTime, detectPatterns,
+  TimeFilter, PatternSeverity,
 } from "@/services/tradeStats";
 import type { RegimeKey } from "@/utils/regimePlaybook";
 
@@ -61,6 +62,7 @@ export default function StatsScreen() {
   const byCat  = useMemo(() => statsByCategory(trades), [trades]);
   const byExit = useMemo(() => exitTypeBreakdown(trades), [trades]);
   const byDev  = useMemo(() => deviationBreakdown(trades), [trades]);
+  const patterns = useMemo(() => detectPatterns(trades), [trades]);
 
   // 국면별 분석: entryRegime 태그된 청산만 집계
   const regimeStats = useMemo(() => {
@@ -248,6 +250,38 @@ export default function StatsScreen() {
               )}
             </View>
 
+            {/* 내 매매 패턴 — 청산 기록 5건 이상에서만 자동 검출 */}
+            {patterns.length > 0 && (
+              <View style={[styles.card, { backgroundColor: c.card }]}>
+                <Text style={[styles.cardTitle, { color: c.text }]}>내 매매 패턴</Text>
+                <Text style={[styles.helperText, { color: c.textTertiary, marginBottom: 4 }]}>
+                  본인 청산 기록에서 자동 추출. 데이터로 보이는 약점부터 고치는 게 가장 큰 역량 개선.
+                </Text>
+                {patterns.map((p) => {
+                  const sevColor =
+                    p.severity === "alert" ? "#F04452" :
+                    p.severity === "warn"  ? "#F59E0B" : c.textSecondary;
+                  const sevIcon: React.ComponentProps<typeof Ionicons>["name"] =
+                    p.severity === "alert" ? "alert-circle" :
+                    p.severity === "warn"  ? "warning"      : "information-circle";
+                  return (
+                    <View key={p.id} style={[styles.patternRow, { borderTopColor: c.separator }]}>
+                      <Ionicons name={sevIcon} size={16} color={sevColor} style={{ marginTop: 2 }} />
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={[styles.catName, { color: c.text }]}>{p.title}</Text>
+                        <Text style={[styles.catSub, { color: c.textSecondary, lineHeight: 17 }]}>
+                          {p.detail}
+                        </Text>
+                        <Text style={[styles.patternEvidence, { color: sevColor }]}>
+                          📊 {p.evidence}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             {/* 청산 타입별 */}
             <View style={[styles.card, { backgroundColor: c.card }]}>
               <Text style={[styles.cardTitle, { color: c.text }]}>청산 타입 분포</Text>
@@ -390,6 +424,19 @@ const styles = StyleSheet.create({
   catName:     { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   catSub:      { fontSize: 11, marginTop: 1 },
   catPnl:      { fontSize: 13, fontFamily: "Inter_700Bold" },
+
+  patternRow:  {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  patternEvidence: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 2,
+  },
 
   bigPct:      { fontSize: 28, fontFamily: "Inter_700Bold" },
   subTitle:    { fontSize: 12, fontFamily: "Inter_600SemiBold", marginTop: 8, marginBottom: 4 },

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import YahooFinanceClass from "yahoo-finance2";
+import { rateLimit } from "../lib/rateLimit";
 
 const router = Router();
 const yahooFinance = new (YahooFinanceClass as any)({
@@ -183,7 +184,7 @@ async function fetchYahooData(ticker: string, market: string): Promise<{
   }
 }
 
-router.get("/earnings", async (req, res) => {
+router.get("/earnings", rateLimit("earnings", 100), async (req, res) => {
   const ticker = String(req.query.ticker ?? "").trim();
   const market = String(req.query.market ?? "NASDAQ").trim();
   if (!ticker) return res.status(400).json({ error: "ticker required" });
