@@ -174,7 +174,7 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
                   style={[
                     styles.bubble,
                     m.role === "user"
-                      ? [styles.userBubble, { backgroundColor: c.tint }]
+                      ? [styles.userBubble, { backgroundColor: c.aiAccent }]
                       : [styles.aiBubble, { backgroundColor: c.card, borderColor: c.cardBorder }],
                   ]}
                 >
@@ -218,7 +218,7 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
             <TouchableOpacity
               style={[
                 styles.sendBtn,
-                { backgroundColor: input.trim() ? c.tint : c.backgroundTertiary, opacity: loading ? 0.5 : 1 },
+                { backgroundColor: input.trim() ? c.aiAccent : c.backgroundTertiary, opacity: loading ? 0.5 : 1 },
               ]}
               disabled={loading || !input.trim()}
               onPress={() => send(input)}
