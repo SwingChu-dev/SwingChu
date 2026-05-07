@@ -33,6 +33,7 @@ import TargetTiersSection from "@/components/detail/TargetTiersSection";
 import EarningsBadge from "@/components/detail/EarningsBadge";
 import FomcBadge from "@/components/detail/FomcBadge";
 import TradingViewChart from "@/components/detail/TradingViewChart";
+import PatternCard from "@/components/detail/PatternCard";
 import AnalystSection from "@/components/detail/AnalystSection";
 import ShortSellSection from "@/components/detail/ShortSellSection";
 import OverheatSection from "@/components/detail/OverheatSection";
@@ -358,6 +359,13 @@ export default function StockDetailScreen() {
       <TradingViewChart
         ticker={stock.ticker}
         market={stock.market as "NASDAQ" | "KOSPI" | "KOSDAQ"}
+        name={stock.name}
+      />
+
+      {/* 차트 패턴 카드 — 규칙 기반 + AI 자세히 */}
+      <PatternCard
+        ticker={stock.ticker}
+        market={stock.market}
         name={stock.name}
       />
 
