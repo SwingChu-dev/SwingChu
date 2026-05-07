@@ -83,6 +83,47 @@ export function filterByTime(trades: ClosedTrade[], filter: TimeFilter): ClosedT
   return trades.filter(t => t.exitDate >= cutoff);
 }
 
+// ── 요일별 청산 통계 ───────────────────────────────────────────────────────
+// "본인은 어느 요일에 매매가 잘 풀리는가?"를 자기 데이터로 답함.
+// 주말 청산은 (시장 휴장이라 거의 없지만) 제외.
+
+export type Dow = 1 | 2 | 3 | 4 | 5;
+
+export interface DowStats {
+  dow:         Dow;
+  dowLabel:    "월" | "화" | "수" | "목" | "금";
+  totalCount:  number;
+  winCount:    number;
+  winRate:     number;       // 0~1
+  avgPnLKRW:   number;
+  totalPnLKRW: number;
+}
+
+const DOW_DEFS: Array<{ dow: Dow; dowLabel: DowStats["dowLabel"] }> = [
+  { dow: 1, dowLabel: "월" },
+  { dow: 2, dowLabel: "화" },
+  { dow: 3, dowLabel: "수" },
+  { dow: 4, dowLabel: "목" },
+  { dow: 5, dowLabel: "금" },
+];
+
+export function statsByDayOfWeek(trades: ClosedTrade[]): DowStats[] {
+  return DOW_DEFS.map(({ dow, dowLabel }) => {
+    const subset = trades.filter(t => new Date(t.exitDate).getDay() === dow);
+    const wins   = subset.filter(t => t.realizedPnLKRW > 0);
+    const totalPnL = subset.reduce((s, t) => s + t.realizedPnLKRW, 0);
+    return {
+      dow,
+      dowLabel,
+      totalCount:  subset.length,
+      winCount:    wins.length,
+      winRate:     subset.length > 0 ? wins.length / subset.length : 0,
+      avgPnLKRW:   subset.length > 0 ? totalPnL / subset.length : 0,
+      totalPnLKRW: totalPnL,
+    };
+  }).filter(d => d.totalCount > 0);
+}
+
 // ── 매매 패턴 자동 검출 ────────────────────────────────────────────────────
 // 청산 기록에서 사용자 본인의 행동 패턴을 추출해 약점을 데이터로 노출.
 // "승자 빨리 팔고 패자 오래 쥔다" 같은 클래식 편향이 본인에게도 있는지 확인용.

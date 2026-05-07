@@ -16,6 +16,7 @@ import {
 import {
   computeStats, statsByCategory, exitTypeBreakdown,
   deviationBreakdown, filterByTime, detectPatterns,
+  statsByDayOfWeek,
   TimeFilter, PatternSeverity,
 } from "@/services/tradeStats";
 import type { RegimeKey } from "@/utils/regimePlaybook";
@@ -63,6 +64,7 @@ export default function StatsScreen() {
   const byExit = useMemo(() => exitTypeBreakdown(trades), [trades]);
   const byDev  = useMemo(() => deviationBreakdown(trades), [trades]);
   const patterns = useMemo(() => detectPatterns(trades), [trades]);
+  const byDow    = useMemo(() => statsByDayOfWeek(trades), [trades]);
 
   // 국면별 분석: entryRegime 태그된 청산만 집계
   const regimeStats = useMemo(() => {
@@ -282,6 +284,46 @@ export default function StatsScreen() {
               </View>
             )}
 
+            {/* 요일별 성과 — 청산 5건 이상에서만 노출 */}
+            {byDow.length > 0 && trades.length >= 5 && (() => {
+              const sorted = [...byDow].sort((a, b) => b.totalPnLKRW - a.totalPnLKRW);
+              const best   = sorted[0];
+              const worst  = sorted[sorted.length - 1];
+              return (
+                <View style={[styles.card, { backgroundColor: c.card }]}>
+                  <Text style={[styles.cardTitle, { color: c.text }]}>요일별 성과</Text>
+                  <Text style={[styles.helperText, { color: c.textTertiary, marginBottom: 4 }]}>
+                    본인 청산 데이터로 계산. 강한 요일은 사이즈↑, 약한 요일은 진입 자제 검토.
+                  </Text>
+                  {byDow.map((d) => {
+                    const isBest  = d === best  && byDow.length > 1 && d.totalPnLKRW > 0;
+                    const isWorst = d === worst && byDow.length > 1 && d.totalPnLKRW < 0;
+                    const color = d.totalPnLKRW > 0 ? winColor : d.totalPnLKRW < 0 ? lossColor : c.textSecondary;
+                    return (
+                      <View key={d.dow} style={[styles.catRow, { borderTopColor: c.separator }]}>
+                        <View style={[styles.dowChip, { backgroundColor: color + "22" }]}>
+                          <Text style={[styles.dowChipText, { color }]}>{d.dowLabel}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.catName, { color: c.text }]}>
+                            {d.totalCount}건 · 승률 {(d.winRate * 100).toFixed(0)}%
+                            {isBest  ? "  · 가장 강한 요일" : ""}
+                            {isWorst ? "  · 가장 약한 요일" : ""}
+                          </Text>
+                          <Text style={[styles.catSub, { color: c.textTertiary }]}>
+                            평균 {d.avgPnLKRW >= 0 ? "+" : ""}{fmtKRW(d.avgPnLKRW)}
+                          </Text>
+                        </View>
+                        <Text style={[styles.catPnl, { color }]}>
+                          {d.totalPnLKRW >= 0 ? "+" : ""}{fmtKRW(d.totalPnLKRW)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+
             {/* 청산 타입별 */}
             <View style={[styles.card, { backgroundColor: c.card }]}>
               <Text style={[styles.cardTitle, { color: c.text }]}>청산 타입 분포</Text>
@@ -437,6 +479,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     marginTop: 2,
   },
+  dowChip: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dowChipText: { fontSize: 13, fontFamily: "Inter_700Bold" },
 
   bigPct:      { fontSize: 28, fontFamily: "Inter_700Bold" },
   subTitle:    { fontSize: 12, fontFamily: "Inter_600SemiBold", marginTop: 8, marginBottom: 4 },

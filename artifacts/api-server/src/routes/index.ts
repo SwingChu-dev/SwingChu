@@ -8,6 +8,7 @@ import weeklyCoachRouter from "./weeklyCoach";
 import portfolioImportRouter from "./portfolioImport";
 import earningsRouter from "./earnings";
 import fomcRouter from "./fomc";
+import macroEventsRouter from "./macroEvents";
 import analystRouter from "./analyst";
 
 const router: IRouter = Router();
@@ -21,6 +22,7 @@ router.use(weeklyCoachRouter);
 router.use(portfolioImportRouter);
 router.use(earningsRouter);
 router.use(fomcRouter);
+router.use(macroEventsRouter);
 router.use(analystRouter);
 
 export default router;

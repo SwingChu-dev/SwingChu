@@ -4,7 +4,7 @@ const router = Router();
 
 // 공식 FOMC 일정 (2026-2027). 결정일 = 2일 회의의 둘째 날 (보통 발표 시각 14:00 ET)
 // 출처: Federal Reserve official calendar
-const FOMC_MEETINGS: Array<{ start: string; decisionDate: string; spr: boolean }> = [
+export const FOMC_MEETINGS: Array<{ start: string; decisionDate: string; spr: boolean }> = [
   { start: "2026-01-27", decisionDate: "2026-01-28", spr: false },
   { start: "2026-03-17", decisionDate: "2026-03-18", spr: true  },
   { start: "2026-04-28", decisionDate: "2026-04-29", spr: false },

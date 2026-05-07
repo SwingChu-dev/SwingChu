@@ -12,6 +12,7 @@ import Svg, {
 
 import { useMarketIntel, CyclePhase, FgLevel, Severity, Market } from "@/hooks/useMarketIntel";
 import { playbookFor } from "@/utils/regimePlaybook";
+import { useMacroEvents } from "@/hooks/useMacroEvents";
 
 // ── 디자인 토큰 (HTML 시안의 색상) ─────────────────────────────────────────
 const T = {
@@ -200,6 +201,7 @@ export default function MarketCycleScreen() {
   const router = useRouter();
   const [market, setMarket] = useState<Market>("us");
   const { data, loading, error, refresh } = useMarketIntel(market);
+  const { events: macroEvents } = useMacroEvents(30);
 
   const dateStr = useMemo(() => {
     const d = data?.asOf ? new Date(data.asOf) : new Date();
@@ -334,6 +336,55 @@ export default function MarketCycleScreen() {
                 </View>
               );
             })()}
+
+            {/* SECTION 1.7: 다가오는 매크로 이벤트 (30일) */}
+            <View style={s.section}>
+              <View style={s.sectionHead}>
+                <Text style={s.sectionNum}>1.7</Text>
+                <Text style={s.h2}>다가오는 매크로 이벤트</Text>
+              </View>
+              <Text style={s.sectionNote}>
+                자금이 들어오거나 빠질 만한 일정. 14일 이내 HIGH 이벤트는 사이즈 ↓ + 진입 자제 검토.
+              </Text>
+
+              {macroEvents.length === 0 ? (
+                <View style={s.card}>
+                  <Text style={macroStyles.empty}>
+                    한산한 구간 — 30일 내 주요 일정 없음. 신규 진입에 우호적.
+                  </Text>
+                </View>
+              ) : (
+                macroEvents.map((ev) => {
+                  const sevColor =
+                    ev.severity === "HIGH"   ? T.danger :
+                    ev.severity === "MEDIUM" ? T.amber  : T.inkMuted;
+                  const isImminentHigh = ev.severity === "HIGH" && ev.daysUntil <= 14;
+                  return (
+                    <View
+                      key={`${ev.type}-${ev.dateISO}`}
+                      style={[
+                        s.card,
+                        macroStyles.row,
+                        isImminentHigh && { borderColor: T.amber, borderWidth: 1 },
+                      ]}
+                    >
+                      <View style={[macroStyles.dPill, { backgroundColor: sevColor + "22" }]}>
+                        <Text style={[macroStyles.dPillText, { color: sevColor }]}>
+                          {ev.daysUntil <= 0 ? "오늘" : `D-${ev.daysUntil}`}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={macroStyles.title}>{ev.title}</Text>
+                        <Text style={macroStyles.detail}>{ev.detail}</Text>
+                        <Text style={macroStyles.meta}>
+                          {ev.dateISO} · {ev.market === "us" ? "미장" : ev.market === "kr" ? "국장" : "글로벌"}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
 
             {/* SECTION 2: 공포 탐욕 */}
             <View style={s.section}>
@@ -613,6 +664,22 @@ const pbStyles = StyleSheet.create({
   row:        { flexDirection: "row", gap: 8, paddingLeft: 4 },
   bullet:     { fontSize: 13, width: 10, fontFamily: "Inter_700Bold" },
   itemText:   { flex: 1, fontSize: 13, color: T.ink, lineHeight: 19 },
+});
+
+const macroStyles = StyleSheet.create({
+  empty:    { fontSize: 12, color: T.inkDim, lineHeight: 18 },
+  row:      { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  dPill:    {
+    paddingHorizontal: 10,
+    paddingVertical:    6,
+    borderRadius:       8,
+    minWidth:           48,
+    alignItems:         "center",
+  },
+  dPillText:{ fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  title:    { fontSize: 13, fontFamily: "Inter_700Bold", color: T.ink },
+  detail:   { fontSize: 12, color: T.inkDim, lineHeight: 17 },
+  meta:     { fontSize: 11, color: T.inkMuted, marginTop: 2 },
 });
 
 const s = StyleSheet.create({
