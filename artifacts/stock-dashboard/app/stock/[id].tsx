@@ -28,7 +28,7 @@ import NewsSection from "@/components/detail/NewsSection";
 import BacktestSection from "@/components/detail/BacktestSection";
 import AlertSettingsModal from "@/components/detail/AlertSettingsModal";
 import StockChatSheet from "@/components/StockChatSheet";
-import IsraelSection from "@/components/detail/IsraelSection";
+import AnthropicSection from "@/components/detail/AnthropicSection";
 import TargetTiersSection from "@/components/detail/TargetTiersSection";
 import EarningsBadge from "@/components/detail/EarningsBadge";
 import FomcBadge from "@/components/detail/FomcBadge";
@@ -39,9 +39,9 @@ import { calcBoxPosition } from "@/utils/boxPosition";
 import { buildEnrichedStock, StockDetail } from "@/utils/enrichStub";
 import { getMarketStatus, type MarketKey } from "@/utils/marketHolidays";
 
-type TabKey = "진입" | "익절" | "박스권" | "재무·전망" | "기술·진단" | "리스크" | "요일" | "뉴스" | "백테스트" | "지정학";
+type TabKey = "진입" | "익절" | "박스권" | "재무·전망" | "기술·진단" | "리스크" | "요일" | "뉴스" | "백테스트" | "AI/앤트로픽";
 
-const TABS: TabKey[] = ["진입", "익절", "박스권", "재무·전망", "기술·진단", "리스크", "요일", "뉴스", "백테스트", "지정학"];
+const TABS: TabKey[] = ["진입", "익절", "박스권", "재무·전망", "기술·진단", "리스크", "요일", "뉴스", "백테스트", "AI/앤트로픽"];
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#3B82F6",
@@ -377,7 +377,7 @@ export default function StockDetailScreen() {
       </ScrollView>
 
       {/* stub 종목: AI 분석 중 전체 로딩 화면 */}
-      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" ? (
+      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#F59E0B" />
           <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
@@ -387,7 +387,7 @@ export default function StockDetailScreen() {
             분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
           </Text>
         </View>
-      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" ? (
+      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={c.tint} />
           <Text style={[styles.loadingText, { color: c.textSecondary }]}>
@@ -401,7 +401,7 @@ export default function StockDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
         >
-          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && (
+          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" && (
             <>
               <View style={styles.descriptionBox}>
                 <Text style={[styles.description, { color: c.textSecondary }]}>
@@ -429,7 +429,7 @@ export default function StockDetailScreen() {
           )}
 
           {/* predefined 종목: AI 요약 중 탭 위에 오버레이 배너 */}
-          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "지정학" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
+          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
             <View style={[styles.aiOverlayBanner, { backgroundColor: "#F59E0B14" }]}>
               <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.75 }] }} />
               <Text style={[styles.aiOverlayText, { color: "#F59E0B" }]}>
@@ -485,7 +485,7 @@ export default function StockDetailScreen() {
           {activeTab === "요일"     && <DayFeaturesSection stock={stock} />}
           {activeTab === "뉴스"     && <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />}
           {activeTab === "백테스트" && <BacktestSection stock={stock} />}
-          {activeTab === "지정학"   && <IsraelSection stockId={stock.id} />}
+          {activeTab === "AI/앤트로픽"   && <AnthropicSection stockId={stock.id} />}
 
           <View style={styles.bottomPad} />
         </ScrollView>
