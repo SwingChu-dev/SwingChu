@@ -173,6 +173,10 @@ export default function StockDetailScreen() {
   const showAiBanner = isCurrentlyEnriching || !!enrichedData || enrichmentFailed;
   // predefined 종목이고 아직 AI 분석 없을 때 "AI 분석하기" 버튼 표시
   const showAiPrompt = isPredefined && !enrichedData && !isCurrentlyEnriching && !enrichmentFailed;
+  // stub 종목 enrichment 중 — 탭 콘텐츠 대신 스피너 표시 (해당 탭만)
+  const showStubLoading =
+    isStub && (isCurrentlyEnriching || detailLoading) && !enrichedData
+    && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽";
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
@@ -316,103 +320,103 @@ export default function StockDetailScreen() {
         </View>
       )}
 
-      <View style={[styles.statsBar, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: c.textTertiary }]}>박스권</Text>
-          <Text style={[styles.statValue, { color: boxPosColor }]}>{dynBoxPos}</Text>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: c.textTertiary }]}>재무 평가</Text>
-          <Text style={[styles.statValue, {
-            color: stock.financials.evaluation.includes("저평가") ? c.positive
-                 : stock.financials.evaluation.includes("거품")   ? c.negative
-                 : c.warning,
-          }]}>
-            {isStub && detailLoading ? "로딩중" : stock.financials.evaluation}
-          </Text>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: c.textTertiary }]}>
-            {isLive ? "당일 등락" : "내일 전망"}
-          </Text>
-          <Text style={[styles.statValue, { color: isPositiveShort ? c.positive : c.negative }]}>
-            {isPositiveShort ? "+" : ""}{displayChangePct.toFixed(2)}%
-          </Text>
-        </View>
-        <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statLabel, { color: c.textTertiary }]}>1차 진입</Text>
-          <Text style={[styles.statValue, { color: c.tint }]}>
-            -5%
-          </Text>
-        </View>
-      </View>
-
-      {/* TradingView 차트 — 탭 바 직전에 항상 노출 */}
-      <TradingViewChart
-        ticker={stock.ticker}
-        market={stock.market as "NASDAQ" | "KOSPI" | "KOSDAQ"}
-        name={stock.name}
-      />
-
-      {/* 차트 패턴 카드 — 규칙 기반 + AI 자세히 */}
-      <PatternCard
-        ticker={stock.ticker}
-        market={stock.market}
-        name={stock.name}
-      />
-
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.tabBar, { backgroundColor: c.card }]}
-        contentContainerStyle={styles.tabBarContent}
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        stickyHeaderIndices={[3]}
       >
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && [styles.tabActive, { borderBottomColor: c.tint }]]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: activeTab === tab ? c.tint : c.textSecondary },
-              activeTab === tab && { fontFamily: "Inter_600SemiBold" },
-            ]}>
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        <View style={[styles.statsBar, { backgroundColor: c.card, borderBottomColor: c.separator }]}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: c.textTertiary }]}>박스권</Text>
+              <Text style={[styles.statValue, { color: boxPosColor }]}>{dynBoxPos}</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: c.textTertiary }]}>재무 평가</Text>
+              <Text style={[styles.statValue, {
+                color: stock.financials.evaluation.includes("저평가") ? c.positive
+                     : stock.financials.evaluation.includes("거품")   ? c.negative
+                     : c.warning,
+              }]}>
+                {isStub && detailLoading ? "로딩중" : stock.financials.evaluation}
+              </Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: c.textTertiary }]}>
+                {isLive ? "당일 등락" : "내일 전망"}
+              </Text>
+              <Text style={[styles.statValue, { color: isPositiveShort ? c.positive : c.negative }]}>
+                {isPositiveShort ? "+" : ""}{displayChangePct.toFixed(2)}%
+              </Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: c.separator }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: c.textTertiary }]}>1차 진입</Text>
+              <Text style={[styles.statValue, { color: c.tint }]}>
+                -5%
+              </Text>
+            </View>
+          </View>
 
-      {/* stub 종목: AI 분석 중 전체 로딩 화면 */}
-      {isStub && isCurrentlyEnriching && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#F59E0B" />
-          <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
-            AI가 1년 실데이터를 분석하고 있습니다...
-          </Text>
-          <Text style={[styles.loadingText, { color: c.textSecondary, fontSize: 12, textAlign: "center" }]}>
-            분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
-          </Text>
-        </View>
-      ) : isStub && detailLoading && !enrichedData && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={c.tint} />
-          <Text style={[styles.loadingText, { color: c.textSecondary }]}>
-            실시간 재무 데이터 로딩 중...
-          </Text>
-        </View>
-      ) : (
-        /* predefined 종목: AI 분석 중에도 기존 데이터 표시 (로딩 화면 없음) */
-        <ScrollView
-          style={styles.content}
-          showsVerticalScrollIndicator={false}
-          contentInsetAdjustmentBehavior="automatic"
-        >
-          {activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" && (
+          <TradingViewChart
+            ticker={stock.ticker}
+            market={stock.market as "NASDAQ" | "KOSPI" | "KOSDAQ"}
+            name={stock.name}
+          />
+
+          <PatternCard
+            ticker={stock.ticker}
+            market={stock.market}
+            name={stock.name}
+          />
+
+          <View style={{ backgroundColor: c.card }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={[styles.tabBar, { backgroundColor: c.card }]}
+              contentContainerStyle={styles.tabBarContent}
+            >
+              {TABS.map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tab, activeTab === tab && [styles.tabActive, { borderBottomColor: c.tint }]]}
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Text style={[
+                    styles.tabText,
+                    { color: activeTab === tab ? c.tint : c.textSecondary },
+                    activeTab === tab && { fontFamily: "Inter_600SemiBold" },
+                  ]}>
+                    {tab}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {showStubLoading ? (
+            isCurrentlyEnriching ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator size="large" color="#F59E0B" />
+                <Text style={[styles.loadingText, { color: "#F59E0B" }]}>
+                  AI가 1년 실데이터를 분석하고 있습니다...
+                </Text>
+                <Text style={[styles.loadingText, { color: c.textSecondary, fontSize: 12, textAlign: "center" }]}>
+                  분할매수 레벨 · 익절 목표 · 재무 분석 · 리스크 계산 중
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator size="large" color={c.tint} />
+                <Text style={[styles.loadingText, { color: c.textSecondary }]}>
+                  실시간 재무 데이터 로딩 중...
+                </Text>
+              </View>
+            )
+          ) : activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" ? (
             <>
               <View style={styles.descriptionBox}>
                 <Text style={[styles.description, { color: c.textSecondary }]}>
@@ -437,10 +441,10 @@ export default function StockDetailScreen() {
               <EarningsBadge ticker={stock.ticker} market={stock.market} />
               <FomcBadge market={stock.market} />
             </>
-          )}
+          ) : null}
 
           {/* predefined 종목: AI 요약 중 탭 위에 오버레이 배너 */}
-          {isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
+          {!showStubLoading && isPredefined && isCurrentlyEnriching && activeTab !== "뉴스" && activeTab !== "백테스트" && activeTab !== "AI/앤트로픽" && activeTab !== "기술·진단" && activeTab !== "리스크" && (
             <View style={[styles.aiOverlayBanner, { backgroundColor: "#F59E0B14" }]}>
               <ActivityIndicator size="small" color="#F59E0B" style={{ transform: [{ scale: 0.75 }] }} />
               <Text style={[styles.aiOverlayText, { color: "#F59E0B" }]}>
@@ -449,7 +453,7 @@ export default function StockDetailScreen() {
             </View>
           )}
 
-          {activeTab === "진입"   && (
+          {!showStubLoading && activeTab === "진입"   && (
             <>
               <TargetTiersSection
                 ticker={stock.ticker}
@@ -465,17 +469,17 @@ export default function StockDetailScreen() {
               <SplitEntrySection stock={stock} livePrice={displayPrice} overheatScore={tradingStatus?.score} />
             </>
           )}
-          {activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
-          {activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
+          {!showStubLoading && activeTab === "익절"   && <ProfitTargetSection stock={stock} livePrice={displayPrice} />}
+          {!showStubLoading && activeTab === "박스권" && <BoxRangeSection     stock={stock} livePrice={displayPrice} />}
 
-          {activeTab === "재무·전망" && (
+          {!showStubLoading && activeTab === "재무·전망" && (
             <>
               <FinancialsSection stock={stock} />
               <ForecastSection   stock={stock} />
             </>
           )}
 
-          {activeTab === "기술·진단" && (
+          {!showStubLoading && activeTab === "기술·진단" && (
             <>
               <TechnicalSection
                 ticker={stock.ticker}
@@ -486,21 +490,20 @@ export default function StockDetailScreen() {
             </>
           )}
 
-          {activeTab === "리스크" && (
+          {!showStubLoading && activeTab === "리스크" && (
             <>
               <ShortSellSection ticker={stock.ticker} market={stock.market} />
               <RiskSection      stock={stock} />
             </>
           )}
 
-          {activeTab === "요일"     && <DayFeaturesSection stock={stock} />}
+          {!showStubLoading && activeTab === "요일"     && <DayFeaturesSection stock={stock} />}
           {activeTab === "뉴스"     && <NewsSection ticker={stock.ticker} market={stock.market} name={stock.name} />}
           {activeTab === "백테스트" && <BacktestSection stock={stock} />}
           {activeTab === "AI/앤트로픽"   && <AnthropicSection stockId={stock.id} />}
 
           <View style={styles.bottomPad} />
-        </ScrollView>
-      )}
+      </ScrollView>
 
       <AlertSettingsModal
         visible={showAlertModal}
@@ -600,7 +603,7 @@ const styles = StyleSheet.create({
   tabActive: { borderBottomWidth: 2 },
   tabText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   content: { flex: 1 },
-  loadingWrap: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
+  loadingWrap: { paddingVertical: 80, paddingHorizontal: 32, justifyContent: "center", alignItems: "center", gap: 16 },
   loadingText: { fontSize: 14, fontFamily: "Inter_400Regular" },
   aiPromptBanner: {
     flexDirection: "row", alignItems: "center", gap: 6,
