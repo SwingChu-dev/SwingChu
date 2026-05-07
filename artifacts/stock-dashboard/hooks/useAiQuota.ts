@@ -8,18 +8,20 @@
 import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type QuotaFeature = "chat" | "trade-import" | "weekly-coach";
+export type QuotaFeature = "chat" | "trade-import" | "weekly-coach" | "pattern";
 
 const LIMITS: Record<QuotaFeature, number> = {
   "chat":          10,
   "trade-import":  20,
   "weekly-coach":  5,
+  "pattern":       5,
 };
 
 const LABELS: Record<QuotaFeature, string> = {
   "chat":          "AI 채팅",
   "trade-import":  "체결 자동 등록",
   "weekly-coach":  "주간 AI 코치",
+  "pattern":       "패턴 AI 자세히",
 };
 
 function todayKey(feature: QuotaFeature): string {
