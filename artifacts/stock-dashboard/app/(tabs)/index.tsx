@@ -25,6 +25,7 @@ import { playbookFor } from "@/utils/regimePlaybook";
 import { usePortfolio } from "@/context/PortfolioContext";
 import { regimeStatsFromClosed } from "@/services/weeklyReport";
 import { buildDailyInsight } from "@/services/dailyInsight";
+import { getTodayGuide } from "@/constants/dayOfWeekGuide";
 
 type FilterType = "전체" | "미국장" | "국내장" | "우량주" | "저점권" | "고점권" | "세력진입";
 
@@ -91,6 +92,7 @@ export default function HomeScreen() {
     () => buildDailyInsight(marketIntel?.cycle.phase ?? null, regimeHistory, macroEvents),
     [marketIntel, regimeHistory, macroEvents],
   );
+  const todayGuide = useMemo(() => getTodayGuide(), []);
 
   const filters: FilterType[] = ["전체", "미국장", "국내장", "우량주", "저점권"];
 
@@ -185,6 +187,18 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
+
+        {/* ─── 오늘 요일 한 줄 ─── */}
+        {todayGuide && (
+          <View style={[styles.todayLine, { borderColor: c.cardBorder }]}>
+            <Text style={styles.todayEmoji}>{todayGuide.emoji}</Text>
+            <Text style={[styles.todayText, { color: c.textSecondary }]} numberOfLines={2}>
+              <Text style={{ color: c.text, fontFamily: "Inter_700Bold" }}>오늘 {todayGuide.dowLabel}요일</Text>
+              {" — "}
+              {todayGuide.feature}
+            </Text>
+          </View>
+        )}
 
         {/* ─── Summary Row ─── */}
         <View style={[styles.summaryCard, { backgroundColor: c.card }]}>
@@ -320,6 +334,20 @@ const styles = StyleSheet.create({
   insightLabel:  { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
   insightHeadline: { fontSize: 14, fontFamily: "Inter_700Bold", lineHeight: 20 },
   insightDetail: { fontSize: 12, lineHeight: 18 },
+
+  todayLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  todayEmoji: { fontSize: 16 },
+  todayText:  { flex: 1, fontSize: 12, lineHeight: 17 },
 
   summaryCard: {
     marginHorizontal: 16,
