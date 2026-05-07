@@ -17,6 +17,7 @@ import { STOCKS } from "@/constants/stockData";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { searchStocks, type SearchHit } from "@/services/stockSearch";
 import { buildCustomStockStub } from "@/utils/customStock";
+import { aliasLookup, aliasPrefixMatches } from "@/constants/koreanAliases";
 
 const MARKET_COLORS: Record<string, string> = {
   NASDAQ: "#0064FF",
@@ -44,12 +45,16 @@ export default function AddStockSheet() {
   const allLocal = useMemo(() => [...STOCKS, ...customStocks], [customStocks]);
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // 한글 입력이면 alias로 영문 티커도 매칭 키로 사용
+    const aliasTickers = aliasPrefixMatches(query)
+      .map((m) => m.ticker.toLowerCase());
     const matches = (s: StockItem) =>
       !q ||
       s.ticker.toLowerCase().includes(q) ||
       s.name.toLowerCase().includes(q) ||
       s.id.toLowerCase().includes(q) ||
-      s.themes?.some((t) => t.toLowerCase().includes(q));
+      s.themes?.some((t) => t.toLowerCase().includes(q)) ||
+      aliasTickers.includes(s.ticker.toLowerCase());
     return [
       { market: "NASDAQ", data: allLocal.filter((s) => s.market === "NASDAQ" && matches(s)) },
       { market: "KOSPI",  data: allLocal.filter((s) => s.market === "KOSPI"  && matches(s)) },
@@ -173,7 +178,7 @@ export default function AddStockSheet() {
         <Ionicons name="search" size={16} color={c.textTertiary} />
         <TextInput
           style={[styles.searchInput, { color: c.text }]}
-          placeholder="이름·티커·테마로 검색 (예: 엔비디아, NVDA, AI)"
+          placeholder="엔비디아 · 삼성전자 · 005930 · TSLA · AI"
           placeholderTextColor={c.textTertiary}
           value={query}
           onChangeText={setQuery}
