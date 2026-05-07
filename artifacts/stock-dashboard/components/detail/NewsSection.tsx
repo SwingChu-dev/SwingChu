@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Linking,
-  ScrollView,
   useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +27,8 @@ const SENTIMENT_CONFIG = {
   중립: { color: "#F59E0B", bg: "rgba(245,158,11,0.12)", icon: "remove-outline" as const },
 };
 
+const TOP_N = 3;
+
 function timeAgo(ts: number | null): string {
   if (!ts) return "";
   const diff = Date.now() - ts;
@@ -37,6 +38,22 @@ function timeAgo(ts: number | null): string {
   if (h < 24) return `${h}시간 전`;
   if (d < 7) return `${d}일 전`;
   return `${Math.floor(d / 7)}주 전`;
+}
+
+/** 시장에 맞는 외부 뉴스 페이지 URL — 자세한 뉴스는 외부에 위임. */
+function externalNewsUrl(ticker: string, market: string): { url: string; label: string } {
+  const t = ticker.toUpperCase();
+  if (market === "KOSPI" || market === "KOSDAQ") {
+    return {
+      url:   `https://m.stock.naver.com/domestic/stock/${t}/news`,
+      label: "네이버 증권에서 더 보기",
+    };
+  }
+  // NASDAQ·NYSE 등 미국주식
+  return {
+    url:   `https://finance.yahoo.com/quote/${t}/news`,
+    label: "Yahoo Finance에서 더 보기",
+  };
 }
 
 interface Props {
@@ -74,7 +91,7 @@ export default function NewsSection({ ticker, market, name }: Props) {
 
   const sentimentCounts = news.reduce(
     (acc, n) => { acc[n.sentiment]++; return acc; },
-    { 호재: 0, 악재: 0, 중립: 0 } as Record<string, number>
+    { 호재: 0, 악재: 0, 중립: 0 } as Record<string, number>,
   );
 
   const overallSentiment =
@@ -91,6 +108,8 @@ export default function NewsSection({ ticker, market, name }: Props) {
       ? "#1B63E8"
       : "#F59E0B";
 
+  const ext = externalNewsUrl(ticker, market);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -102,35 +121,37 @@ export default function NewsSection({ ticker, market, name }: Props) {
     );
   }
 
-  if (error) {
+  if (error || news.length === 0) {
     return (
-      <View style={styles.center}>
-        <Ionicons name="newspaper-outline" size={40} color={c.textSecondary} />
-        <Text style={[styles.errorText, { color: c.textSecondary }]}>
-          뉴스를 불러올 수 없습니다.
-        </Text>
+      <View style={styles.wrapper}>
+        <View style={styles.center}>
+          <Ionicons name="newspaper-outline" size={36} color={c.textSecondary} />
+          <Text style={[styles.errorText, { color: c.textSecondary }]}>
+            {error ? "뉴스를 불러올 수 없습니다." : "관련 뉴스가 없습니다."}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.externalBtn, { backgroundColor: c.card, borderColor: c.cardBorder }]}
+          onPress={() => Linking.openURL(ext.url)}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="open-outline" size={15} color={c.tint} />
+          <Text style={[styles.externalBtnText, { color: c.tint }]}>{ext.label}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  if (news.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Ionicons name="newspaper-outline" size={40} color={c.textSecondary} />
-        <Text style={[styles.errorText, { color: c.textSecondary }]}>
-          관련 뉴스가 없습니다.
-        </Text>
-      </View>
-    );
-  }
+  const top = news.slice(0, TOP_N);
+  const more = news.length - top.length;
 
   return (
     <View style={styles.wrapper}>
-      {/* AI 감성 요약 */}
+      {/* 감성 요약 — 핵심만 */}
       <View style={[styles.summaryCard, { backgroundColor: isDark ? "#141B2D" : "#F0F4FF" }]}>
         <View style={styles.summaryHeader}>
           <Ionicons name="analytics-outline" size={18} color="#0064FF" />
-          <Text style={[styles.summaryTitle, { color: c.text }]}>AI 뉴스 감성 분석</Text>
+          <Text style={[styles.summaryTitle, { color: c.text }]}>AI 뉴스 요약</Text>
           <View style={[styles.overallBadge, { backgroundColor: overallColor + "22" }]}>
             <Text style={[styles.overallText, { color: overallColor }]}>{overallSentiment}</Text>
           </View>
@@ -151,8 +172,8 @@ export default function NewsSection({ ticker, market, name }: Props) {
         </View>
       </View>
 
-      {/* 뉴스 목록 */}
-      {news.map((item, i) => {
+      {/* 핵심 헤드라인 — 최근 3건만 */}
+      {top.map((item, i) => {
         const cfg = SENTIMENT_CONFIG[item.sentiment];
         return (
           <TouchableOpacity
@@ -166,28 +187,43 @@ export default function NewsSection({ ticker, market, name }: Props) {
                 <Ionicons name={cfg.icon} size={12} color={cfg.color} />
                 <Text style={[styles.badgeText, { color: cfg.color }]}>{item.sentiment}</Text>
               </View>
-              <Text style={[styles.publisher, { color: c.textSecondary }]}>{item.publisher}</Text>
+              <Text style={[styles.publisher, { color: c.textSecondary }]} numberOfLines={1}>
+                {item.publisher}
+              </Text>
               <Text style={[styles.timeAgo, { color: c.textTertiary }]}>
                 {timeAgo(item.publishedAt)}
               </Text>
             </View>
-            <Text style={[styles.newsTitle, { color: c.text }]} numberOfLines={3}>
+            <Text style={[styles.newsTitle, { color: c.text }]} numberOfLines={2}>
               {item.title}
             </Text>
-            <View style={styles.newsFooter}>
-              <Ionicons name="open-outline" size={13} color={c.textTertiary} />
-              <Text style={[styles.openLink, { color: c.textTertiary }]}>기사 전문 보기</Text>
-            </View>
           </TouchableOpacity>
         );
       })}
+
+      {/* 외부 링크 — 자세히는 외부에서 */}
+      <TouchableOpacity
+        style={[styles.externalBtn, { backgroundColor: c.card, borderColor: c.cardBorder }]}
+        onPress={() => Linking.openURL(ext.url)}
+        activeOpacity={0.75}
+      >
+        <Ionicons name="open-outline" size={15} color={c.tint} />
+        <Text style={[styles.externalBtnText, { color: c.tint }]}>
+          {more > 0 ? `+${more}건 — ${ext.label}` : ext.label}
+        </Text>
+      </TouchableOpacity>
+
+      <Text style={[styles.note, { color: c.textTertiary }]}>
+        개별 뉴스 분석은 깊이 있는 투자 판단의 단일 근거가 될 수 없습니다.
+        헤드라인 흐름·감성 추이만 참고로 활용하세요.
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper:         { padding: 16, gap: 10 },
-  center:          { paddingTop: 60, alignItems: "center", gap: 12 },
+  center:          { paddingVertical: 32, alignItems: "center", gap: 10 },
   loadingText:     { fontSize: 14 },
   errorText:       { fontSize: 14 },
 
@@ -209,6 +245,18 @@ const styles = StyleSheet.create({
   publisher:       { fontSize: 12, flex: 1 },
   timeAgo:         { fontSize: 11 },
   newsTitle:       { fontSize: 14, fontFamily: "Inter_500Medium", lineHeight: 20 },
-  newsFooter:      { flexDirection: "row", alignItems: "center", gap: 4 },
-  openLink:        { fontSize: 12 },
+
+  externalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+  },
+  externalBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  note: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 4 },
 });
