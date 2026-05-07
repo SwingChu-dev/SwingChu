@@ -32,6 +32,7 @@ import AnthropicSection from "@/components/detail/AnthropicSection";
 import TargetTiersSection from "@/components/detail/TargetTiersSection";
 import EarningsBadge from "@/components/detail/EarningsBadge";
 import FomcBadge from "@/components/detail/FomcBadge";
+import TradingViewChart from "@/components/detail/TradingViewChart";
 import AnalystSection from "@/components/detail/AnalystSection";
 import ShortSellSection from "@/components/detail/ShortSellSection";
 import OverheatSection from "@/components/detail/OverheatSection";
@@ -352,6 +353,13 @@ export default function StockDetailScreen() {
           </Text>
         </View>
       </View>
+
+      {/* TradingView 차트 — 탭 바 직전에 항상 노출 */}
+      <TradingViewChart
+        ticker={stock.ticker}
+        market={stock.market as "NASDAQ" | "KOSPI" | "KOSDAQ"}
+        name={stock.name}
+      />
 
       <ScrollView
         horizontal
