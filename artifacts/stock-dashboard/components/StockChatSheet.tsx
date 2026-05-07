@@ -125,7 +125,9 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
             },
           ]}
         >
-          <View style={styles.handle} />
+          <Pressable style={styles.handleHit} onPress={onClose} hitSlop={8}>
+            <View style={styles.handle} />
+          </Pressable>
           <View style={styles.header}>
             <View>
               <Text style={[styles.title, { color: c.text }]}>
@@ -135,8 +137,12 @@ export default function StockChatSheet({ visible, onClose, context }: Props) {
                 Claude Haiku · 오늘 {quota.remaining}/{quota.limit}건 남음
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={24} color={c.text} />
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={12}
+              style={[styles.closeBtn, { backgroundColor: c.backgroundTertiary }]}
+            >
+              <Ionicons name="close" size={20} color={c.text} />
             </TouchableOpacity>
           </View>
 
@@ -242,14 +248,15 @@ const styles = StyleSheet.create({
     minHeight: 480,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  handleHit: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
   handle: {
-    alignSelf: "center",
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: "rgba(127,127,127,0.4)",
-    marginTop: 8,
-    marginBottom: 4,
   },
   header: {
     flexDirection: "row",
@@ -260,6 +267,13 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontFamily: "Inter_700Bold" },
   sub:   { fontSize: 11, marginTop: 2 },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   body:        { flex: 1 },
   bodyContent: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
