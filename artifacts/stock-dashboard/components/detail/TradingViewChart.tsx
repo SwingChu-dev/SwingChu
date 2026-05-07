@@ -16,16 +16,8 @@ interface Props {
 }
 
 const STUDIES = [
-  // 5/20/60일 단순이동평균 — TradingView v1.x 위젯 형식
-  { id: "MASimple@tv-basicstudies", inputs: { length: 5  } },
   { id: "MASimple@tv-basicstudies", inputs: { length: 20 } },
-  { id: "MASimple@tv-basicstudies", inputs: { length: 60 } },
-  // RSI(14)
   { id: "RSI@tv-basicstudies",      inputs: { length: 14 } },
-  // 볼린저 밴드 (default 20, 2)
-  { id: "BB@tv-basicstudies" },
-  // 거래량 — 명시적으로 추가해 가시성 보장
-  { id: "Volume@tv-basicstudies" },
 ];
 
 /** TradingView symbol 표기로 변환 — KOSPI/KOSDAQ → KRX */
@@ -79,7 +71,7 @@ export default function TradingViewChart({
   ticker,
   market,
   height = 240,
-  expandedHeight = 480,
+  expandedHeight = 360,
 }: Props) {
   const isDark = useColorScheme() === "dark";
   const c = isDark ? Colors.dark : Colors.light;

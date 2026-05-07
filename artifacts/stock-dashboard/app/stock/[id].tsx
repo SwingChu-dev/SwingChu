@@ -229,11 +229,6 @@ export default function StockDetailScreen() {
                 <Text style={styles.liveText}>실시간</Text>
               </View>
             )}
-            <View style={[styles.regionBadge, { backgroundColor: c.backgroundTertiary }]}>
-              <Text style={[styles.regionText, { color: c.textSecondary }]}>
-                {stock.region} · {stock.grade}
-              </Text>
-            </View>
           </View>
         </View>
         <TouchableOpacity
@@ -583,8 +578,6 @@ const styles = StyleSheet.create({
   holidayBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#F59E0B" },
   headerPriceRow:{ flexDirection: "row", alignItems: "center", gap: 8 },
   headerPrice:   { fontSize: 18, fontFamily: "Inter_600SemiBold" },
-  regionBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  regionText:    { fontSize: 11, fontFamily: "Inter_400Regular" },
   usdBadge:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   usdBadgeText:  { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   liveBadge: {
@@ -668,11 +661,11 @@ const styles = StyleSheet.create({
   },
   chatFab: {
     position: "absolute",
-    right: 18,
-    bottom: 28,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    right: 14,
+    bottom: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -680,6 +673,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
+    zIndex: 999,
   },
   techAnalyzeBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
