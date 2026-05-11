@@ -22,8 +22,6 @@ import { useVix } from "@/hooks/useVix";
 import { useMarketIntel } from "@/hooks/useMarketIntel";
 import { useMacroEvents } from "@/hooks/useMacroEvents";
 import { playbookFor } from "@/utils/regimePlaybook";
-import { usePortfolio } from "@/context/PortfolioContext";
-import { regimeStatsFromClosed } from "@/services/weeklyReport";
 import { buildDailyInsight } from "@/services/dailyInsight";
 import { getTodayGuide } from "@/constants/dayOfWeekGuide";
 
@@ -85,12 +83,10 @@ export default function HomeScreen() {
   const vix = useVix();
   const { data: marketIntel } = useMarketIntel("us");
   const { events: macroEvents } = useMacroEvents(30);
-  const { closedTrades } = usePortfolio();
   const playbook = marketIntel ? playbookFor(marketIntel.cycle.phase) : null;
-  const regimeHistory = useMemo(() => regimeStatsFromClosed(closedTrades), [closedTrades]);
   const insight = useMemo(
-    () => buildDailyInsight(marketIntel?.cycle.phase ?? null, regimeHistory, macroEvents),
-    [marketIntel, regimeHistory, macroEvents],
+    () => buildDailyInsight(marketIntel?.cycle.phase ?? null, macroEvents),
+    [marketIntel, macroEvents],
   );
   const todayGuide = useMemo(() => getTodayGuide(), []);
 

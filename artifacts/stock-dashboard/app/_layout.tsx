@@ -21,7 +21,6 @@ import { StockPriceProvider, useStockPrice } from "@/context/StockPriceContext";
 import { AlertProvider, useAlerts } from "@/context/AlertContext";
 import { EnrichmentProvider } from "@/context/EnrichmentContext";
 import { AISignalProvider } from "@/context/AISignalContext";
-import { PortfolioProvider, usePortfolio } from "@/context/PortfolioContext";
 import { TargetTiersProvider, useTargetTiers } from "@/context/TargetTiersContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import AlertBanner from "@/components/AlertBanner";
@@ -105,13 +104,10 @@ const disclaimerStyles = StyleSheet.create({
 
 function PriceBridge({ children }: { children: React.ReactNode }) {
   const { watchlistStocks } = useWatchlist();
-  const { positions } = usePortfolio();
-  const watchlist = React.useMemo(() => {
-    const map = new Map<string, { ticker: string; market: string }>();
-    for (const s of watchlistStocks) map.set(`${s.ticker}:${s.market}`, { ticker: s.ticker, market: s.market });
-    for (const p of positions)      map.set(`${p.ticker.toUpperCase()}:${p.market}`, { ticker: p.ticker.toUpperCase(), market: p.market });
-    return Array.from(map.values());
-  }, [watchlistStocks, positions]);
+  const watchlist = React.useMemo(
+    () => watchlistStocks.map((s) => ({ ticker: s.ticker, market: s.market })),
+    [watchlistStocks],
+  );
   return <StockPriceProvider watchlist={watchlist}>{children}</StockPriceProvider>;
 }
 
@@ -124,7 +120,6 @@ function AISignalBridge({ children }: { children: React.ReactNode }) {
 function AlertChecker() {
   const { quotes } = useStockPrice();
   const { checkPrices } = useAlerts();
-  const { checkPositionAlerts } = usePortfolio();
   const { checkPricesForTiers } = useTargetTiers();
   React.useEffect(() => {
     const map: Record<string, { priceKRW: number }> = {};
@@ -133,7 +128,6 @@ function AlertChecker() {
     });
     if (Object.keys(map).length > 0) {
       checkPrices(map);
-      checkPositionAlerts(map);
       checkPricesForTiers(map);
     }
   }, [quotes]);
@@ -190,14 +184,6 @@ function RootLayoutNav() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
-          name="backup"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="tax"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
           name="legal"
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
@@ -205,55 +191,6 @@ function RootLayoutNav() {
           name="onboarding"
           options={{ headerShown: false, animation: "fade", gestureEnabled: false }}
         />
-        <Stack.Screen
-          name="import-screenshot"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="import-trade"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="buy"
-          options={{
-            presentation: "modal",
-            headerShown: false,
-            animation: "slide_from_bottom",
-          }}
-        />
-        <Stack.Screen
-          name="cooldown/[id]"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="positions"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="weekly-report"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="stats"
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="sell/[positionId]"
-          options={{
-            presentation: "modal",
-            headerShown: false,
-            animation: "slide_from_bottom",
-          }}
-        />
-        <Stack.Screen
-          name="add-holding"
-          options={{
-            presentation: "modal",
-            headerShown: false,
-            animation: "slide_from_bottom",
-          }}
-        />
-
       </Stack>
     </>
   );
@@ -293,19 +230,17 @@ export default function RootLayout() {
             <GestureHandlerRootView>
               <KeyboardProvider>
                 <WatchlistProvider>
-                  <PortfolioProvider>
-                    <EnrichmentProvider>
-                      <AISignalBridge>
-                        <PriceBridge>
-                          <AlertProvider>
-                            <TargetTiersProvider>
-                              <RootLayoutNav />
-                            </TargetTiersProvider>
-                          </AlertProvider>
-                        </PriceBridge>
-                      </AISignalBridge>
-                    </EnrichmentProvider>
-                  </PortfolioProvider>
+                  <EnrichmentProvider>
+                    <AISignalBridge>
+                      <PriceBridge>
+                        <AlertProvider>
+                          <TargetTiersProvider>
+                            <RootLayoutNav />
+                          </TargetTiersProvider>
+                        </AlertProvider>
+                      </PriceBridge>
+                    </AISignalBridge>
+                  </EnrichmentProvider>
                 </WatchlistProvider>
               </KeyboardProvider>
             </GestureHandlerRootView>

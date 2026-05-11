@@ -187,13 +187,6 @@ export default function StockDetailScreen() {
         >
           <Ionicons name="arrow-back" size={20} color={c.text} />
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.push({ pathname: "/buy", params: { stockId: id } })}
-          style={[styles.buyBtn, { backgroundColor: "#22C55E" }]}
-        >
-          <Ionicons name="cart" size={16} color="#fff" />
-          <Text style={styles.buyBtnText}>매수 검토</Text>
-        </TouchableOpacity>
         <View style={styles.headerInfo}>
           <View style={styles.headerNameRow}>
             <Text style={[styles.headerName, { color: c.text }]}>{stock.name}</Text>

@@ -68,26 +68,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="portfolio"
-        options={{
-          title: "포트폴리오",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView
-                name={focused ? "chart.pie.fill" : "chart.pie"}
-                tintColor={color}
-                size={24}
-              />
-            ) : (
-              <Ionicons
-                name={focused ? "pie-chart" : "pie-chart-outline"}
-                size={22}
-                color={color}
-              />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="more"
         options={{
           title: "설정",
